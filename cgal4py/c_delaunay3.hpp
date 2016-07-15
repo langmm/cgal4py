@@ -147,6 +147,7 @@ class Delaunay_with_info_3
       }
 
       T.tds().set_dimension(d);
+      All_cells_iterator to_delete = T.tds().cells_begin();
 
       std::vector<Vertex_handle> V(n+1);
       std::vector<Cell_handle> C(m);
@@ -192,6 +193,9 @@ class Delaunay_with_info_3
 	  }
 	}
       }
+
+      // delete flat cell
+      T.tds().delete_cell(to_delete);
 
       is.close();
     }

@@ -16,10 +16,6 @@ cdef extern from "c_delaunay2.hpp":
         # uint32_t num_edges()
         uint32_t num_cells()
         void edge_info(vector[pair[Info,Info]]& edges)
-        void outgoing_points(double *left_edge, double *right_edge, bool periodic,
-                             vector[Info]& lx, vector[Info]& ly,
-                             vector[Info]& rx, vector[Info]& ry,
-                             vector[Info]& alln)
 
 
 cdef class Delaunay2:
@@ -27,8 +23,4 @@ cdef class Delaunay2:
     cdef Delaunay_with_info_2[uint32_t] *T
     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
     cdef object _edge_info(self, int max_incl, np.uint64_t[:])
-    cdef object _outgoing_points(self,
-                                 np.ndarray[double, ndim=1] left_edge,
-                                 np.ndarray[double, ndim=1] right_edge,
-                                 bool periodic, object neighbors, int num_leaves)
 

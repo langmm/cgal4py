@@ -96,12 +96,14 @@ class Delaunay_with_info_2
       inum = 0;
       int dim = (d == -1 ? 1 :  d + 1);
       int index;
+      int nvert = 0;
       for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
 	   ib != T.tds().face_iterator_base_end(); ++ib) {
 	F[ib] = inum++;
 	for (int j = 0; j < dim ; ++j) {
 	  index = V[ib->vertex(j)];
 	  os.write((char*)&index, sizeof(int));
+	  nvert++;
 	}
       }
   
@@ -124,8 +126,9 @@ class Delaunay_with_info_2
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
 
-      if (T.number_of_vertices() != 0)  
-	T.clear();
+
+      if (T.number_of_vertices() != 0) 
+      	T.clear();
   
       // header
       int n, m, d;
@@ -139,6 +142,8 @@ class Delaunay_with_info_2
       }
 
       T.tds().set_dimension(d);
+
+      All_faces_iterator to_delete = T.tds().face_iterator_base_begin();
 
       std::vector<Vertex_handle> V(n+1);
       std::vector<Face_handle> F(m);
@@ -164,6 +169,7 @@ class Delaunay_with_info_2
       int index;
       int dim = (d == -1 ? 1 : d + 1);
       {
+	int nvert = 0;
 	for(i = 0; i < m; ++i) {
 	  F[i] = T.tds().create_face() ;
 	  for(int j = 0; j < dim ; ++j){
@@ -172,6 +178,7 @@ class Delaunay_with_info_2
 	    // The face pointer of vertices is set too often,
 	    // but otherwise we had to use a further map 
 	    V[index]->set_face(F[i]);
+	    nvert++;
 	  }
 	}
       }
@@ -185,6 +192,9 @@ class Delaunay_with_info_2
 	  }
 	}
       }
+
+      // Remove flat face
+      T.tds().delete_face(to_delete);
 
       T.set_infinite_vertex(V[0]);
       is.close();

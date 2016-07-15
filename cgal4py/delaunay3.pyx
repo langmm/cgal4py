@@ -51,7 +51,9 @@ cdef class Delaunay3:
         assert(m == 3)
         self.T.insert(&pts[0,0], &idx[0], <uint32_t>Nnew)
         self.n += Nnew
-        assert(self.n == self.num_verts())
+        if self.n != self.num_verts():
+            print "There were {} duplicates".format(self.n-self.num_verts())
+        # assert(self.n == self.num_verts())
 
     def edge_info(self, max_incl, idx):
         return self._edge_info(max_incl, idx)
