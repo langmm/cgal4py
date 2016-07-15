@@ -128,18 +128,3 @@ cdef class Delaunay2:
 
         return hvall
 
-    def voronoi_volumes(self, max_idx):
-        cdef np.ndarray[np.float64_t, ndim=1] vol
-        vol = -999*np.ones(max_idx, 'float64')
-        self._voronoi_volumes(max_idx, vol)
-        return vol
-    cdef void _voronoi_volumes(self, int max_idx, np.float64_t[:] vol):
-        cdef vector[pair[uint32_t,double]] out
-        voronoi_areas(self.T, out)
-        cdef int i
-        cdef int count = 0
-        for i in xrange(<int>out.size()):
-            if <int>out[i].first < max_idx:
-                vol[out[i].first] = out[i].second
-                count += 1
-

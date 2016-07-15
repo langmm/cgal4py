@@ -5,7 +5,7 @@ from libcpp.pair cimport pair
 from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t
 
-cdef extern from "c_delaunay3.h":
+cdef extern from "c_delaunay3.hpp":
     cdef cppclass Delaunay_with_info_3[Info]:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
@@ -30,4 +30,3 @@ cdef class Delaunay3:
                                  np.ndarray[double, ndim=1] left_edge,
                                  np.ndarray[double, ndim=1] right_edge,
                                  bool periodic, object neighbors, int num_leaves)
-    cdef void _voronoi_volumes(self, int max_idx, np.float64_t[:] vol)

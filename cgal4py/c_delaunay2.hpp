@@ -13,7 +13,6 @@
 #include <stdint.h>
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel         K;
-typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K>      Cb3;
 
 template <typename Info_>
 class Delaunay_with_info_2
