@@ -37,12 +37,16 @@ cdef class Delaunay2_vertex:
 
     property point:
         def __get__(self):
-            cdef vector[double] p = self.v.point()
-            cdef np.ndarray[np.float64_t] out = np.zeros(p.size(), 'float64')
-            cdef int i
-            for i in range(<int>p.size()):
-                out[i] = p[i]
+            cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
+            self.v.point(&out[0])
             return out
+
+            # cdef vector[double] p = self.v.point()
+            # cdef np.ndarray[np.float64_t] out = np.zeros(p.size(), 'float64')
+            # cdef int i
+            # for i in range(<int>p.size()):
+            #     out[i] = p[i]
+            # return out
 
     property index:
         def __get__(self):
