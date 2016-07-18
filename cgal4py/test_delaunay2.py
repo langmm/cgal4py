@@ -28,31 +28,31 @@ def test_insert_dup():
 def test_num_verts():
     T = Delaunay2()
     T.insert(pts)
-    assert(T.num_verts() == pts.shape[0])
+    assert(T.num_verts == pts.shape[0])
 
 def test_num_verts_dup():
     T = Delaunay2()
     T.insert(pts_dup)
-    assert(T.num_verts() == pts.shape[0])
+    assert(T.num_verts == pts.shape[0])
 
 def test_num_cells():
     T = Delaunay2()
     T.insert(pts)
-    assert(T.num_cells() == ncells)
+    assert(T.num_cells == ncells)
     
 def test_num_cells_dup():
     T = Delaunay2()
     T.insert(pts_dup)
-    assert(T.num_cells() == ncells)
+    assert(T.num_cells == ncells)
 
 def test_verts():
     T = Delaunay2()
     T.insert(pts)
     count = 0
-    for v in T.all_verts():
+    for v in T.all_verts:
         assert(np.allclose(v.point, pts[v.index,:]))
         count += 1
-    assert(count == T.num_verts())
+    assert(count == T.num_verts)
 
 def test_io():
     fname = 'test_io2348_2.dat'
@@ -61,6 +61,6 @@ def test_io():
     Tout.write_to_file(fname)
     Tin = Delaunay2()
     Tin.read_from_file(fname)
-    assert(Tout.num_verts() == Tin.num_verts())
-    assert(Tout.num_cells() == Tin.num_cells())
+    assert(Tout.num_verts == Tin.num_verts)
+    assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
