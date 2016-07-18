@@ -1,7 +1,9 @@
+# cython: linetrace=True
+# distutils: define_macros=CYTHON_TRACE=1
 """
-delaunay.pyx
+delaunay3.pyx
 
-Wrapper for CGAL Triangulation
+Wrapper for CGAL 3D Delaunay Triangulation
 """
 
 import cython
@@ -18,6 +20,54 @@ from cpython cimport bool as pybool
 from cython.operator cimport dereference
 from cython.operator cimport preincrement
 from libc.stdint cimport uint32_t, uint64_t
+
+cdef class Delaunay3_vertex:
+    cdef Delaunay_with_info_3[uint32_t].All_verts_iter v
+
+    def __richcmp__(Delaunay3_vertex self, Delaunay3_vertex solf, int op):
+        if (op == 2):
+            return <pybool>(self.v == solf.v)
+        elif (op == 3):
+            return <pybool>(self.v != solf.v)
+        else:
+            raise NotImplementedError
+
+    def increment(self):
+        preincrement(self.v)
+
+    property point:
+        def __get__(self):
+            cdef vector[double] p = self.v.point()
+            cdef np.ndarray[np.float64_t] out = np.zeros(p.size(), 'float64')
+            cdef int i
+            for i in range(<int>p.size()):
+                out[i] = p[i]
+            return out
+
+    property index:
+        def __get__(self):
+            cdef np.uint64_t out = self.v.info()
+            return out
+
+
+cdef class Delaunay3_vertex_range:
+    cdef Delaunay3_vertex v
+    cdef Delaunay3_vertex vstop
+    def __cinit__(self, Delaunay3_vertex vstart, Delaunay3_vertex vstop):
+        self.v = vstart
+        self.vstop = vstop
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.v.increment()
+        cdef Delaunay3_vertex out = self.v
+        if self.v != self.vstop:
+            return out
+        else:
+            raise StopIteration()
+
 
 cdef class Delaunay3:
     @cython.boundscheck(False)
@@ -55,6 +105,23 @@ cdef class Delaunay3:
             print "There were {} duplicates".format(self.n-self.num_verts())
         # assert(self.n == self.num_verts())
 
+    def all_verts_begin(self):
+        cdef Delaunay_with_info_3[uint32_t].All_verts_iter it_begin
+        it_begin = self.T.all_verts_begin()
+        cdef Delaunay3_vertex v_begin = Delaunay3_vertex()
+        v_begin.v = it_begin
+        return v_begin
+    def all_verts_end(self):
+        cdef Delaunay_with_info_3[uint32_t].All_verts_iter it_end
+        it_end = self.T.all_verts_end()
+        cdef Delaunay3_vertex v_end = Delaunay3_vertex()
+        v_end.v = it_end
+        return v_end
+
+    def all_verts(self):
+        return Delaunay3_vertex_range(self.all_verts_begin(), 
+                                      self.all_verts_end())
+
     def edge_info(self, max_incl, idx):
         return self._edge_info(max_incl, idx)
     cdef object _edge_info(self, int max_incl, np.uint64_t[:] idx):
@@ -72,58 +139,3 @@ cdef class Delaunay3:
                 edge_list.append(np.array([i1,i2],'int64'))
         return np.array(edge_list)
 
-    def outgoing_points(self, 
-                        np.ndarray[double, ndim=1] left_edge,
-                        np.ndarray[double, ndim=1] right_edge,
-                        cbool periodic, object neighbors, int num_leaves):
-        return self._outgoing_points(left_edge, right_edge, periodic,
-                                     neighbors, num_leaves)
-    cdef object _outgoing_points(self, 
-                                 np.ndarray[double, ndim=1] left_edge,
-                                 np.ndarray[double, ndim=1] right_edge,
-                                 cbool periodic, object neighbors, int num_leaves):
-        cdef int i, j, k
-        cdef vector[uint32_t] lr, lx, ly, lz, rx, ry, rz, alln
-        self.T.outgoing_points(&left_edge[0], &right_edge[0], periodic,
-                               lx, ly, lz, rx, ry, rz, alln)
-        # Get counts to preallocate arrays
-        cdef object hvall
-        cdef np.ndarray[np.uint32_t] Nind = np.zeros(num_leaves, 'uint32')
-        cdef np.uint32_t iN
-        Nind += <np.uint32_t>alln.size()
-        for i, lr in enumerate([lx, ly, lz]):
-            iN = <np.uint32_t>lr.size()
-            for k in neighbors[i]['left']+neighbors[i]['left_periodic']:
-                Nind[k] += iN
-        for i, lr in enumerate([rx, ry, rz]):
-            iN = <np.uint32_t>lr.size()
-            for k in neighbors[i]['right']+neighbors[i]['right_periodic']:        
-                Nind[k] += iN
-        hvall = [np.zeros(Nind[j], 'uint32') for j in xrange(num_leaves)]
-
-        # Transfer values
-        cdef np.ndarray[np.uint32_t] Cind = np.zeros(num_leaves, 'uint32')
-        cdef np.ndarray[np.uint32_t] lr_arr
-        iN = alln.size()
-        lr_arr = np.array([alln[j] for j in xrange(<int>iN)], 'uint32')
-        for k in xrange(num_leaves):
-            hvall[k][Cind[k]:(Cind[k]+iN)] = lr_arr
-            Cind[k] += iN
-        for i, lr in enumerate([lx, ly, lz]):
-            iN = <np.uint32_t>lr.size()
-            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], 'uint32')
-            for k in neighbors[i]['left']+neighbors[i]['left_periodic']:
-                hvall[k][Cind[k]:(Cind[k]+iN)] = lr_arr
-                Cind[k] += iN
-        for i, lr in enumerate([rx, ry, rz]):
-            iN = <np.uint32_t>lr.size()
-            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], 'uint32')
-            for k in neighbors[i]['right']+neighbors[i]['right_periodic']:
-                hvall[k][Cind[k]:(Cind[k]+iN)] = lr_arr
-                Cind[k] += iN
-
-        # Find unique indices
-        for k in xrange(num_leaves):
-            hvall[k] = np.unique(hvall[k])
-
-        return hvall

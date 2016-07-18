@@ -16,17 +16,18 @@ cdef extern from "c_delaunay3.hpp":
         uint32_t num_edges()
         uint32_t num_cells()
         void edge_info(vector[pair[Info,Info]]& edges)
-        void outgoing_points(double *left_edge, double *right_edge, bool periodic,
-                             vector[Info]& lx, vector[Info]& ly, vector[Info]& lz,
-                             vector[Info]& rx, vector[Info]& ry, vector[Info]& rz,
-                             vector[Info]& alln)
+        cppclass All_verts_iter:
+            All_verts_iter()
+            All_verts_iter& operator++()
+            bool operator==(All_verts_iter other)
+            bool operator!=(All_verts_iter other)
+            vector[double] point()
+            Info info()
+        All_verts_iter all_verts_begin()
+        All_verts_iter all_verts_end()
 
 cdef class Delaunay3:
     cdef int n
     cdef Delaunay_with_info_3[uint32_t] *T
     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
     cdef object _edge_info(self, int max_incl, np.uint64_t[:])
-    cdef object _outgoing_points(self,
-                                 np.ndarray[double, ndim=1] left_edge,
-                                 np.ndarray[double, ndim=1] right_edge,
-                                 bool periodic, object neighbors, int num_leaves)

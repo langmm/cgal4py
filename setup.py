@@ -16,19 +16,21 @@ ext_modules = [ ]
 
 if use_cython:
     ext_modules += cythonize(Extension("cgal4py/delaunay2",
-                             sources=["cgal4py/delaunay2.pyx","cgal4py/c_delaunay2.cpp"],
-                             language="c++",
-                             include_dirs=[numpy.get_include()],
-                             libraries=['gmp'],
-                             extra_link_args=["-lgmp"],
-                             extra_compile_args=["-std=gnu++11"]))
+                                       sources=["cgal4py/delaunay2.pyx","cgal4py/c_delaunay2.cpp"],
+                                       language="c++",
+                                       include_dirs=[numpy.get_include()],
+                                       libraries=['gmp'],
+                                       extra_link_args=["-lgmp"],
+                                       extra_compile_args=["-std=gnu++11"]),
+                             compiler_directives={'linetrace':True})
     ext_modules += cythonize(Extension("cgal4py/delaunay3",
-                             sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
-                             language="c++",
-                             include_dirs=[numpy.get_include()],
-                             libraries=['gmp'],
-                             extra_link_args=["-lgmp"],
-                             extra_compile_args=["-std=gnu++11"]))
+                                       sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
+                                       language="c++",
+                                       include_dirs=[numpy.get_include()],
+                                       libraries=['gmp'],
+                                       extra_link_args=["-lgmp"],
+                                       extra_compile_args=["-std=gnu++11"]),
+                             compiler_directives={'linetrace':True})
     # ext_modules += cythonize(Extension("cgal4py/kdtree",
     #                          sources=["cgal4py/kdtree.pyx","cgal4py/c_kdtree.cpp"],
     #                          language="c++",

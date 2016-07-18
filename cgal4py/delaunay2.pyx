@@ -1,7 +1,9 @@
+# cython: linetrace=True
+# distutils: define_macros=CYTHON_TRACE=1
 """
-delaunay.pyx
+delaunay2.pyx
 
-Wrapper for CGAL Triangulation
+Wrapper for CGAL 2D Delaunay Triangulation
 """
 
 import cython
@@ -18,6 +20,53 @@ from cpython cimport bool as pybool
 from cython.operator cimport dereference
 from cython.operator cimport preincrement
 from libc.stdint cimport uint32_t, uint64_t
+
+cdef class Delaunay2_vertex:
+    cdef Delaunay_with_info_2[uint32_t].All_verts_iter v
+
+    def __richcmp__(Delaunay2_vertex self, Delaunay2_vertex solf, int op):
+        if (op == 2): 
+            return <pybool>(self.v == solf.v)
+        elif (op == 3):
+            return <pybool>(self.v != solf.v)
+        else:
+            raise NotImplementedError
+
+    def increment(self):
+        preincrement(self.v)
+
+    property point:
+        def __get__(self):
+            cdef vector[double] p = self.v.point()
+            cdef np.ndarray[np.float64_t] out = np.zeros(p.size(), 'float64')
+            cdef int i
+            for i in range(<int>p.size()):
+                out[i] = p[i]
+            return out
+
+    property index:
+        def __get__(self):
+            cdef np.uint64_t out = self.v.info()
+            return out
+
+cdef class Delaunay2_vertex_range:
+    cdef Delaunay2_vertex v
+    cdef Delaunay2_vertex vstop
+    def __cinit__(self, Delaunay2_vertex vstart, Delaunay2_vertex vstop):
+        self.v = vstart
+        self.vstop = vstop
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.v.increment()
+        cdef Delaunay2_vertex out = self.v
+        if self.v != self.vstop:
+            return out
+        else:
+            raise StopIteration()
+
 
 cdef class Delaunay2:
     @cython.boundscheck(False)
@@ -54,6 +103,22 @@ cdef class Delaunay2:
         if self.n != self.num_verts():
             print "There were {} duplicates".format(self.n-self.num_verts())
         # assert(self.n == self.num_verts())
+
+    def all_verts_begin(self):
+        cdef Delaunay_with_info_2[uint32_t].All_verts_iter it_begin
+        it_begin = self.T.all_verts_begin()
+        cdef Delaunay2_vertex v_begin = Delaunay2_vertex()
+        v_begin.v = it_begin
+        return v_begin
+    def all_verts_end(self):
+        cdef Delaunay_with_info_2[uint32_t].All_verts_iter it_end
+        it_end = self.T.all_verts_end()
+        cdef Delaunay2_vertex v_end = Delaunay2_vertex()
+        v_end.v = it_end
+        return v_end
+    def all_verts(self):
+        return Delaunay2_vertex_range(self.all_verts_begin(), 
+                                      self.all_verts_end())
 
     def edge_info(self, max_incl, idx):
         return self._edge_info(max_incl, idx)

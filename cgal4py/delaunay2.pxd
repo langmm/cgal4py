@@ -16,7 +16,15 @@ cdef extern from "c_delaunay2.hpp":
         # uint32_t num_edges()
         uint32_t num_cells()
         void edge_info(vector[pair[Info,Info]]& edges)
-
+        cppclass All_verts_iter:
+            All_verts_iter()
+            All_verts_iter& operator++()
+            bool operator==(All_verts_iter other)
+            bool operator!=(All_verts_iter other)
+            vector[double] point()
+            Info info()
+        All_verts_iter all_verts_begin()
+        All_verts_iter all_verts_end()
 
 cdef class Delaunay2:
     cdef int n

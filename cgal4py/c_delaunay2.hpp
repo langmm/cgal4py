@@ -40,12 +40,38 @@ class Delaunay_with_info_2
   Delaunay_with_info_2() {};
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
   uint32_t num_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_edges()); }
+  // uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_edges()); }
+  uint32_t num_faces() { return static_cast<uint32_t>(T.number_of_faces()); }
   uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_faces()); }
-  Finite_vertices_iterator finite_vertices_begin() { return T.finite_vertices_begin(); }
-  Finite_vertices_iterator finite_vertices_end() { return T.finite_vertices_end(); }
-  All_faces_iterator all_faces_begin() { return T.all_faces_begin(); }
-  All_faces_iterator all_faces_end() { return T.all_faces_end(); }
+
+  class All_verts_iter {
+  public:
+    All_vertices_iterator _v = All_vertices_iterator();
+    All_verts_iter() {
+      _v = All_vertices_iterator();
+    }
+    All_verts_iter(All_vertices_iterator v) { _v = v; }
+    All_verts_iter& operator*() { return *this; }
+    All_verts_iter& operator++() {
+      _v++;
+      return *this;
+    }
+    bool operator==(All_verts_iter other) { return (_v == other._v); }
+    bool operator!=(All_verts_iter other) { return (_v != other._v); }
+    std::vector<double> point() {
+      std::vector<double> out;
+      Point p = _v->point();
+      out.push_back(p.x());
+      out.push_back(p.y());
+      return out;
+    }
+    Info info() {
+      return _v->info();
+    }
+  };
+  All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
+  All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
+
   bool is_infinite(Face_handle x) { return T.is_infinite(x); }
   bool is_infinite(Vertex_handle x) { return T.is_infinite(x); }
   Point circumcenter(Face_handle x) { return T.circumcenter(x); }

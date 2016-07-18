@@ -48,6 +48,15 @@ def test_num_cells_dup():
     print T.num_cells(), ncells
     assert(T.num_cells() == ncells)
 
+def test_verts():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts():
+        assert(np.allclose(v.point, pts[v.index,:]))
+        count += 1
+    assert(count == T.num_verts())
+
 def test_io():
     fname = 'test_io2348_3.dat'
     Tout = Delaunay3()
