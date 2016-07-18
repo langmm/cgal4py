@@ -63,6 +63,12 @@ class Delaunay_with_info_3
     }
     bool operator==(All_verts_iter other) { return (_v == other._v); }
     bool operator!=(All_verts_iter other) { return (_v != other._v); }
+    void point(double* out) {
+      Point p = _v->point();
+      out[0] = p.x();
+      out[1] = p.y();
+      out[2] = p.z();
+    }
     std::vector<double> point() {
       std::vector<double> out;
       Point p = _v->point();
