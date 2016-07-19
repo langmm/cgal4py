@@ -13,12 +13,14 @@ cdef extern from "c_delaunay2.hpp":
         void read_from_file(const char* filename) except +
         void insert(double *, Info *val, uint32_t n)
         uint32_t num_verts()
-        # uint32_t num_edges()
         uint32_t num_cells()
+        uint32_t num_infinite_cells()
         void edge_info(vector[pair[Info,Info]]& edges)
+
         cppclass All_verts_iter:
             All_verts_iter()
             All_verts_iter& operator++()
+            All_verts_iter& operator--()
             bool operator==(All_verts_iter other)
             bool operator!=(All_verts_iter other)
             void point(double* out)
@@ -26,6 +28,18 @@ cdef extern from "c_delaunay2.hpp":
             Info info()
         All_verts_iter all_verts_begin()
         All_verts_iter all_verts_end()
+
+        cppclass All_cells_iter:
+            All_cells_iter()
+            All_cells_iter& operator++()
+            All_cells_iter& operator--()
+            bool operator==(All_cells_iter other)
+            bool operator!=(All_cells_iter other)
+        All_cells_iter all_cells_begin()
+        All_cells_iter all_cells_end()
+
+        bool is_infinite(All_verts_iter x)
+        bool is_infinite(All_cells_iter x)
 
 cdef class Delaunay2:
     cdef int n

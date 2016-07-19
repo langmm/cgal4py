@@ -43,7 +43,16 @@ class Delaunay_with_info_2
   // uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_edges()); }
   uint32_t num_faces() { return static_cast<uint32_t>(T.number_of_faces()); }
   uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_faces()); }
-
+  uint32_t num_infinite_cells() {
+    Face_circulator fc = T.incident_faces(T.infinite_vertex()), done(fc);
+    if (fc == 0)
+      return 0;
+    int count = 0;
+    do {
+      count++;
+    } while (++fc != done);
+    return count;
+  }
   class All_verts_iter {
   public:
     All_vertices_iterator _v = All_vertices_iterator();
@@ -54,6 +63,10 @@ class Delaunay_with_info_2
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
       _v++;
+      return *this;
+    }
+    All_verts_iter& operator--() {
+      _v--;
       return *this;
     }
     bool operator==(All_verts_iter other) { return (_v == other._v); }
@@ -77,8 +90,31 @@ class Delaunay_with_info_2
   All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
   All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
 
-  bool is_infinite(Face_handle x) { return T.is_infinite(x); }
-  bool is_infinite(Vertex_handle x) { return T.is_infinite(x); }
+  class All_cells_iter {
+  public:
+    All_faces_iterator _c = All_faces_iterator();
+    All_cells_iter() {
+      _c = All_faces_iterator();
+    }
+    All_cells_iter(All_faces_iterator c) { _c = c; }
+    All_cells_iter& operator*() { return *this; }
+    All_cells_iter& operator++() {
+      _c++;
+      return *this;
+    }
+    All_cells_iter& operator--() {
+      _c--;
+      return *this;
+    }
+    bool operator==(All_cells_iter other) { return (_c == other._c); }
+    bool operator!=(All_cells_iter other) { return (_c != other._c); }
+  };
+  All_cells_iter all_cells_begin() { return All_cells_iter(T.all_faces_begin()); }
+  All_cells_iter all_cells_end() { return All_cells_iter(T.all_faces_end()); }
+
+  bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
+  bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
+
   Point circumcenter(Face_handle x) { return T.circumcenter(x); }
 
   void write_to_file(const char* filename)

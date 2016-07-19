@@ -39,6 +39,7 @@ class Delaunay_with_info_3
   typedef typename Delaunay::Finite_edges_iterator     Finite_edges_iterator;
   typedef typename Delaunay::Tetrahedron               Tetrahedron;
   typedef typename Delaunay::Facet_circulator          Facet_circulator;
+  typedef typename Delaunay::Cell_circulator           Cell_circulator;
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Cell_handle,int>    Cell_hash;
   typedef Info_ Info;
@@ -46,8 +47,19 @@ class Delaunay_with_info_3
   Delaunay_with_info_3() {};
   Delaunay_with_info_3(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
   uint32_t num_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_edges()); }
-  uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_cells()); }
+  uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
+  uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_finite_cells()); }
+  uint32_t num_infinite_cells() {
+    return (T.number_of_cells() - T.number_of_finite_cells());
+    // Cell_circulator fc = T.incident_cells(T.infinite_vertex()), done(fc);
+    // if (fc == 0)
+    //   return 0;
+    // int count = 0;
+    // do {
+    //   count++;
+    // } while (++fc != done);
+    // return count;
+  }
 
   class All_verts_iter {
   public:
@@ -59,6 +71,10 @@ class Delaunay_with_info_3
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
       _v++;
+      return *this;
+    }
+    All_verts_iter& operator--() {
+      _v--;
       return *this;
     }
     bool operator==(All_verts_iter other) { return (_v == other._v); }
@@ -84,13 +100,31 @@ class Delaunay_with_info_3
   All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
   All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
 
-  Finite_vertices_iterator finite_vertices_begin() { return T.finite_vertices_begin(); }
-  Finite_vertices_iterator finite_vertices_end() { return T.finite_vertices_end(); }
-  All_cells_iterator all_cells_begin() { return T.all_cells_begin(); }
-  All_cells_iterator all_cells_end() { return T.all_cells_end(); }
-  bool is_infinite(Vertex_handle x) { return T.is_infinite(x); }
-  bool is_infinite(Cell_handle x) { return T.is_infinite(x); }
-  bool is_infinite(Edge x) { return T.is_infinite(x); }
+  class All_cells_iter {
+  public:
+    All_cells_iterator _c = All_cells_iterator();
+    All_cells_iter() {
+      _c = All_cells_iterator();
+    }
+    All_cells_iter(All_cells_iterator c) { _c = c; }
+    All_cells_iter& operator*() { return *this; }
+    All_cells_iter& operator++() {
+      _c++;
+      return *this;
+    }
+    All_cells_iter& operator--() {
+      _c--;
+      return *this;
+    }
+    bool operator==(All_cells_iter other) { return (_c == other._c); }
+    bool operator!=(All_cells_iter other) { return (_c != other._c); }
+  };
+  All_cells_iter all_cells_begin() { return All_cells_iter(T.all_cells_begin()); }
+  All_cells_iter all_cells_end() { return All_cells_iter(T.all_cells_end()); }
+
+  bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
+  bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
+
   void write_to_file(const char* filename)
   {
     std::ofstream os(filename, std::ios::binary);
