@@ -58,7 +58,7 @@ def test_num_cells_dup():
     assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
 
-def test_verts():
+def test_all_verts():
     T = Delaunay2()
     T.insert(pts)
     count_fin = count_inf = 0
@@ -73,7 +73,16 @@ def test_verts():
     assert(count_inf == T.num_infinite_verts)
     assert(count == T.num_verts)
 
-def test_cells():
+def test_finite_verts():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.finite_verts:
+        assert((not v.is_infinite()))
+        count += 1
+    assert(count == T.num_finite_verts)
+
+def test_all_cells():
     T = Delaunay2()
     T.insert(pts)
     count_fin = count_inf = 0
@@ -86,6 +95,15 @@ def test_cells():
     assert(count_fin == T.num_finite_cells)
     assert(count_inf == T.num_infinite_cells)
     assert(count == T.num_cells)
+
+def test_finite_cells():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for c in T.finite_cells:
+        assert((not c.is_infinite()))
+        count += 1
+    assert(count == T.num_finite_cells)
 
 def test_io():
     fname = 'test_io2348_2.dat'

@@ -62,6 +62,7 @@ class Delaunay_with_info_2
       _v = All_vertices_iterator();
     }
     All_verts_iter(All_vertices_iterator v) { _v = v; }
+
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
       _v++;
