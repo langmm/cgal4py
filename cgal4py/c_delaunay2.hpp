@@ -118,7 +118,11 @@ class Delaunay_with_info_2
   bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
 
-  Point circumcenter(Face_handle x) { return T.circumcenter(x); }
+  void circumcenter(All_cells_iter x, double* out) {
+    Point p = T.circumcenter(x._c);
+    out[0] = p.x();
+    out[1] = p.y();
+  }
 
   void write_to_file(const char* filename)
   {

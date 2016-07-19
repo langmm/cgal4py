@@ -119,6 +119,12 @@ class Delaunay_with_info_3
 
   bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
+  void circumcenter(All_cells_iter x, double* out) {
+    Point p = (x._c)->circumcenter();
+    out[0] = p.x();
+    out[1] = p.y();
+    out[2] = p.z();
+  }
 
   void write_to_file(const char* filename)
   {

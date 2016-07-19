@@ -183,6 +183,18 @@ cdef class Delaunay2_cell:
         r"""Advance to the previous cell in the triangulation."""
         predecrement(self.x)
 
+    def circumcenter(self):
+        r"""Determines the circumcenter of the cell.
+
+        Returns:
+            :obj:`ndarray` of float64: x,y cartesian coordinates of the cell's
+                circumcenter.
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
+        self.T.circumcenter(self.x, &out[0])
+        return out
+
 
 cdef class Delaunay2_cell_range:
     r"""Wrapper class for iterating over a range of triangulation cells.

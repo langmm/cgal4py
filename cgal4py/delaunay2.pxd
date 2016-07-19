@@ -43,6 +43,7 @@ cdef extern from "c_delaunay2.hpp":
 
         bool is_infinite(All_verts_iter x)
         bool is_infinite(All_cells_iter x)
+        void circumcenter(All_cells_iter x, double* out)
 
 cdef class Delaunay2:
     cdef int n

@@ -115,3 +115,5 @@ def test_io():
     assert(Tout.num_verts == Tin.num_verts)
     assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
+
+# TODO: test circumcenter
