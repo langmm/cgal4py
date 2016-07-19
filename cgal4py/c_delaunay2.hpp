@@ -39,10 +39,9 @@ class Delaunay_with_info_2
   Delaunay T;
   Delaunay_with_info_2() {};
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
-  uint32_t num_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  // uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_edges()); }
-  uint32_t num_faces() { return static_cast<uint32_t>(T.number_of_faces()); }
-  uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_faces()); }
+  uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
+  uint32_t num_finite_cells() { return static_cast<uint32_t>(T.number_of_faces()); }
+  uint32_t num_infinite_verts() { return static_cast<uint32_t>(1); }
   uint32_t num_infinite_cells() {
     Face_circulator fc = T.incident_faces(T.infinite_vertex()), done(fc);
     if (fc == 0)
@@ -53,6 +52,9 @@ class Delaunay_with_info_2
     } while (++fc != done);
     return count;
   }
+  uint32_t num_verts() { return (num_finite_verts() + num_infinite_verts()); }
+  uint32_t num_cells() { return (num_finite_cells() + num_infinite_cells()); }
+
   class All_verts_iter {
   public:
     All_vertices_iterator _v = All_vertices_iterator();

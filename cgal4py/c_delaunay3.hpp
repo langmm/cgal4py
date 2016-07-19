@@ -46,20 +46,15 @@ class Delaunay_with_info_3
   Delaunay T;
   Delaunay_with_info_3() {};
   Delaunay_with_info_3(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
-  uint32_t num_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  uint32_t num_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
-  uint32_t num_cells() { return static_cast<uint32_t>(T.number_of_finite_cells()); }
-  uint32_t num_infinite_cells() {
-    return (T.number_of_cells() - T.number_of_finite_cells());
-    // Cell_circulator fc = T.incident_cells(T.infinite_vertex()), done(fc);
-    // if (fc == 0)
-    //   return 0;
-    // int count = 0;
-    // do {
-    //   count++;
-    // } while (++fc != done);
-    // return count;
-  }
+  uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
+  uint32_t num_finite_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
+  uint32_t num_finite_cells() { return static_cast<uint32_t>(T.number_of_finite_cells()); }
+  uint32_t num_infinite_verts() { return 1; }
+  uint32_t num_infinite_edges() { return (T.number_of_edges() - T.number_of_finite_edges()); }
+  uint32_t num_infinite_cells() { return (T.number_of_cells() - T.number_of_finite_cells()); }
+  uint32_t num_verts() { return (T.number_of_vertices() + num_infinite_verts()); }
+  uint32_t num_edges() { return T.number_of_edges(); }
+  uint32_t num_cells() { return T.number_of_cells(); }
 
   class All_verts_iter {
   public:

@@ -224,24 +224,34 @@ cdef class Delaunay2:
         """
         cdef char* cfname = fname
         self.T.read_from_file(cfname)
-        self.n = self.num_verts
+        self.n = self.num_finite_verts
 
     @property
-    def num_verts(self): 
-        r"""int: The number of unique vertices in the triangulation."""
-        return self.T.num_verts()
+    def num_finite_verts(self): 
+        r"""int: The number of finite vertices in the triangulation."""
+        return self.T.num_finite_verts()
     @property
-    def num_cells(self): 
-        r"""int: The number of triangular cells in the triangulation."""
-        return self.T.num_cells()
+    def num_finite_cells(self): 
+        r"""int: The number of finite cells in the triangulation."""
+        return self.T.num_finite_cells()
     @property
     def num_infinite_verts(self):
         r"""int: The number of infinite vertices in the triangulation."""
-        return 1
+        return self.T.num_infinite_verts()
     @property
     def num_infinite_cells(self): 
         r"""int: The number of infinite cells in the triangulation."""
         return self.T.num_infinite_cells()
+    @property
+    def num_verts(self): 
+        r"""int: The total number of vertices (Finite + infinite) in the 
+        triangulation."""
+        return self.T.num_verts()
+    @property
+    def num_cells(self): 
+        r"""int: The total number of cells (finite + infinite) in the 
+        triangulation."""
+        return self.T.num_cells()
 
     def insert(self, np.ndarray[double, ndim=2, mode="c"] pts not None):
         r"""Insert points into the triangulation.
@@ -262,9 +272,9 @@ cdef class Delaunay2:
         assert(m == 2)
         self.T.insert(&pts[0,0], &idx[0], <uint32_t>Nnew)
         self.n += Nnew
-        if self.n != self.num_verts:
-            print("There were {} duplicates".format(self.n-self.num_verts))
-        # assert(self.n == self.num_verts)
+        if self.n != self.num_finite_verts:
+            print("There were {} duplicates".format(self.n-self.num_finite_verts))
+        # assert(self.n == self.num_finite_verts)
 
     @property
     def all_verts_begin(self):

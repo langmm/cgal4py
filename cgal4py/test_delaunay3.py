@@ -13,10 +13,12 @@ pts = np.array([[ 0,  0,  0],
                 [ 1,  1, -1],
                 [ 1,  1,  1]], 'float64')
 pts_dup = np.concatenate([pts, np.reshape(pts[0,:],(1,pts.shape[1]))])
-nverts = pts.shape[0]
+nverts_fin = pts.shape[0]
 nverts_inf = 1
-ncells = 12
+nverts = nverts_fin + nverts_inf
+ncells_fin = 12
 ncells_inf = 12
+ncells = ncells_fin + ncells_inf
 
 
 def test_create():
@@ -33,50 +35,59 @@ def test_insert_dup():
 def test_num_verts():
     T = Delaunay3()
     T.insert(pts)
+    assert(T.num_finite_verts == nverts_fin)
+    assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
 
 def test_num_verts_dup():
     T = Delaunay3()
     T.insert(pts_dup)
+    assert(T.num_finite_verts == nverts_fin)
+    assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
 
 def test_num_cells():
     T = Delaunay3()
     T.insert(pts)
+    assert(T.num_finite_cells == ncells_fin)
+    assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
     
 def test_num_cells_dup():
     T = Delaunay3()
     T.insert(pts_dup)
-    assert(T.num_cells == ncells)
-
-def test_num_infinite_verts():
-    T = Delaunay3()
-    T.insert(pts)
-    assert(T.num_infinite_verts == nverts_inf)
-
-def test_num_infinite_cells():
-    T = Delaunay3()
-    T.insert(pts)
+    assert(T.num_finite_cells == ncells_fin)
     assert(T.num_infinite_cells == ncells_inf)
+    assert(T.num_cells == ncells)
 
 def test_verts():
     T = Delaunay3()
     T.insert(pts)
-    count = 0
+    count_fin = count_inf = 0
     for v in T.all_verts:
-        if not v.is_infinite():
+        if v.is_infinite():
+            count_inf += 1
+        else:
             assert(np.allclose(v.point, pts[v.index,:]))
-        count += 1
-    assert(count == T.num_verts+T.num_infinite_verts)
+            count_fin += 1
+    count = count_fin + count_inf
+    assert(count_fin == T.num_finite_verts)
+    assert(count_inf == T.num_infinite_verts)
+    assert(count == T.num_verts)
 
 def test_cells():
     T = Delaunay3()
     T.insert(pts)
-    count = 0
+    count_fin = count_inf = 0
     for c in T.all_cells:
-        count += 1
-    assert(count == T.num_cells+T.num_infinite_cells)
+        if c.is_infinite():
+            count_inf += 1
+        else:
+            count_fin += 1
+    count = count_fin + count_inf
+    assert(count_fin == T.num_finite_cells)
+    assert(count_inf == T.num_infinite_cells)
+    assert(count == T.num_cells)
 
 def test_io():
     fname = 'test_io2348_3.dat'
