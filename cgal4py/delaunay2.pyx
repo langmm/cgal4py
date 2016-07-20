@@ -428,12 +428,12 @@ cdef class Delaunay2:
 
     @property
     def all_verts_begin(self):
-        r"""Delaunay2_vertex: Starting vertex for all vertices in the 
+        r"""Delaunay2_vertex_iter: Starting vertex for all vertices in the 
         triangulation."""
         return Delaunay2_vertex_iter(self, 'all_begin')
     @property
     def all_verts_end(self):
-        r"""Delaunay2_vertex: Final vertex for all vertices in the 
+        r"""Delaunay2_vertex_iter: Final vertex for all vertices in the 
         triangulation."""
         return Delaunay2_vertex_iter(self, 'all_end')
     @property
@@ -451,11 +451,11 @@ cdef class Delaunay2:
 
     @property
     def all_cells_begin(self):
-        r"""Delaunay2_cell: Starting cell for all cells in the triangulation."""
+        r"""Delaunay2_cell_iter: Starting cell for all cells in the triangulation."""
         return Delaunay2_cell_iter(self, 'all_begin')
     @property
     def all_cells_end(self):
-        r"""Delaunay2_cell: Final cell for all cells in the triangulation."""
+        r"""Delaunay2_cell_iter: Final cell for all cells in the triangulation."""
         return Delaunay2_cell_iter(self, 'all_end')
     @property
     def all_cells(self):

@@ -26,9 +26,9 @@ cdef extern from "c_delaunay2.hpp":
             All_verts_iter& operator--()
             bool operator==(All_verts_iter other)
             bool operator!=(All_verts_iter other)
-            void point(double* out)
-            vector[double] point()
-            Info info()
+            # void point(double* out)
+            # vector[double] point()
+            # Info info()
         All_verts_iter all_verts_begin()
         All_verts_iter all_verts_end()
 

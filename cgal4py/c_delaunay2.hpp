@@ -73,21 +73,21 @@ class Delaunay_with_info_2
     }
     bool operator==(All_verts_iter other) { return (_v == other._v); }
     bool operator!=(All_verts_iter other) { return (_v != other._v); }
-    void point(double* out) {
-      Point p = _v->point();
-      out[0] = p.x();
-      out[1] = p.y();
-    }
-    std::vector<double> point() {
-      std::vector<double> out;
-      Point p = _v->point();
-      out.push_back(p.x());
-      out.push_back(p.y());
-      return out;
-    }
-    Info info() {
-      return _v->info();
-    }
+    // void point(double* out) {
+    //   Point p = _v->point();
+    //   out[0] = p.x();
+    //   out[1] = p.y();
+    // }
+    // std::vector<double> point() {
+    //   std::vector<double> out;
+    //   Point p = _v->point();
+    //   out.push_back(p.x());
+    //   out.push_back(p.y());
+    //   return out;
+    // }
+    // Info info() {
+    //   return _v->info();
+    // }
   };
   All_verts_iter all_verts_begin() {
     return All_verts_iter(T.all_vertices_begin());

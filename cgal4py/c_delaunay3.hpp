@@ -74,6 +74,34 @@ class Delaunay_with_info_3
     }
     bool operator==(All_verts_iter other) { return (_v == other._v); }
     bool operator!=(All_verts_iter other) { return (_v != other._v); }
+    // void point(double* out) {
+    //   Point p = _v->point();
+    //   out[0] = p.x();
+    //   out[1] = p.y();
+    //   out[2] = p.z();
+    // }
+    // std::vector<double> point() {
+    //   std::vector<double> out;
+    //   Point p = _v->point();
+    //   out.push_back(p.x());
+    //   out.push_back(p.y());
+    //   out.push_back(p.z());
+    //   return out;
+    // }
+    // Info info() {
+    //   return _v->info();
+    // }
+  };
+  All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
+  All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
+
+  class Vertex {
+  public:
+    Vertex_handle _v = Vertex_handle();
+    Vertex() { _v = Vertex_handle(); }
+    Vertex(All_verts_iter v) { _v = static_cast<Vertex_handle>(v._v); }
+    bool operator==(Vertex other) { return (_v == other._v); }
+    bool operator!=(Vertex other) { return (_v != other._v); }
     void point(double* out) {
       Point p = _v->point();
       out[0] = p.x();
@@ -92,8 +120,6 @@ class Delaunay_with_info_3
       return _v->info();
     }
   };
-  All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
-  All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
 
   class All_cells_iter {
   public:
@@ -117,9 +143,20 @@ class Delaunay_with_info_3
   All_cells_iter all_cells_begin() { return All_cells_iter(T.all_cells_begin()); }
   All_cells_iter all_cells_end() { return All_cells_iter(T.all_cells_end()); }
 
+  class Cell {
+  public:
+    Cell_handle _c = Cell_handle();
+    Cell() { _c = Cell_handle(); }
+    Cell(All_cells_iter c) { _c = static_cast<Cell_handle>(c._c); }
+    bool operator==(Cell other) { return (_c == other._c); }
+    bool operator!=(Cell other) { return (_c != other._c); }
+  };
+
+  bool is_infinite(Vertex x) { return T.is_infinite(x._v); }
+  bool is_infinite(Cell x) { return T.is_infinite(x._c); }
   bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
-  void circumcenter(All_cells_iter x, double* out) {
+  void circumcenter(Cell x, double* out) {
     Point p = (x._c)->circumcenter();
     out[0] = p.x();
     out[1] = p.y();
