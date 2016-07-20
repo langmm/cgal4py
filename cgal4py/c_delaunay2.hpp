@@ -62,7 +62,6 @@ class Delaunay_with_info_2
       _v = All_vertices_iterator();
     }
     All_verts_iter(All_vertices_iterator v) { _v = v; }
-
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
       _v++;
@@ -90,15 +89,41 @@ class Delaunay_with_info_2
       return _v->info();
     }
   };
-  All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
-  All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
+  All_verts_iter all_verts_begin() {
+    return All_verts_iter(T.all_vertices_begin());
+  }
+  All_verts_iter all_verts_end() {
+    return All_verts_iter(T.all_vertices_end()); 
+  }
+
+  class Vertex {
+  public:
+    Vertex_handle _v = Vertex_handle();
+    Vertex() { _v = Vertex_handle(); }
+    Vertex(All_verts_iter v) { _v = static_cast<Vertex_handle>(v._v); }
+    bool operator==(Vertex other) { return (_v == other._v); }
+    bool operator!=(Vertex other) { return (_v != other._v); }
+    void point(double* out) {
+      Point p = _v->point();
+      out[0] = p.x();
+      out[1] = p.y();
+    }
+    std::vector<double> point() {
+      std::vector<double> out;
+      Point p = _v->point();
+      out.push_back(p.x());
+      out.push_back(p.y());
+      return out;
+    }
+    Info info() {
+      return _v->info();
+    }
+  };
 
   class All_cells_iter {
   public:
     All_faces_iterator _c = All_faces_iterator();
-    All_cells_iter() {
-      _c = All_faces_iterator();
-    }
+    All_cells_iter() { _c = All_faces_iterator(); }
     All_cells_iter(All_faces_iterator c) { _c = c; }
     All_cells_iter& operator*() { return *this; }
     All_cells_iter& operator++() {
@@ -115,10 +140,49 @@ class Delaunay_with_info_2
   All_cells_iter all_cells_begin() { return All_cells_iter(T.all_faces_begin()); }
   All_cells_iter all_cells_end() { return All_cells_iter(T.all_faces_end()); }
 
+  class Cell {
+  public:
+    Face_handle _c = Face_handle();
+    Cell() { _c = Face_handle(); }
+    Cell(All_cells_iter c) { _c = static_cast<Face_handle>(c._c); }
+    bool operator==(Cell other) { return (_c == other._c); }
+    bool operator!=(Cell other) { return (_c != other._c); }
+  };
+
+  class Cell_circ {
+  public:
+    Face_circulator _fc = Face_circulator();
+    Face_circulator _done = _fc;
+    Cell_circ() {
+      _fc = Face_circulator();
+      _done = _fc;
+    }
+    Cell_circ(Face_circulator fc) { _fc = fc; _done = fc; }
+
+    Cell_circ& operator*() { return *this; }
+    Cell_circ& operator++() {
+      _fc++;
+      return *this;
+    }
+    Cell_circ& operator--() {
+      _fc--;
+      return *this;
+    }
+    bool operator==(Cell_circ other) { return (_fc == other._fc); }
+    bool operator!=(Cell_circ other) { return (_fc != other._fc); }
+    bool is_done() { return (_fc == _done); }
+  };
+
+
+  bool is_infinite(Vertex x) { return T.is_infinite(x._v); }
+  bool is_infinite(Cell x) { return T.is_infinite(x._c); }
   bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
 
-  void circumcenter(All_cells_iter x, double* out) {
+  // Cell_circ incident_cells(All_verts_iter x) { return Cell_circ(T.incident_faces(x._v)); }
+  All_cells_iter incident_cells(All_verts_iter x) { return All_cells_iter(T.incident_faces(x._v)); }
+
+  void circumcenter(Cell x, double* out) {
     Point p = T.circumcenter(x._c);
     out[0] = p.x();
     out[1] = p.y();

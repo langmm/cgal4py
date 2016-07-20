@@ -25,29 +25,15 @@ from libc.stdint cimport uint32_t, uint64_t
 cdef class Delaunay2_vertex:
     r"""Wrapper class for a triangulation vertex.
 
-    Args:
-        T (Delaunay2): Triangulation that this vertex belongs to.
-        vert (:obj:`str`, optional): String specifying the vertex that 
-            should be referenced. Valid options include:
-                'all_begin': The first vertex in an iteration over all vertices.
-                'all_end': The last vertex in an iteration over all vertices.
-
     Attributes:
         T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ Triangulation object 
             that this vertex belongs to.
-        x (:obj:`Delaunay_with_info_2[uint32_t].All_verts_iter`): C++ vertex 
+        x (:obj:`Delaunay_with_info_2[uint32_t].Vertex`): C++ vertex 
             object. Direct interaction with this object is not recommended.
 
     """
     cdef Delaunay_with_info_2[uint32_t] *T
-    cdef Delaunay_with_info_2[uint32_t].All_verts_iter x
-    
-    def __cinit__(self, Delaunay2 T, str vert = None):
-        self.T = T.T
-        if vert == 'all_begin':
-            self.x = self.T.all_verts_begin()
-        elif vert == 'all_end':
-            self.x = self.T.all_verts_end()
+    cdef Delaunay_with_info_2[uint32_t].Vertex x
 
     def __richcmp__(Delaunay2_vertex self, Delaunay2_vertex solf, int op):
         if (op == 2): 
@@ -66,14 +52,6 @@ cdef class Delaunay2_vertex:
         """
         return self.T.is_infinite(self.x)
 
-    def increment(self):
-        r"""Advance to the next vertex in the triangulation."""
-        preincrement(self.x)
-
-    def decrement(self):
-        r"""Advance to the previous vertex in the triangulation."""
-        predecrement(self.x)
-
     property point:
         r""":obj:`ndarray` of :obj:`float64`: The cartesian (x,y) coordinates of 
         the vertex."""
@@ -88,27 +66,99 @@ cdef class Delaunay2_vertex:
             cdef np.uint64_t out = self.x.info()
             return out
 
+    # def incident_cells(self):
+    #     cdef Delaunay_with_info_2[uint32_t].All_cells_iter it
+    #     it = self.T.incident_cells(self.x) 
+    #     cdef Delaunay2_cell out = Delaunay2_cell()
+    #     out.x = it
+        
+    #     cdef Delaunay_with_info_2[uint32_t].Cell_circ it
+    #     it = self.T.incident_cells(self.x)
+    #     cdef Delaunay2_cell_circ out = Delaunay2_cell_circ()
+        
+
+cdef class Delaunay2_vertex_iter:
+    r"""Wrapper class for a triangulation vertex iterator.
+
+    Args:
+        T (Delaunay2): Triangulation that this vertex belongs to.
+        vert (:obj:`str`, optional): String specifying the vertex that 
+            should be referenced. Valid options include:
+                'all_begin': The first vertex in an iteration over all vertices.
+                'all_end': The last vertex in an iteration over all vertices.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ Triangulation object 
+            that this vertex belongs to.
+        x (:obj:`Delaunay_with_info_2[uint32_t].All_verts_iter`): C++ vertex 
+            iteration object. Direct interaction with this object is not 
+            recommended.
+
+    """
+    cdef Delaunay_with_info_2[uint32_t] *T
+    cdef Delaunay_with_info_2[uint32_t].All_verts_iter x
+    
+    def __cinit__(self, Delaunay2 T, str vert = None):
+        self.T = T.T
+        if vert == 'all_begin':
+            self.x = self.T.all_verts_begin()
+        elif vert == 'all_end':
+            self.x = self.T.all_verts_end()
+
+    def __richcmp__(Delaunay2_vertex_iter self, Delaunay2_vertex_iter solf, int op):
+        if (op == 2): 
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def increment(self):
+        r"""Advance to the next vertex in the triangulation."""
+        preincrement(self.x)
+
+    def decrement(self):
+        r"""Advance to the previous vertex in the triangulation."""
+        predecrement(self.x)
+
+    def is_infinite(self):
+        r"""Determine if the vertex is the infinite vertex.
+
+        Returns:
+            bool: True if the vertex is the infinite vertex, False otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    property vertex:
+        r"""Delaunay2_vertex: The corresponding vertex object."""
+        def __get__(self):
+            cdef Delaunay2_vertex out = Delaunay2_vertex()
+            out.T = self.T
+            out.x = Delaunay_with_info_2[uint32_t].Vertex(self.x)
+            return out
+
 cdef class Delaunay2_vertex_range:
     r"""Wrapper class for iterating over a range of triangulation vertices
     
     Args:
-        vstart (Delaunay2_vertex): The starting vertex.
-        vstop (Delaunay2_vertex): Final vertex that will end the iteration.
+        vstart (Delaunay2_vertex_iter): The starting vertex.
+        vstop (Delaunay2_vertex_iter): Final vertex that will end the iteration.
         finite (:obj:`bool`, optional): If True, only finite verts are
             iterated over. Otherwise, all verts are iterated over. Defaults 
             to False.
 
     Attributes:
-        x (Delaunay2_vertex): The current vertex.
-        xstop (Delaunay2_vertex): Final vertex that will end the iteration.
+        x (Delaunay2_vertex_iter): The current vertex.
+        xstop (Delaunay2_vertex_iter): Final vertex that will end the iteration.
         finite (bool): If True, only finite verts are iterater over. Otherwise 
             all verts are iterated over.
 
     """
-    cdef Delaunay2_vertex x
-    cdef Delaunay2_vertex xstop
+    cdef Delaunay2_vertex_iter x
+    cdef Delaunay2_vertex_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay2_vertex xstart, Delaunay2_vertex xstop,
+    def __cinit__(self, Delaunay2_vertex_iter xstart, Delaunay2_vertex_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -123,7 +173,7 @@ cdef class Delaunay2_vertex_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay2_vertex out = self.x
+        cdef Delaunay2_vertex out = self.x.vertex
         if self.x != self.xstop:
             return out
         else:
@@ -131,6 +181,50 @@ cdef class Delaunay2_vertex_range:
 
 
 cdef class Delaunay2_cell:
+    r"""Wrapper class for a triangulation cell.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ Triangulation object 
+            that this cell belongs to.
+        x (:obj:`Delaunay_with_info_2[uint32_t].Cell`): C++ cell object.
+            Direct interaction with this object is not recommended.
+
+    """
+    cdef Delaunay_with_info_2[uint32_t] *T
+    cdef Delaunay_with_info_2[uint32_t].Cell x
+    
+    def __richcmp__(Delaunay2_cell self, Delaunay2_cell solf, int op):
+        if (op == 2): 
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def is_infinite(self):
+        r"""Determine if the cell is incident to the infinite vertex.
+
+        Returns:
+            bool: True if the cell is incident to the infinite vertex, False 
+                otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    def circumcenter(self):
+        r"""Determines the circumcenter of the cell.
+
+        Returns:
+            :obj:`ndarray` of float64: x,y cartesian coordinates of the cell's
+                circumcenter.
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
+        self.T.circumcenter(self.x, &out[0])
+        return out
+
+
+cdef class Delaunay2_cell_iter:
     r"""Wrapper class for a triangulation cell.
 
     Args:
@@ -157,7 +251,7 @@ cdef class Delaunay2_cell:
         elif cell == 'all_end':
             self.x = self.T.all_cells_end()
 
-    def __richcmp__(Delaunay2_cell self, Delaunay2_cell solf, int op):
+    def __richcmp__(Delaunay2_cell_iter self, Delaunay2_cell_iter solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -183,40 +277,36 @@ cdef class Delaunay2_cell:
         r"""Advance to the previous cell in the triangulation."""
         predecrement(self.x)
 
-    def circumcenter(self):
-        r"""Determines the circumcenter of the cell.
-
-        Returns:
-            :obj:`ndarray` of float64: x,y cartesian coordinates of the cell's
-                circumcenter.
-
-        """
-        cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
-        self.T.circumcenter(self.x, &out[0])
-        return out
+    property cell:
+        r"""Delaunay2_cell: Corresponding cell object."""
+        def __get__(self):
+            cdef Delaunay2_cell out = Delaunay2_cell()
+            out.T = self.T
+            out.x = Delaunay_with_info_2[uint32_t].Cell(self.x)
+            return out
 
 
 cdef class Delaunay2_cell_range:
     r"""Wrapper class for iterating over a range of triangulation cells.
     
     Args:
-        xstart (Delaunay2_cell): The starting cell.
-        xstop (Delaunay2_cell): Final cell that will end the iteration.
+        xstart (Delaunay2_cell_iter): The starting cell.
+        xstop (Delaunay2_cell_iter): Final cell that will end the iteration.
         finite (:obj:`bool`, optional): If True, only finite cells are
             iterated over. Otherwise, all cells are iterated over. Defaults 
             to False.
 
     Attributes:
-        x (Delaunay2_cell): The current cell.
-        xstop (Delaunay2_cell): Final cell that will end the iteration.
+        x (Delaunay2_cell_iter): The current cell.
+        xstop (Delaunay2_cell_iter): Final cell that will end the iteration.
         finite (bool): If True, only finite cells are iterated over. Otherwise, 
             all cells are iterated over.
 
     """
-    cdef Delaunay2_cell x
-    cdef Delaunay2_cell xstop
+    cdef Delaunay2_cell_iter x
+    cdef Delaunay2_cell_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay2_cell xstart, Delaunay2_cell xstop,
+    def __cinit__(self, Delaunay2_cell_iter xstart, Delaunay2_cell_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -231,12 +321,21 @@ cdef class Delaunay2_cell_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay2_cell out = self.x
+        cdef Delaunay2_cell out = self.x.cell
         if self.x != self.xstop:
             return out
         else:
             raise StopIteration()
 
+cdef class Delaunay2_cell_circ(Delaunay2_cell_range):
+
+    def __next__(self):
+        self.x.increment()
+        if self.finite:
+            while self.x.is_infinite():
+                self.x.increment()
+        cdef Delaunay2_cell out = self.x
+        return out
 
 cdef class Delaunay2:
     r"""Wrapper class for a 2D Delaunay triangulation.
@@ -331,12 +430,12 @@ cdef class Delaunay2:
     def all_verts_begin(self):
         r"""Delaunay2_vertex: Starting vertex for all vertices in the 
         triangulation."""
-        return Delaunay2_vertex(self, 'all_begin')
+        return Delaunay2_vertex_iter(self, 'all_begin')
     @property
     def all_verts_end(self):
         r"""Delaunay2_vertex: Final vertex for all vertices in the 
         triangulation."""
-        return Delaunay2_vertex(self, 'all_end')
+        return Delaunay2_vertex_iter(self, 'all_end')
     @property
     def all_verts(self):
         r"""Delaunay2_vertex_range: Iterable for all vertices in the 
@@ -353,11 +452,11 @@ cdef class Delaunay2:
     @property
     def all_cells_begin(self):
         r"""Delaunay2_cell: Starting cell for all cells in the triangulation."""
-        return Delaunay2_cell(self, 'all_begin')
+        return Delaunay2_cell_iter(self, 'all_begin')
     @property
     def all_cells_end(self):
         r"""Delaunay2_cell: Final cell for all cells in the triangulation."""
-        return Delaunay2_cell(self, 'all_end')
+        return Delaunay2_cell_iter(self, 'all_end')
     @property
     def all_cells(self):
         r"""Delaunay2_cell_range: Iterable for all cells in the
