@@ -35,6 +35,20 @@ cdef class Delaunay2_vertex:
     cdef Delaunay_with_info_2[uint32_t] *T
     cdef Delaunay_with_info_2[uint32_t].Vertex x
 
+    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T,
+                     Delaunay_with_info_2[uint32_t].Vertex x):
+        r"""Assign C++ objects to attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ Triangulation object 
+                that this vertex belongs to.
+            x (:obj:`Delaunay_with_info_2[uint32_t].Vertex`): C++ vertex 
+                object. Direct interaction with this object is not recommended.
+
+        """
+        self.T = T
+        self.x = x
+
     def __richcmp__(Delaunay2_vertex self, Delaunay2_vertex solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
@@ -66,15 +80,32 @@ cdef class Delaunay2_vertex:
             cdef np.uint64_t out = self.x.info()
             return out
 
-    # def incident_cells(self):
-    #     cdef Delaunay_with_info_2[uint32_t].All_cells_iter it
-    #     it = self.T.incident_cells(self.x) 
-    #     cdef Delaunay2_cell out = Delaunay2_cell()
-    #     out.x = it
-        
-    #     cdef Delaunay_with_info_2[uint32_t].Cell_circ it
-    #     it = self.T.incident_cells(self.x)
-    #     cdef Delaunay2_cell_circ out = Delaunay2_cell_circ()
+    def incident_cells(self):
+        r"""Find cells that are incident to this vertex.
+
+        Returns:
+            Delaunay2_cell_vector: Iterator over cells incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this vertex.
+
+        Returns:
+            Delaunay2_vertex_vector: Iterator over vertices incident to this 
+                vertex.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
+        out.assign(self.T, it)
+        return out
         
 
 cdef class Delaunay2_vertex_iter:
@@ -121,22 +152,59 @@ cdef class Delaunay2_vertex_iter:
         r"""Advance to the previous vertex in the triangulation."""
         predecrement(self.x)
 
-    def is_infinite(self):
-        r"""Determine if the vertex is the infinite vertex.
-
-        Returns:
-            bool: True if the vertex is the infinite vertex, False otherwise.
-
-        """
-        return self.T.is_infinite(self.x)
-
     property vertex:
         r"""Delaunay2_vertex: The corresponding vertex object."""
         def __get__(self):
             cdef Delaunay2_vertex out = Delaunay2_vertex()
-            out.T = self.T
-            out.x = Delaunay_with_info_2[uint32_t].Vertex(self.x)
+            out.assign(self.T, Delaunay_with_info_2[uint32_t].Vertex(self.x))
             return out
+
+cdef class Delaunay2_vertex_vector:
+    r"""Wrapper class for a vector of vertices. 
+
+    Attributes: 
+        T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ triangulation object. 
+            Direct interaction with this object is not recommended. 
+        v (:obj:`vector[Delaunay_with_info_2[uint32_t].Vertex]`): Vector of C++ 
+            vertices. 
+        n (int): The number of vertices in the vector. 
+        i (int): The index of the currect vertex. 
+
+    """
+    cdef Delaunay_with_info_2[uint32_t] *T
+    cdef vector[Delaunay_with_info_2[uint32_t].Vertex] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T,
+                     vector[Delaunay_with_info_2[uint32_t].Vertex] v):
+        r"""Assign C++ attributes. 
+
+        Args: 
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object. 
+                Direct interaction with this object is not recommended. 
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Vertex]`): Vector of 
+                C++ vertices. 
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay2_vertex out
+        if self.i < self.n:
+            out = Delaunay2_vertex()
+            out.assign(self.T, self.v[self.i])
+            self.i += 1
+            return out
+        else:
+            raise StopIteration()
+
 
 cdef class Delaunay2_vertex_range:
     r"""Wrapper class for iterating over a range of triangulation vertices
@@ -171,7 +239,7 @@ cdef class Delaunay2_vertex_range:
     def __next__(self):
         self.x.increment()
         if self.finite:
-            while (self.x != self.xstop) and self.x.is_infinite():
+            while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
         cdef Delaunay2_vertex out = self.x.vertex
         if self.x != self.xstop:
@@ -259,16 +327,6 @@ cdef class Delaunay2_cell_iter:
         else:
             raise NotImplementedError
 
-    def is_infinite(self):
-        r"""Determine if the cell is incident to the infinite vertex.
-
-        Returns:
-            bool: True if the cell is incident to the infinite vertex, False 
-                otherwise.
-
-        """
-        return self.T.is_infinite(self.x)
-
     def increment(self):
         r"""Advance to the next cell in the triangulation."""
         preincrement(self.x)
@@ -284,6 +342,54 @@ cdef class Delaunay2_cell_iter:
             out.T = self.T
             out.x = Delaunay_with_info_2[uint32_t].Cell(self.x)
             return out
+
+
+cdef class Delaunay2_cell_vector:
+    r"""Wrapper class for a vector of cells. 
+
+    Attributes: 
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object. 
+            Direct interaction with this object is not recommended. 
+        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of C++ 
+            cells. 
+        n (int): The number of cells in the vector. 
+        i (int): The index of the currect cell. 
+
+    """
+    cdef Delaunay_with_info_2[uint32_t] *T
+    cdef vector[Delaunay_with_info_2[uint32_t].Cell] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T,
+                     vector[Delaunay_with_info_2[uint32_t].Cell] v):
+        r"""Assign C++ attributes. 
+
+        Args: 
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object. 
+                Direct interaction with this object is not recommended. 
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of 
+                C++ cells. 
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay2_cell out
+        if self.i < self.n:
+            out = Delaunay2_cell()
+            out.T = self.T
+            out.x = self.v[self.i]
+            self.i += 1
+            return out
+        else:
+            raise StopIteration()
 
 
 cdef class Delaunay2_cell_range:
@@ -319,7 +425,7 @@ cdef class Delaunay2_cell_range:
     def __next__(self):
         self.x.increment()
         if self.finite:
-            while (self.x != self.xstop) and self.x.is_infinite():
+            while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
         cdef Delaunay2_cell out = self.x.cell
         if self.x != self.xstop:
@@ -327,14 +433,42 @@ cdef class Delaunay2_cell_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay2_cell_circ(Delaunay2_cell_range):
+cdef class Delaunay2_cell_circ:
+    r"""Wrapper class for a cell circulator.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ triangulation object.
+            Direct interaction with this object is not recommended.
+        x (:obj:`Delaunay_with_info_2[uint32_t].Cell_circ`): C++ object for 
+            continuously iterating over a set of cells.
+
+    """
+    cdef Delaunay_with_info_2[uint32_t] *T
+    cdef Delaunay_with_info_2[uint32_t].Cell_circ x
+
+    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T, 
+                     Delaunay_with_info_2[uint32_t].Cell_circ x):
+        r"""Assign C++ objects to attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ triangulation object.
+                Direct interaction with this object is not recommended.  
+            x (:obj:`Delaunay_with_info_2[uint32_t].Cell_circ`): C++ object for 
+                continuously iterating over a set of cells.  
+
+        """
+        self.T = T
+        self.x = x
+        predecrement(self.x)
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
-        self.x.increment()
-        if self.finite:
-            while self.x.is_infinite():
-                self.x.increment()
-        cdef Delaunay2_cell out = self.x
+        preincrement(self.x)
+        cdef Delaunay2_cell out = Delaunay2_cell()
+        out.T = self.T
+        out.x = Delaunay_with_info_2[uint32_t].Cell(self.x)
         return out
 
 cdef class Delaunay2:
@@ -469,6 +603,22 @@ cdef class Delaunay2:
         triangulation."""
         return Delaunay2_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
+
+    def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
+        r"""Determine which vertex is closes to a given set of x,y coordinates
+
+        Args:
+            x (:obj:`ndarray` of float64): x,y coordinates.
+
+        Returns:
+            Delaunay2_vertex: Vertex closest to x.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Vertex vc
+        vc = self.T.nearest_vertex(&x[0])
+        cdef Delaunay2_vertex v = Delaunay2_vertex()
+        v.assign(self.T, vc)
+        return v
 
     def edge_info(self, max_incl, idx):
         return self._edge_info(max_incl, idx)

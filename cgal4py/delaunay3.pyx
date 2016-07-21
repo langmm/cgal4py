@@ -34,6 +34,20 @@ cdef class Delaunay3_vertex:
     cdef Delaunay_with_info_3[uint32_t] *T
     cdef Delaunay_with_info_3[uint32_t].Vertex x
 
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     Delaunay_with_info_3[uint32_t].Vertex x):
+        r"""Assign C++ objects to attributes.
+
+            Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+                that this vertex belongs to. 
+            x (:obj:`Delaunay_with_info_3[uint32_t].Vertex`): C++ vertex object 
+                Direct interaction with this object is not recommended. 
+
+        """
+        self.T = T
+        self.x = x
+
     def __richcmp__(Delaunay3_vertex self, Delaunay3_vertex solf, int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -64,6 +78,32 @@ cdef class Delaunay3_vertex:
         def __get__(self):
             cdef np.uint64_t out = self.x.info()
             return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this vertex.
+
+        Returns:
+            Delaunay3_cell_vector: Iterator over cells incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_vertices(self):
+        r"""Find vertices that are adjacent to this vertex.
+
+        Returns:
+            Delaunay3_vertex_vector: Iterator over cells incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        out.assign(self.T, it)
+        return out
 
 
 cdef class Delaunay3_vertex_iter:
@@ -123,8 +163,7 @@ cdef class Delaunay3_vertex_iter:
         r"""Delaunay3_vertex: Corresponding vertex object."""
         def __get__(self):
             cdef Delaunay3_vertex out = Delaunay3_vertex()
-            out.T = self.T
-            out.x = Delaunay_with_info_3[uint32_t].Vertex(self.x)
+            out.assign(self.T, Delaunay_with_info_3[uint32_t].Vertex(self.x))
             return out
 
 
@@ -169,6 +208,53 @@ cdef class Delaunay3_vertex_range:
             return out
         else:
             raise StopIteration()
+
+cdef class Delaunay3_vertex_vector:
+    r"""Wrapper class for a vector of vertices.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            Direct interaction with this object is not recommended.
+        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Vertex]`): Vector of C++ 
+            vertices.
+        n (int): The number of vertices in the vector.
+        i (int): The index of the currect vertex.
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef vector[Delaunay_with_info_3[uint32_t].Vertex] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     vector[Delaunay_with_info_3[uint32_t].Vertex] v):
+        r"""Assign C++ attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+                Direct interaction with this object is not recommended.
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Vertex]`): Vector of 
+                C++ vertices.
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay3_vertex out
+        if self.i < self.n:
+            out = Delaunay3_vertex()
+            out.assign(self.T, self.v[self.i])
+            self.i += 1
+            return out
+        else:
+            raise StopIteration()
+
 
 cdef class Delaunay3_cell:
     r"""Wrapper class for a triangulation cell.
@@ -313,6 +399,53 @@ cdef class Delaunay3_cell_range:
                 self.x.increment()
         cdef Delaunay3_cell out = self.x.cell
         if self.x != self.xstop:
+            return out
+        else:
+            raise StopIteration()
+
+cdef class Delaunay3_cell_vector:
+    r"""Wrapper class for a vector of cells.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            Direct interaction with this object is not recommended.
+        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of C++ 
+            cells.
+        n (int): The number of cells in the vector.
+        i (int): The index of the currect cell.
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef vector[Delaunay_with_info_3[uint32_t].Cell] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     vector[Delaunay_with_info_3[uint32_t].Cell] v):
+        r"""Assign C++ attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+                Direct interaction with this object is not recommended.
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of 
+                C++ cells.
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay3_cell out
+        if self.i < self.n:
+            out = Delaunay3_cell()
+            out.T = self.T
+            out.x = self.v[self.i]
+            self.i += 1
             return out
         else:
             raise StopIteration()
@@ -462,6 +595,22 @@ cdef class Delaunay3:
         triangulation."""
         return Delaunay3_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
+
+    def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
+        r"""Determine which vertex is closes to a given set of x,y coordinates.
+
+        Args:
+            x (:obj:`ndarray` of float64): x,y coordinates. 
+
+        Returns: 
+            Delaunay3_vertex: Vertex closest to x. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex vc
+        vc = self.T.nearest_vertex(&x[0])
+        cdef Delaunay3_vertex v = Delaunay3_vertex()
+        v.assign(self.T, vc)
+        return v
 
     def edge_info(self, max_incl, idx):
         return self._edge_info(max_incl, idx)

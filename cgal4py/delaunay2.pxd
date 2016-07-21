@@ -26,9 +26,6 @@ cdef extern from "c_delaunay2.hpp":
             All_verts_iter& operator--()
             bool operator==(All_verts_iter other)
             bool operator!=(All_verts_iter other)
-            # void point(double* out)
-            # vector[double] point()
-            # Info info()
         All_verts_iter all_verts_begin()
         All_verts_iter all_verts_end()
 
@@ -50,12 +47,6 @@ cdef extern from "c_delaunay2.hpp":
         All_cells_iter all_cells_begin()
         All_cells_iter all_cells_end()
 
-        cppclass Cell:
-            Cell()
-            Cell(All_cells_iter c)
-            bool operator==(Cell other)
-            bool operator!=(Cell other)
-
         cppclass Cell_circ:
             Cell_circ()
             Cell_circ& operator++()
@@ -64,13 +55,25 @@ cdef extern from "c_delaunay2.hpp":
             bool operator!=(Cell_circ other)
             bool is_done()
 
+        cppclass Cell:
+            Cell()
+            Cell(All_cells_iter c)
+            Cell(Cell_circ c)
+            bool operator==(Cell other)
+            bool operator!=(Cell other)
+
         bool is_infinite(Vertex x)
         bool is_infinite(Cell x)
         bool is_infinite(All_verts_iter x)
         bool is_infinite(All_cells_iter x)
-        # Cell_circ incident_cells(All_verts_iter x)
-        All_cells_iter incident_cells(All_verts_iter x)
+
+        vector[Cell] incident_cells(Vertex x)
+        vector[Vertex] incident_vertices(Vertex x)
+
+        Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)
+
+
 
 cdef class Delaunay2:
     cdef int n

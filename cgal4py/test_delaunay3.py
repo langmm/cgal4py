@@ -19,7 +19,7 @@ nverts = nverts_fin + nverts_inf
 ncells_fin = 12
 ncells_inf = 12
 ncells = ncells_fin + ncells_inf
-
+# vert_incident_cells = [12, 
 
 def test_create():
     T = Delaunay3()
@@ -118,5 +118,42 @@ def test_io():
     assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
 
-# TODO: test circumcenter
+def test_circumcenter():
+    # TODO: value test
+    T = Delaunay3()
+    T.insert(pts)
+    for c in T.all_cells:
+        out = c.circumcenter()
 
+def test_vert_incident_cells():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts:
+        c0 = 0
+        for c in v.incident_cells():
+            c0 += 1
+            count += 1
+        print(v.index, c0)
+    print(count)
+    assert(count == 96)
+
+def test_vert_incident_verts():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts:
+        c0 = 0
+        for c in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(v.index, c0)
+    print(count)
+    assert(count == 68)
+    
+def test_nearest_vertex():
+    idx_test = 8
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.nearest_vertex(pts[idx_test,:]-0.1)
+    assert(v.index == idx_test)

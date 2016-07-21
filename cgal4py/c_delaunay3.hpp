@@ -56,112 +56,131 @@ class Delaunay_with_info_3
   uint32_t num_edges() { return T.number_of_edges(); }
   uint32_t num_cells() { return T.number_of_cells(); }
 
+  template <typename Wrap, typename Wrap_handle>
+  class wrap_insert_iterator
+  {
+  protected:
+    std::vector<Wrap>* container;
+
+  public:
+    explicit wrap_insert_iterator (std::vector<Wrap>& x) : container(&x) {}
+    wrap_insert_iterator& operator= (Wrap_handle value) {
+      Wrap value_wrap = Wrap();
+      value_wrap._x = value;
+      container->push_back(value_wrap);
+      return *this;
+    }
+    wrap_insert_iterator& operator* ()
+    { return *this; }
+    wrap_insert_iterator& operator++ ()
+    { return *this; }
+    wrap_insert_iterator operator++ (int)
+    { return *this; }
+  };
+
   class All_verts_iter {
   public:
-    All_vertices_iterator _v = All_vertices_iterator();
+    All_vertices_iterator _x = All_vertices_iterator();
     All_verts_iter() {
-      _v = All_vertices_iterator();
+      _x = All_vertices_iterator();
     }
-    All_verts_iter(All_vertices_iterator v) { _v = v; }
+    All_verts_iter(All_vertices_iterator x) { _x = x; }
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
-      _v++;
+      _x++;
       return *this;
     }
     All_verts_iter& operator--() {
-      _v--;
+      _x--;
       return *this;
     }
-    bool operator==(All_verts_iter other) { return (_v == other._v); }
-    bool operator!=(All_verts_iter other) { return (_v != other._v); }
-    // void point(double* out) {
-    //   Point p = _v->point();
-    //   out[0] = p.x();
-    //   out[1] = p.y();
-    //   out[2] = p.z();
-    // }
-    // std::vector<double> point() {
-    //   std::vector<double> out;
-    //   Point p = _v->point();
-    //   out.push_back(p.x());
-    //   out.push_back(p.y());
-    //   out.push_back(p.z());
-    //   return out;
-    // }
-    // Info info() {
-    //   return _v->info();
-    // }
+    bool operator==(All_verts_iter other) { return (_x == other._x); }
+    bool operator!=(All_verts_iter other) { return (_x != other._x); }
   };
   All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
   All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
 
+  class Cell; // forward declaration
+
   class Vertex {
   public:
-    Vertex_handle _v = Vertex_handle();
-    Vertex() { _v = Vertex_handle(); }
-    Vertex(All_verts_iter v) { _v = static_cast<Vertex_handle>(v._v); }
-    bool operator==(Vertex other) { return (_v == other._v); }
-    bool operator!=(Vertex other) { return (_v != other._v); }
+    Vertex_handle _x = Vertex_handle();
+    Vertex() { _x = Vertex_handle(); }
+    Vertex(All_verts_iter x) { _x = static_cast<Vertex_handle>(x._x); }
+    bool operator==(Vertex other) { return (_x == other._x); }
+    bool operator!=(Vertex other) { return (_x != other._x); }
     void point(double* out) {
-      Point p = _v->point();
+      Point p = _x->point();
       out[0] = p.x();
       out[1] = p.y();
       out[2] = p.z();
     }
-    std::vector<double> point() {
-      std::vector<double> out;
-      Point p = _v->point();
-      out.push_back(p.x());
-      out.push_back(p.y());
-      out.push_back(p.z());
-      return out;
-    }
     Info info() {
-      return _v->info();
+      return _x->info();
     }
   };
 
   class All_cells_iter {
   public:
-    All_cells_iterator _c = All_cells_iterator();
+    All_cells_iterator _x = All_cells_iterator();
     All_cells_iter() {
-      _c = All_cells_iterator();
+      _x = All_cells_iterator();
     }
-    All_cells_iter(All_cells_iterator c) { _c = c; }
+    All_cells_iter(All_cells_iterator x) { _x = x; }
     All_cells_iter& operator*() { return *this; }
     All_cells_iter& operator++() {
-      _c++;
+      _x++;
       return *this;
     }
     All_cells_iter& operator--() {
-      _c--;
+      _x--;
       return *this;
     }
-    bool operator==(All_cells_iter other) { return (_c == other._c); }
-    bool operator!=(All_cells_iter other) { return (_c != other._c); }
+    bool operator==(All_cells_iter other) { return (_x == other._x); }
+    bool operator!=(All_cells_iter other) { return (_x != other._x); }
   };
   All_cells_iter all_cells_begin() { return All_cells_iter(T.all_cells_begin()); }
   All_cells_iter all_cells_end() { return All_cells_iter(T.all_cells_end()); }
 
   class Cell {
   public:
-    Cell_handle _c = Cell_handle();
-    Cell() { _c = Cell_handle(); }
-    Cell(All_cells_iter c) { _c = static_cast<Cell_handle>(c._c); }
-    bool operator==(Cell other) { return (_c == other._c); }
-    bool operator!=(Cell other) { return (_c != other._c); }
+    Cell_handle _x = Cell_handle();
+    Cell() { _x = Cell_handle(); }
+    Cell(All_cells_iter x) { _x = static_cast<Cell_handle>(x._x); }
+    bool operator==(Cell other) { return (_x == other._x); }
+    bool operator!=(Cell other) { return (_x != other._x); }
   };
 
-  bool is_infinite(Vertex x) { return T.is_infinite(x._v); }
-  bool is_infinite(Cell x) { return T.is_infinite(x._c); }
-  bool is_infinite(All_verts_iter x) { return T.is_infinite(x._v); }
-  bool is_infinite(All_cells_iter x) { return T.is_infinite(x._c); }
+  bool is_infinite(Vertex x) { return T.is_infinite(x._x); }
+  bool is_infinite(Cell x) { return T.is_infinite(x._x); }
+  bool is_infinite(All_verts_iter x) { return T.is_infinite(x._x); }
+  bool is_infinite(All_cells_iter x) { return T.is_infinite(x._x); }
+
+  std::vector<Cell> incident_cells(Vertex x) {
+    std::vector<Cell> out;
+    T.incident_cells(x._x, wrap_insert_iterator<Cell,Cell_handle>(out));
+    return out;
+  }
+  
+  std::vector<Vertex> incident_vertices(Vertex x) {
+    std::vector<Vertex> out;
+    T.adjacent_vertices(x._x, wrap_insert_iterator<Vertex,Vertex_handle>(out));
+    return out;
+  }
+
+  Vertex nearest_vertex(double* pos) {
+    Point p = Point(pos[0], pos[1], pos[2]);
+    Vertex out = Vertex(T.nearest_vertex(p));
+    return out;
+  }
+
   void circumcenter(Cell x, double* out) {
-    Point p = (x._c)->circumcenter();
+    Point p = x._x->circumcenter();
     out[0] = p.x();
     out[1] = p.y();
     out[2] = p.z();
   }
+
 
   void write_to_file(const char* filename)
   {
