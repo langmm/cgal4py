@@ -79,6 +79,13 @@ cdef class Delaunay3_vertex:
             cdef np.uint64_t out = self.x.info()
             return out
 
+    property volume:
+        r"""float64: The volume of the dual Voronoi cell. If the volume is 
+        infinite, -1.0 is returned."""
+        def __get__(self):
+            cdef np.float64_t out = self.T.dual_volume(self.x)
+            return out
+
     def incident_cells(self):
         r"""Find cells that are incident to this vertex.
 

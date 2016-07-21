@@ -198,6 +198,32 @@ class Delaunay_with_info_2
     out[1] = p.y();
   }
 
+  double dual_area(const Vertex v) {
+
+    Face_circulator fstart = T.incident_faces(v._x);
+    Face_circulator fcit = fstart;
+    std::vector<Point> pts;
+
+
+    pts.push_back(T.circumcenter(fstart));
+    fcit++;
+    for ( ; fcit != fstart; fcit++) {
+      if (T.is_infinite(fcit))
+	return -1.0;
+      Point dual = T.circumcenter(fcit);
+      pts.push_back(dual);
+    }
+    pts.push_back(T.circumcenter(fstart));
+
+    double vol = 0.0;
+    Point orig = v._x->point();
+    for (uint32_t i=0 ; i<pts.size()-1 ; i++) {
+      vol = vol + Triangle(orig,pts[i],pts[i+1]).area();
+    }
+
+    return vol;
+  }
+
   void write_to_file(const char* filename)
   {
     std::ofstream os(filename, std::ios::binary);
@@ -368,32 +394,6 @@ class Delaunay_with_info_2
       edges.push_back( std::make_pair( i1, i2 ) );
     }
   }
-  double dual_area(const Vertex_handle &v) {
-
-    Face_circulator fstart = T.incident_faces(v);
-    Face_circulator fcit = fstart;
-    std::vector<Point> pts;
-
-
-    pts.push_back(T.circumcenter(fstart));
-    fcit++;
-    for ( ; fcit != fstart; fcit++) {
-      if (T.is_infinite(fcit))
-	return -1.0;
-      Point dual = T.circumcenter(fcit);
-      pts.push_back(dual);
-    }
-    pts.push_back(T.circumcenter(fstart));
-
-    double vol = 0.0;
-    Point orig = v->point();
-    for (uint32_t i=0 ; i<pts.size()-1 ; i++) {
-      vol = vol + Triangle(orig,pts[i],pts[i+1]).area();
-    }
-
-    return vol;
-  }
-
   void outgoing_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly,
                        std::vector<Info>& rx, std::vector<Info>& ry,

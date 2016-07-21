@@ -72,7 +72,7 @@ cdef extern from "c_delaunay2.hpp":
 
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)
-
+        double dual_area(const Vertex v)
 
 
 cdef class Delaunay2:

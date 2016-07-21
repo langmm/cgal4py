@@ -155,3 +155,11 @@ def test_nearest_vertex():
     T.insert(pts)
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
+
+def test_dual_volume():
+    T = Delaunay2()
+    T.insert(pts)
+    for v in T.finite_verts:
+        print(v.index,v.volume)
+        if v.index >= 4:
+            assert(np.isclose(v.volume, -1.0))

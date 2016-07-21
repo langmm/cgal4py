@@ -66,7 +66,7 @@ cdef extern from "c_delaunay3.hpp":
 
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)
-
+        double dual_volume(const Vertex v)
 
 cdef class Delaunay3:
     cdef int n

@@ -181,6 +181,31 @@ class Delaunay_with_info_3
     out[2] = p.z();
   }
 
+  double dual_volume(const Vertex v) {
+    std::list<Edge> edges;
+    T.incident_edges(v._x, std::back_inserter(edges));
+
+    Point orig = v._x->point();
+    double vol = 0.0;
+    for (typename std::list<Edge>::iterator eit = edges.begin() ;
+         eit != edges.end() ; ++eit) {
+
+      Facet_circulator fstart = T.incident_facets(*eit);
+      Facet_circulator fcit = fstart;
+      std::vector<Point> pts;
+      do {
+	if (T.is_infinite(fcit->first))
+	  return -1.0;
+        Point dual_orig = fcit->first->circumcenter();
+        pts.push_back(dual_orig);
+        ++fcit;
+      } while (fcit != fstart);
+
+      for (uint32_t i=1 ; i<pts.size()-1 ; i++)
+        vol += Tetrahedron(orig,pts[0],pts[i],pts[i+1]).volume();
+    }
+    return vol;
+  }
 
   void write_to_file(const char* filename)
   {
@@ -347,31 +372,6 @@ class Delaunay_with_info_3
     }
   }
 
-  double dual_volume(const Vertex_handle &v) {
-    std::list<Edge> edges;
-    T.incident_edges(v, std::back_inserter(edges));
-
-    Point orig = v->point();
-    double vol = 0.0;
-    for (typename std::list<Edge>::iterator eit = edges.begin() ;
-         eit != edges.end() ; ++eit) {
-
-      Facet_circulator fstart = T.incident_facets(*eit);
-      Facet_circulator fcit = fstart;
-      std::vector<Point> pts;
-      do {
-	if (T.is_infinite(fcit->first))
-	  return -1.0;
-        Point dual_orig = fcit->first->circumcenter();
-        pts.push_back(dual_orig);
-        ++fcit;
-      } while (fcit != fstart);
-
-      for (uint32_t i=1 ; i<pts.size()-1 ; i++)
-        vol += Tetrahedron(orig,pts[0],pts[i],pts[i+1]).volume();
-    }
-    return vol;
-  }
   void outgoing_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly, std::vector<Info>& lz,
                        std::vector<Info>& rx, std::vector<Info>& ry, std::vector<Info>& rz,
