@@ -55,6 +55,29 @@ class Delaunay_with_info_2
   }
   uint32_t num_verts() { return (num_finite_verts() + num_infinite_verts()); }
   uint32_t num_cells() { return (num_finite_cells() + num_infinite_cells()); }
+  class Vertex;
+  class Cell;
+
+  void insert(double *pts, Info *val, uint32_t n)
+  {
+    uint32_t i, j;
+    std::vector< std::pair<Point,Info> > points;
+    for (i = 0; i < n; i++) {
+      j = 2*i;
+      points.push_back( std::make_pair( Point(pts[j],pts[j+1]), val[i]) );
+    }
+    T.insert( points.begin(),points.end() );
+  }
+  void remove(Vertex v) { T.remove(v._x); }
+
+  Vertex get_vertex(Info index) {
+    Finite_vertices_iterator it = T.finite_vertices_begin();
+    for ( ; it != T.finite_vertices_end(); it++) {
+      if (it->info() == index)
+	return Vertex(static_cast<Vertex_handle>(it));
+    }
+    return Vertex(T.infinite_vertex());
+  }
 
   class All_verts_iter {
   public:
@@ -375,16 +398,6 @@ class Delaunay_with_info_2
     }
   }
 
-  void insert(double *pts, Info *val, uint32_t n)
-  {
-    uint32_t i, j;
-    std::vector< std::pair<Point,Info> > points;
-    for (i = 0; i < n; i++) {
-      j = 2*i;
-      points.push_back( std::make_pair( Point(pts[j],pts[j+1]), val[i]) );
-    }
-    T.insert( points.begin(),points.end() );
-  }
   void edge_info(std::vector< std::pair<Info,Info> >& edges)
   {
     Info i1, i2;

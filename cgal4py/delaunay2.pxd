@@ -9,15 +9,23 @@ cdef extern from "c_delaunay2.hpp":
     cdef cppclass Delaunay_with_info_2[Info]:
         Delaunay_with_info_2() except +
         Delaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
-        void write_to_file(const char* filename) except +
-        void read_from_file(const char* filename) except +
-        void insert(double *, Info *val, uint32_t n)
         uint32_t num_finite_verts()
         uint32_t num_finite_cells()
         uint32_t num_infinite_verts()
         uint32_t num_infinite_cells()
         uint32_t num_verts()
         uint32_t num_cells()
+
+        cppclass Vertex
+        cppclass Cell
+
+        void insert(double *, Info *val, uint32_t n)
+        void remove(Vertex v)
+        void write_to_file(const char* filename) except +
+        void read_from_file(const char* filename) except +
+
+        Vertex get_vertex(Info index)
+
         void edge_info(vector[pair[Info,Info]]& edges)
 
         cppclass All_verts_iter:
