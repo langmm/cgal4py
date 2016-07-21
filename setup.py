@@ -21,7 +21,7 @@ if use_cython:
                                        include_dirs=[numpy.get_include()],
                                        libraries=['gmp'],
                                        extra_link_args=["-lgmp"],
-                                       extra_compile_args=["-std=gnu++11"]),
+                                       extra_compile_args=["-std=c++11"]),# "-std=gnu++11",
                              compiler_directives={'linetrace':True})
     ext_modules += cythonize(Extension("cgal4py/delaunay3",
                                        sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
@@ -29,7 +29,7 @@ if use_cython:
                                        include_dirs=[numpy.get_include()],
                                        libraries=['gmp'],
                                        extra_link_args=["-lgmp"],
-                                       extra_compile_args=["-std=gnu++11"]),
+                                       extra_compile_args=["-std=c++11"]),#"-std=gnu++11"]),
                              compiler_directives={'linetrace':True})
     # ext_modules += cythonize(Extension("cgal4py/kdtree",
     #                          sources=["cgal4py/kdtree.pyx","cgal4py/c_kdtree.cpp"],

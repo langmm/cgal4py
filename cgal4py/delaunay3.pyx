@@ -559,6 +559,31 @@ cdef class Delaunay3:
             print "There were {} duplicates".format(self.n-self.num_finite_verts)
         # assert(self.n == self.num_finite_verts)
 
+    def remove(self, Delaunay3_vertex x):
+        r"""Remove a vertex from the triangulation. 
+
+        Args: 
+            x (Delaunay3_vertex): Vertex that should be removed. 
+
+        """
+        self.T.remove(x.x)
+
+    def get_vertex(self, np.uint64_t index):
+        r"""Get the vertex object corresponding to the given index. 
+
+        Args: 
+            index (np.uint64_t): Index of vertex that should be found. 
+
+        Returns: 
+            Delaunay3_vertex: Vertex corresponding to the given index. If the 
+                index is not found, the infinite vertex is returned. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex v = self.T.get_vertex(index)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, v)
+        return out
+
     @property
     def all_verts_begin(self):
         r"""Delaunay3_vertex_iter: Starting vertex for all vertices in the 

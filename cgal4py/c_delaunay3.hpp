@@ -56,6 +56,30 @@ class Delaunay_with_info_3
   uint32_t num_edges() { return T.number_of_edges(); }
   uint32_t num_cells() { return T.number_of_cells(); }
 
+  class Vertex;
+  class Cell;
+
+  void insert(double *pts, Info *val, uint32_t n)
+  {
+    uint32_t i, j;
+    std::vector< std::pair<Point,Info> > points;
+    for (i = 0; i < n; i++) {
+      j = 3*i;
+      points.push_back( std::make_pair( Point(pts[j],pts[j+1],pts[j+2]), val[i]) );
+    }
+    T.insert( points.begin(),points.end() );
+  }
+  void remove(Vertex v) { T.remove(v._x); }
+
+  Vertex get_vertex(Info index) {
+    Finite_vertices_iterator it = T.finite_vertices_begin();
+    for ( ; it != T.finite_vertices_end(); it++) {
+      if (it->info() == index)
+        return Vertex(static_cast<Vertex_handle>(it));
+    }
+    return Vertex(T.infinite_vertex());
+  }
+
   template <typename Wrap, typename Wrap_handle>
   class wrap_insert_iterator
   {
@@ -99,8 +123,6 @@ class Delaunay_with_info_3
   };
   All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
   All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
-
-  class Cell; // forward declaration
 
   class Vertex {
   public:
@@ -351,16 +373,6 @@ class Delaunay_with_info_3
 
       is.close();
     }
-  }
-  void insert(double *pts, Info *val, uint32_t n)
-  {
-    uint32_t i, j;
-    std::vector< std::pair<Point,Info> > points;
-    for (i = 0; i < n; i++) {
-      j = 3*i;
-      points.push_back( std::make_pair( Point(pts[j],pts[j+1],pts[j+2]), val[i]) );
-    }
-    T.insert( points.begin(),points.end() );
   }
   void edge_info(std::vector< std::pair<Info,Info> >& edges)
   {

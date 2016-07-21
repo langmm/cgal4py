@@ -32,6 +32,20 @@ def test_insert_dup():
     T = Delaunay3()
     T.insert(pts_dup)
 
+def test_get_vertex():
+    T = Delaunay3()
+    T.insert(pts)
+    for i in range(nverts_fin):
+        v = T.get_vertex(i)
+        assert(np.allclose(v.point, pts[i,:]))
+
+def test_remove():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    T.remove(v)
+    assert(T.num_verts == (nverts-1))
+
 def test_num_verts():
     T = Delaunay3()
     T.insert(pts)

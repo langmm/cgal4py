@@ -1,3 +1,8 @@
+# distutils: language = c++
+# distutils: libraries = CGAL
+# cython: linetrace=True
+# distutils: define_macros=CYTHON_TRACE=1
+
 cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.set cimport set as cset

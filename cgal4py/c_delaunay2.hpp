@@ -55,6 +55,7 @@ class Delaunay_with_info_2
   }
   uint32_t num_verts() { return (num_finite_verts() + num_infinite_verts()); }
   uint32_t num_cells() { return (num_finite_cells() + num_infinite_cells()); }
+
   class Vertex;
   class Cell;
 
@@ -74,7 +75,7 @@ class Delaunay_with_info_2
     Finite_vertices_iterator it = T.finite_vertices_begin();
     for ( ; it != T.finite_vertices_end(); it++) {
       if (it->info() == index)
-	return Vertex(static_cast<Vertex_handle>(it));
+    	return Vertex(static_cast<Vertex_handle>(it));
     }
     return Vertex(T.infinite_vertex());
   }

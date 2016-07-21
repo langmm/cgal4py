@@ -1,3 +1,8 @@
+# distutils: language = c++
+# distutils: libraries = CGAL
+# cython: linetrace=True
+# distutils: define_macros=CYTHON_TRACE=1
+
 cimport numpy as np
 from libcpp.vector cimport vector
 from libcpp.set cimport set as cset
@@ -9,9 +14,6 @@ cdef extern from "c_delaunay3.hpp":
     cdef cppclass Delaunay_with_info_3[Info]:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
-        void write_to_file(const char* filename) except +
-        void read_from_file(const char* filename) except +
-        void insert(double *, Info *val, uint32_t n)
         uint32_t num_finite_verts()
         uint32_t num_finite_edges()
         uint32_t num_finite_cells()
@@ -21,6 +23,17 @@ cdef extern from "c_delaunay3.hpp":
         uint32_t num_verts()
         uint32_t num_edges()
         uint32_t num_cells()
+
+        cppclass Vertex
+        cppclass Cell
+
+        void insert(double *, Info *val, uint32_t n) except +
+        void remove(Vertex) except +
+        void write_to_file(const char* filename) except +
+        void read_from_file(const char* filename) except +
+
+        Vertex get_vertex(Info index) except +
+
         void edge_info(vector[pair[Info,Info]]& edges)
 
         cppclass All_verts_iter:
