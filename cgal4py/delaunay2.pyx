@@ -576,6 +576,47 @@ cdef class Delaunay2:
         """
         self.T.remove(x.x)
 
+    def move(self, Delaunay2_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Move a vertex to a new location. If there is a vertex at the given 
+        given coordinates, return that vertex and remove the one that was being 
+        moved.
+
+        Args:
+            x (Delaunay2_vertex): Vertex that should be moved.
+            pos (:obj:`ndarray` of float64): x,y coordinates that the vertex 
+                be moved to.
+
+        Returns:
+            Delaunay2_vertex: Vertex at the new position.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Vertex v
+        v = self.T.move(x.x, &pos[0])
+        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        out.assign(self.T, v)
+        return out
+
+    def move_if_no_collision(self, Delaunay2_vertex x, 
+                             np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Move a vertex to a new location only if there is not already a 
+        vertex at the given coordinates. If there is a vertex there, it is 
+        returned and the vertex being moved remains at its original location.
+
+        Args:
+            x (Delaunay2_vertex): Vertex that should be moved.
+            pos (:obj:`ndarray` of float64): x,y coordinates that the vertex 
+                be moved to.
+
+        Returns:
+            Delaunay2_vertex: Vertex at the new position.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Vertex v
+        v = self.T.move_if_no_collision(x.x, &pos[0])
+        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        out.assign(self.T, v)
+        return out
+
     def get_vertex(self, np.uint64_t index):
         r"""Get the vertex object corresponding to the given index.
 

@@ -26,6 +26,10 @@ def test_insert():
     T = Delaunay2()
     T.insert(pts)
 
+def test_insert_dup():
+    T = Delaunay2()
+    T.insert(pts_dup)
+
 def test_get_vertex():
     T = Delaunay2()
     T.insert(pts)
@@ -40,9 +44,18 @@ def test_remove():
     T.remove(v)
     assert(T.num_verts == (nverts-1))
 
-def test_insert_dup():
+def test_move():
     T = Delaunay2()
-    T.insert(pts_dup)
+    T.insert(pts)
+    v0 = T.get_vertex(0)
+    new_pos = np.zeros(2,'float64')
+    v = T.move(v0, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(np.allclose(v0.point, new_pos))
+    v1 = T.get_vertex(1)
+    v = T.move(v1, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(T.num_verts == (nverts-1))
 
 def test_num_verts():
     T = Delaunay2()

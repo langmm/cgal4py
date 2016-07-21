@@ -71,6 +71,15 @@ class Delaunay_with_info_2
   }
   void remove(Vertex v) { T.remove(v._x); }
 
+  Vertex move(Vertex v, double *pos) {
+    Point p = Point(pos[0], pos[1]);
+    return Vertex(T.move(v._x, p));
+  }
+  Vertex move_if_no_collision(Vertex v, double *pos) {
+    Point p = Point(pos[0], pos[1]);
+    return Vertex(T.move_if_no_collision(v._x, p));
+  }
+
   Vertex get_vertex(Info index) {
     Finite_vertices_iterator it = T.finite_vertices_begin();
     for ( ; it != T.finite_vertices_end(); it++) {
