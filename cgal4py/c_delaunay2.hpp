@@ -344,6 +344,8 @@ class Delaunay_with_info_2
   }
 
   double length(const Edge e) {
+    if (is_infinite(e))
+      return -1.0;
     Point p1 = e._x1._x->point();
     Point p2 = e._x2._x->point();
     double out = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, p2)));

@@ -250,3 +250,13 @@ def test_dual_volume():
             assert(np.isclose(v.volume, 4.5))
         else:
             assert(np.isclose(v.volume, -1.0))
+
+def test_edge_length():
+    T = Delaunay3()
+    T.insert(pts)
+    for e in T.all_edges:
+        if e.is_infinite():
+            assert(np.isclose(e.length, -1.0))
+        else:
+            l = np.sqrt(np.sum((pts[e.vertex1.index,:]-pts[e.vertex2.index,:])**2.0))
+            assert(np.isclose(e.length, l))

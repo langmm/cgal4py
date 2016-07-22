@@ -300,6 +300,8 @@ class Delaunay_with_info_3
   }
 
   double length(const Edge e) {
+    if (is_infinite(e))
+      return -1.0;
     Vertex_handle v1 = e.v1()._x;
     Vertex_handle v2 = e.v2()._x;
     Point p1 = v1->point();
