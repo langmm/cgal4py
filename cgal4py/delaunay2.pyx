@@ -87,32 +87,6 @@ cdef class Delaunay2_vertex:
             cdef np.float64_t out = self.T.dual_area(self.x)
             return out
 
-    def incident_cells(self):
-        r"""Find cells that are incident to this vertex.
-
-        Returns:
-            Delaunay2_cell_vector: Iterator over cells incident to this vertex.
-
-        """
-        cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
-        it = self.T.incident_cells(self.x)
-        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
-        out.assign(self.T, it)
-        return out
-
-    def incident_edges(self):
-        r"""Find edges that are incident to this vertex.
-
-        Returns:
-            Delaunay2_edge_vector: Iterator over edges incident to this vertex.
-
-        """
-        cdef vector[Delaunay_with_info_2[uint32_t].Edge] it
-        it = self.T.incident_edges(self.x)
-        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
-        out.assign(self.T, it)
-        return out
-
     def incident_vertices(self):
         r"""Find vertices that are incident to this vertex.
 
@@ -127,6 +101,32 @@ cdef class Delaunay2_vertex:
         out.assign(self.T, it)
         return out
         
+    def incident_edges(self):
+        r"""Find edges that are incident to this vertex.
+
+        Returns:
+            Delaunay2_edge_vector: Iterator over edges incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this vertex.
+
+        Returns:
+            Delaunay2_cell_vector: Iterator over cells incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        out.assign(self.T, it)
+        return out
+
 
 cdef class Delaunay2_vertex_iter:
     r"""Wrapper class for a triangulation vertex iterator.
@@ -335,21 +335,6 @@ cdef class Delaunay2_edge:
             cdef np.float64_t out = self.T.length(self.x)
             return out
 
-    def incident_cells(self):
-        r"""Find cells that are incident to this edge.
-
-        Returns:
-            Delaunay2_cell_vector: Iterator over cells incident to this edge.
-
-        """
-        pass
-        # TODO:
-        # cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
-        # it = self.T.incident_cells(self.x)
-        # cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
-        # out.assign(self.T, it)
-        # return out
-
     def incident_vertices(self):
         r"""Find vertices that are incident to this edge.
 
@@ -359,11 +344,39 @@ cdef class Delaunay2_edge:
 
         """
         cdef vector[Delaunay_with_info_2[uint32_t].Vertex] it
-        it.push_back(self.x.v1())
-        it.push_back(self.x.v2())
+        it = self.T.incident_vertices(self.x)
+        # it.push_back(self.x.v1())
+        # it.push_back(self.x.v2())
         cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
         out.assign(self.T, it)
         return out
+
+    def incident_edges(self):
+        r"""Find edges that are incident to this edge.
+
+        Returns:
+            Delaunay2_edge_vector: Iterator over edges incident to this edge.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this edge.
+
+        Returns:
+            Delaunay2_cell_vector: Iterator over cells incident to this edge.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        out.assign(self.T, it)
+        return out
+
         
 
 cdef class Delaunay2_edge_iter:
@@ -519,6 +532,20 @@ cdef class Delaunay2_cell:
     cdef Delaunay_with_info_2[uint32_t] *T
     cdef Delaunay_with_info_2[uint32_t].Cell x
     
+    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T,
+                     Delaunay_with_info_2[uint32_t].Cell x):
+        r"""Assign C++ objects to attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ Triangulation object 
+                that this edge belongs to.
+            x (:obj:`Delaunay_with_info_2[uint32_t].Cell`): C++ cell 
+                object. Direct interaction with this object is not recommended.
+
+        """
+        self.T = T
+        self.x = x
+
     def __richcmp__(Delaunay2_cell self, Delaunay2_cell solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
@@ -536,6 +563,86 @@ cdef class Delaunay2_cell:
 
         """
         return self.T.is_infinite(self.x)
+
+    def vertex(self, int i):
+        r"""Find the ith vertex that is incident to this cell.
+
+        Args:
+            i (int): The index of the vertex that should be returned.
+
+        Returns:
+            Delaunay2_vertex: The ith vertex incident to this cell.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Vertex v
+        v = self.x.vertex(i)
+        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        out.assign(self.T, v)
+        return out
+
+    def has_vertex(self, Delaunay2_vertex v, pybool return_index = False):
+        r"""Determine if a vertex belongs to this cell.
+
+        Args:
+            v (Delaunay2_vertex): Vertex to test ownership for.
+            return_index (:obj:`bool`, optional): If True, the index of the 
+                vertex within the cell is returned in the event that it is a 
+                vertex of the cell. Otherwise, the index is not returned.
+
+        Returns:
+            bool: True if the vertex is part of the cell, False otherwise. In 
+                the event that `return_index = True` and the vertex is a part of 
+                the cell, an integer specifying the index of the vertex within 
+                the cell will be returned instead.
+
+        """
+        cdef int i = -1
+        cdef cbool out
+        if return_index:
+            out = self.x.has_vertex(v.x, &i)
+            return i
+        else:
+            out = self.x.has_vertex(v.x)
+            return <pybool>out
+
+    def neighbor(self, int i):
+        r"""Find the neighboring cell opposite the ith vertex of this cell. 
+
+        Args:
+            i (int): The index of the neighboring cell that should be returned.
+
+        Returns:
+            Delaunay2_cell: The neighboring cell opposite the ith vertex.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Cell v
+        v = self.x.neighbor(i)
+        cdef Delaunay2_cell out = Delaunay2_cell()
+        out.assign(self.T, v)
+        return out
+
+    def has_neighbor(self, Delaunay2_cell v, pybool return_index = False):
+        r"""Determine if a cell is a neighbor to this cell.
+
+        Args:
+            v (Delaunay2_cell): Cell to test as a neighbor.
+            return_index (:obj:`bool`, optional): If True, the index of the 
+                neighbor within the cell is returned in the event that it is a 
+                neighbor of the cell. Otherwise, the index is not returned.
+
+        Returns:
+            bool: True if the given cell is a neighbor, False otherwise. In 
+                the event that `return_index = True` and the v is a neighbor of 
+                this cell, an integer specifying the index of the neighbor to 
+                will be returned instead.
+
+        """
+        cdef int i = -1
+        cdef cbool out = self.x.has_neighbor(v.x, &i)
+        if out and return_index:
+            return i
+        else:
+            return <pybool>out
 
     def circumcenter(self):
         r"""Determines the circumcenter of the cell.

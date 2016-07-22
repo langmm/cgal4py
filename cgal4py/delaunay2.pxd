@@ -100,6 +100,12 @@ cdef extern from "c_delaunay2.hpp":
             Cell(Cell_circ c)
             bool operator==(Cell other)
             bool operator!=(Cell other)
+            Vertex vertex(int i)
+            bool has_vertex(Vertex v)
+            bool has_vertex(Vertex v, int *i)
+            Cell neighbor(int i)
+            bool has_neighbor(Cell c)
+            bool has_neighbor(Cell c, int *i)
 
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)
@@ -108,9 +114,13 @@ cdef extern from "c_delaunay2.hpp":
         bool is_infinite(All_edges_iter x)
         bool is_infinite(All_cells_iter x)
 
-        vector[Cell] incident_cells(Vertex x)
-        vector[Edge] incident_edges(Vertex x)
         vector[Vertex] incident_vertices(Vertex x)
+        vector[Edge] incident_edges(Vertex x)
+        vector[Cell] incident_cells(Vertex x)
+
+        vector[Vertex] incident_vertices(Edge x)
+        vector[Edge] incident_edges(Edge x)
+        vector[Cell] incident_cells(Edge x)
 
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)

@@ -274,9 +274,17 @@ class Delaunay_with_info_2
     Cell(Face_handle x) { _x = x; }
     Cell(All_cells_iter x) { _x = static_cast<Face_handle>(x._x); }
     Cell(Cell_circ x) { _x = static_cast<Face_handle>(x._x); }
+    Cell(Vertex v1, Vertex v2, Vertex v3) { _x = Face_handle(v1._x, v2._x, v3._x); }
+    Cell(Vertex v1, Vertex v2, Vertex v3, Cell c1, Cell c2, Cell c3) {
+      _x = Face_handle(v1._x, v2._x, v3._x, c1._x, c2._x, c3._x); }
     bool operator==(Cell other) { return (_x == other._x); }
     bool operator!=(Cell other) { return (_x != other._x); }
-    Vertex vertex(int i) { return Vertex(_x.vertex(i)); }
+    Vertex vertex(int i) { return Vertex(_x->vertex(i)); }
+    bool has_vertex(Vertex v) { return _x->has_vertex(v._x); }
+    bool has_vertex(Vertex v, int *i) { return _x->has_vertex(v._x, *i); }
+    Cell neighbor(int i) { return Cell(_x->neighbor(i)); }
+    bool has_neighbor(Cell c) { return _x->has_neighbor(c._x); }
+    bool has_neighbor(Cell c, int *i) { return _x->has_neighbor(c._x, *i); }
   };
 
   bool is_infinite(Vertex x) { return T.is_infinite(x._x); }
@@ -291,6 +299,28 @@ class Delaunay_with_info_2
   bool is_infinite(All_edges_iter x) { return T.is_infinite(x._x); }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._x); }
 
+
+  // Constructs incident to a vertex
+  std::vector<Vertex> incident_vertices(Vertex x) {
+    std::vector<Vertex> out;
+    Vertex_circulator vc = T.incident_vertices(x._x), done(vc);
+    if (vc == 0)
+      return out;
+    do {
+      out.push_back(Vertex(static_cast<Vertex_handle>(vc)));
+    } while (++vc != done);
+    return out;
+  }
+  std::vector<Edge> incident_edges(Vertex x) {
+    std::vector<Edge> out;
+    Edge_circulator ec = T.incident_edges(x._x), done(ec);
+    if (ec == 0)
+      return out;
+    do {
+      out.push_back(Edge(ec));
+    } while (++ec != done);
+    return out;
+  }
   std::vector<Cell> incident_cells(Vertex x) {
     std::vector<Cell> out;
     Face_circulator fc = T.incident_faces(x._x), done(fc);
@@ -302,26 +332,38 @@ class Delaunay_with_info_2
     return out;
   }
 
-  std::vector<Edge> incident_edges(Vertex x) {
-    std::vector<Edge> out;
-    Edge_circulator ec = T.incident_edges(x._x), done(ec);
-    if (ec == 0)
-      return out;
-    do {
-      out.push_back(Edge(ec));
-    } while (++ec != done);
+  // Constructs incident to an edge
+  std::vector<Vertex> incident_vertices(Edge x) {
+    std::vector<Vertex> out;
+    out.push_back(x.v1());
+    out.push_back(x.v2());
     return out;
   }
-  
-  std::vector<Vertex> incident_vertices(Vertex x) {
-    std::vector<Vertex> out;
-    Vertex_circulator vc = T.incident_vertices(x._x), done(vc);
-    if (vc == 0)
-      return out;
-    do {
-      out.push_back(Vertex(static_cast<Vertex_handle>(vc)));
-    } while (++vc != done);
+  std::vector<Edge> incident_edges(Edge x) {
+    uint32_t i;
+    std::vector<Edge> out1, out2, out;
+    out1 = incident_edges(x.v1());
+    out2 = incident_edges(x.v2());
+    for (i = 0; i < out1.size(); i++) {
+      if (out1[i] != x)
+	out.push_back(out1[i]);
+    }
+    for (i = 0; i < out2.size(); i++) {
+      if (out2[i] != x)
+	out.push_back(out2[i]);
+    }
     return out;
+  }
+  std::vector<Cell> incident_cells(Edge x) {
+    uint32_t i;
+    std::vector<Cell> out1, out2;
+    out1 = incident_cells(x.v1());
+    out2 = incident_cells(x.v2());
+    for (i = 0; i < out2.size(); i++) {
+      if ((!out2[i].has_vertex(x.v1())) && (!out2[i].has_vertex(x.v2())))
+	out1.push_back(out2[i]);
+    }
+    return out1;
   }
 
   Vertex nearest_vertex(double* pos) {

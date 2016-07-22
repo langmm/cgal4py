@@ -149,6 +149,25 @@ def test_finite_cells():
         count += 1
     assert(count == T.num_finite_cells)
 
+def test_clear():
+    T = Delaunay2()
+    T.insert(pts)
+    T.clear()
+    print(T.num_finite_verts, T.num_cells)
+    assert(T.num_finite_verts == 0)
+    assert(T.num_cells == 0)
+
+def test_io():
+    fname = 'test_io2348_2.dat'
+    Tout = Delaunay2()
+    Tout.insert(pts)
+    Tout.write_to_file(fname)
+    Tin = Delaunay2()
+    Tin.read_from_file(fname)
+    assert(Tout.num_verts == Tin.num_verts)
+    assert(Tout.num_cells == Tin.num_cells)
+    os.remove(fname)
+
 def test_get_vertex():
     T = Delaunay2()
     T.insert(pts)
@@ -163,13 +182,20 @@ def test_remove():
     T.remove(v)
     assert(T.num_verts == (nverts-1))
 
-def test_clear():
+def test_vertex():
+    pass
+def test_edge():
+    pass
+def test_cell():
     T = Delaunay2()
     T.insert(pts)
-    T.clear()
-    print(T.num_finite_verts, T.num_cells)
-    assert(T.num_finite_verts == 0)
-    assert(T.num_cells == 0)
+    for c in T.all_cells:
+        v = c.vertex(0)
+        print(c.has_vertex(v))
+        print(c.has_vertex(v, return_index = True))
+        n = c.neighbor(0)
+        print(c.has_neighbor(n))
+        print(c.has_neighbor(n, return_index = True))
 
 def test_move():
     T = Delaunay2()
@@ -213,23 +239,38 @@ def test_flippable():
         T.flip(c, 0)
     assert(T.num_edges == nedges)
 
-def test_io():
-    fname = 'test_io2348_2.dat'
-    Tout = Delaunay2()
-    Tout.insert(pts)
-    Tout.write_to_file(fname)
-    Tin = Delaunay2()
-    Tin.read_from_file(fname)
-    assert(Tout.num_verts == Tin.num_verts)
-    assert(Tout.num_cells == Tin.num_cells)
-    os.remove(fname)
-
 def test_circumcenter():
     # TODO: value test
     T = Delaunay2()
     T.insert(pts)
     for c in T.all_cells:
         out = c.circumcenter()
+
+def test_vert_incident_verts():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts:
+        c0 = 0
+        for c in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(v.index, c0)
+    print(count)
+    assert(count == 42)
+
+def test_vert_incident_edges():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts:
+        c0 = 0
+        for e in v.incident_edges():
+            c0 += 1
+            count += 1
+        print(v.index, c0)
+    print(count)
+    assert(count == 42)
 
 def test_vert_incident_cells():
     T = Delaunay2()
@@ -244,31 +285,44 @@ def test_vert_incident_cells():
     print(count)
     assert(count == 42)
 
+def test_edge_incident_verts():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_edges:
+        c0 = 0
+        for e in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 42)
+
 def test_edge_incident_edges():
     T = Delaunay2()
     T.insert(pts)
     count = 0
-    for v in T.all_verts:
+    for v in T.all_edges:
         c0 = 0
         for e in v.incident_edges():
             c0 += 1
             count += 1
-        print(v.index, c0)
+        print(c0)
     print(count)
-    assert(count == 42)
+    assert(count == 156)
 
-def test_vert_incident_verts():
+def test_edge_incident_cells():
     T = Delaunay2()
     T.insert(pts)
     count = 0
-    for v in T.all_verts:
+    for v in T.all_edges:
         c0 = 0
-        for c in v.incident_vertices():
+        for e in v.incident_cells():
             c0 += 1
             count += 1
-        print(v.index, c0)
+        print(c0)
     print(count)
-    assert(count == 42)
+    assert(count == 100)
 
 def test_nearest_vertex():
     idx_test = 7
