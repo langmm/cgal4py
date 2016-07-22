@@ -116,7 +116,8 @@ cdef extern from "c_delaunay2.hpp":
         void circumcenter(Cell x, double* out)
         double dual_area(const Vertex v)
         double length(const Edge e)
-
+        bool flip(Cell x, int i)
+        void flip_flippable(Cell x, int i)
 
 cdef class Delaunay2:
     cdef int n

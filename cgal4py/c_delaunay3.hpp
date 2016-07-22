@@ -311,6 +311,13 @@ class Delaunay_with_info_3
     return out;
   }
 
+  bool flip(Cell x, int i) {
+    return T.flip(x._x, i);
+  }
+  void flip_flippable(Cell x, int i) {
+    T.flip_flippable(x._x, i);
+  }
+
   void write_to_file(const char* filename)
   {
     std::ofstream os(filename, std::ios::binary);

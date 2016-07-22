@@ -33,55 +33,6 @@ def test_insert_dup():
     T = Delaunay2()
     T.insert(pts_dup)
 
-def test_get_vertex():
-    T = Delaunay2()
-    T.insert(pts)
-    for i in range(nverts_fin):
-        v = T.get_vertex(i)
-        assert(np.allclose(v.point, pts[i,:]))
-
-def test_remove():
-    T = Delaunay2()
-    T.insert(pts)
-    v = T.get_vertex(0)
-    T.remove(v)
-    assert(T.num_verts == (nverts-1))
-
-def test_clear():
-    T = Delaunay2()
-    T.insert(pts)
-    T.clear()
-    print(T.num_finite_verts, T.num_cells)
-    assert(T.num_finite_verts == 0)
-    assert(T.num_cells == 0)
-
-def test_move():
-    T = Delaunay2()
-    T.insert(pts)
-    v0 = T.get_vertex(0)
-    new_pos = np.zeros(2,'float64')
-    v = T.move(v0, new_pos)
-    assert(np.allclose(v.point, new_pos))
-    assert(np.allclose(v0.point, new_pos))
-    v1 = T.get_vertex(1)
-    v = T.move(v1, new_pos)
-    assert(np.allclose(v.point, new_pos))
-    assert(T.num_verts == (nverts-1))
-
-def test_move_if_no_collision():
-    T = Delaunay2()
-    T.insert(pts)
-    v0 = T.get_vertex(0)
-    new_pos = np.zeros(2,'float64')
-    v = T.move_if_no_collision(v0, new_pos)
-    assert(np.allclose(v.point, new_pos))
-    assert(np.allclose(v0.point, new_pos))
-    v1 = T.get_vertex(1)
-    v = T.move_if_no_collision(v1, new_pos)
-    assert(np.allclose(v.point, new_pos))
-    assert(np.allclose(v1.point, pts[1,:]))
-    assert(T.num_verts == nverts)
-
 def test_num_verts():
     T = Delaunay2()
     T.insert(pts)
@@ -197,6 +148,70 @@ def test_finite_cells():
         assert((not c.is_infinite()))
         count += 1
     assert(count == T.num_finite_cells)
+
+def test_get_vertex():
+    T = Delaunay2()
+    T.insert(pts)
+    for i in range(nverts_fin):
+        v = T.get_vertex(i)
+        assert(np.allclose(v.point, pts[i,:]))
+
+def test_remove():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    T.remove(v)
+    assert(T.num_verts == (nverts-1))
+
+def test_clear():
+    T = Delaunay2()
+    T.insert(pts)
+    T.clear()
+    print(T.num_finite_verts, T.num_cells)
+    assert(T.num_finite_verts == 0)
+    assert(T.num_cells == 0)
+
+def test_move():
+    T = Delaunay2()
+    T.insert(pts)
+    v0 = T.get_vertex(0)
+    new_pos = np.zeros(2,'float64')
+    v = T.move(v0, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(np.allclose(v0.point, new_pos))
+    v1 = T.get_vertex(1)
+    v = T.move(v1, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(T.num_verts == (nverts-1))
+
+def test_move_if_no_collision():
+    T = Delaunay2()
+    T.insert(pts)
+    v0 = T.get_vertex(0)
+    new_pos = np.zeros(2,'float64')
+    v = T.move_if_no_collision(v0, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(np.allclose(v0.point, new_pos))
+    v1 = T.get_vertex(1)
+    v = T.move_if_no_collision(v1, new_pos)
+    assert(np.allclose(v.point, new_pos))
+    assert(np.allclose(v1.point, pts[1,:]))
+    assert(T.num_verts == nverts)
+
+def test_flip():
+    T = Delaunay2()
+    T.insert(pts)
+    for c in T.all_cells:
+        out = T.flip(c, 0)
+        assert(out == True)
+    assert(T.num_edges == nedges)
+
+def test_flippable():
+    T = Delaunay2()
+    T.insert(pts)
+    for c in T.all_cells:
+        T.flip(c, 0)
+    assert(T.num_edges == nedges)
 
 def test_io():
     fname = 'test_io2348_2.dat'

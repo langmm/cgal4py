@@ -887,6 +887,35 @@ cdef class Delaunay2:
         out.assign(self.T, v)
         return out
 
+    def flip(self, Delaunay2_cell x, int i):
+        r"""Flip the edge incident to cell x and neighbor i of cell x. The 
+        method first checks if the edge can be flipped. (In the 2D case, it 
+        can always be flipped).
+
+        Args:
+            x (Delaunay2_cell): Cell with edge that should be flipped.
+            i (int): Integer specifying neighbor of x that is also incident 
+                to the edge that should be flipped.
+
+        Returns:
+            bool: True if facet was flipped, False otherwise. (2D edges can 
+                always be flipped).
+
+        """
+        return <pybool>self.T.flip(x.x, i)
+
+    def flip_flippable(self, Delaunay2_cell x, int i):
+        r"""Same as :meth:`Delaunay2.flip`, but assumes that facet is flippable 
+        and does not check.
+
+        Args:
+            x (Delaunay2_cell): Cell with edge that should be flipped.
+            i (int): Integer specifying neighbor of x that is also incident 
+                to the edge that should be flipped.
+
+        """
+        self.T.flip_flippable(x.x, i)
+
     def get_vertex(self, np.uint64_t index):
         r"""Get the vertex object corresponding to the given index.
 
