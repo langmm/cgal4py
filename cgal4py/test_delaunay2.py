@@ -193,9 +193,11 @@ def test_cell():
         v = c.vertex(0)
         print(c.has_vertex(v))
         print(c.has_vertex(v, return_index = True))
+        print(c.index_vertex(v))
         n = c.neighbor(0)
         print(c.has_neighbor(n))
         print(c.has_neighbor(n, return_index = True))
+        print(c.index_neighbor(n))
 
 def test_move():
     T = Delaunay2()

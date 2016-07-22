@@ -279,25 +279,27 @@ class Delaunay_with_info_2
       _x = Face_handle(v1._x, v2._x, v3._x, c1._x, c2._x, c3._x); }
     bool operator==(Cell other) { return (_x == other._x); }
     bool operator!=(Cell other) { return (_x != other._x); }
-    Vertex vertex(int i) { return Vertex(_x->vertex(i)); }
-    bool has_vertex(Vertex v) { return _x->has_vertex(v._x); }
-    bool has_vertex(Vertex v, int *i) { return _x->has_vertex(v._x, *i); }
-    Cell neighbor(int i) { return Cell(_x->neighbor(i)); }
-    bool has_neighbor(Cell c) { return _x->has_neighbor(c._x); }
-    bool has_neighbor(Cell c, int *i) { return _x->has_neighbor(c._x, *i); }
+    Vertex vertex(int i) const { return Vertex(_x->vertex(i)); }
+    bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
+    bool has_vertex(Vertex v, int *i) const { return _x->has_vertex(v._x, *i); }
+    int index(Vertex v) const { return _x->index(v._x); }
+    Cell neighbor(int i) const { return Cell(_x->neighbor(i)); }
+    bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
+    bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
+    int index(Cell c) const { return _x->index(c._x); }
   };
 
-  bool is_infinite(Vertex x) { return T.is_infinite(x._x); }
-  bool is_infinite(Edge x) { 
+  bool is_infinite(Vertex x) const { return T.is_infinite(x._x); }
+  bool is_infinite(Edge x) const { 
     if ((is_infinite(x._x1)) || (is_infinite(x._x2)))
       return true;
     else
       return false;
   }
-  bool is_infinite(Cell x) { return T.is_infinite(x._x); }
-  bool is_infinite(All_verts_iter x) { return T.is_infinite(x._x); }
-  bool is_infinite(All_edges_iter x) { return T.is_infinite(x._x); }
-  bool is_infinite(All_cells_iter x) { return T.is_infinite(x._x); }
+  bool is_infinite(Cell x) const { return T.is_infinite(x._x); }
+  bool is_infinite(All_verts_iter x) const { return T.is_infinite(x._x); }
+  bool is_infinite(All_edges_iter x) const { return T.is_infinite(x._x); }
+  bool is_infinite(All_cells_iter x) const { return T.is_infinite(x._x); }
 
 
   // Constructs incident to a vertex

@@ -605,6 +605,18 @@ cdef class Delaunay2_cell:
             out = self.x.has_vertex(v.x)
             return <pybool>out
 
+    def index_vertex(self, Delaunay2_vertex v):
+        r"""Determine the index of a vertex within a cell.
+
+        Args:
+            v (Delaunay2_vertex): Vertex to find index for.
+        
+        Returns:
+            int: Index of vertex within the cell.
+
+        """
+        return self.x.index(v.x)
+
     def neighbor(self, int i):
         r"""Find the neighboring cell opposite the ith vertex of this cell. 
 
@@ -655,6 +667,19 @@ cdef class Delaunay2_cell:
         cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
         self.T.circumcenter(self.x, &out[0])
         return out
+
+    def index_neighbor(self, Delaunay2_cell v):
+        r"""Determine the index of a neighboring cell.
+
+        Args:
+            v (Delaunay2_cell): Neighboring cell to find index for.
+        
+        Returns:
+            int: Index of vertex opposite to neighboring cell.
+
+        """
+        return self.x.index(v.x)
+
 
 
 cdef class Delaunay2_cell_iter:
