@@ -87,16 +87,17 @@ cdef class Delaunay3_vertex:
             cdef np.float64_t out = self.T.dual_volume(self.x)
             return out
 
-    def incident_cells(self):
-        r"""Find cells that are incident to this vertex.
+    def incident_vertices(self):
+        r"""Find vertices that are adjacent to this vertex.
 
         Returns:
-            Delaunay3_cell_vector: Iterator over cells incident to this vertex.
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
-        it = self.T.incident_cells(self.x)
-        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -113,17 +114,29 @@ cdef class Delaunay3_vertex:
         out.assign(self.T, it)
         return out
 
-    def incident_vertices(self):
-        r"""Find vertices that are adjacent to this vertex.
+    def incident_facets(self):
+        r"""Find facets that are incident to this vertex.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                vertex.
+            Delaunay3_facet_vector: Iterator over facets incident to this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
-        it = self.T.incident_vertices(self.x)
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        it = self.T.incident_facets(self.x)
+        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this vertex.
+
+        Returns:
+            Delaunay3_cell_vector: Iterator over cells incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
         return out
 
@@ -345,6 +358,48 @@ cdef class Delaunay3_edge:
             cdef np.float64_t out = self.T.length(self.x)
             return out
 
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this edge.
+
+        Returns:
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                edge.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        # it.push_back(self.x.v1())
+        # it.push_back(self.x.v2())
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_edges(self):
+        r"""Find edges that are incident to this edge.
+
+        Returns:
+            Delaunay3_edge_vector: Iterator over edges incident to this edge. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_facets(self):
+        r"""Find facets that are incident to this edge.
+
+        Returns:
+            Delaunay3_facet_vector: Iterator over facets incident to this edge. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        it = self.T.incident_facets(self.x)
+        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        out.assign(self.T, it)
+        return out
+
     def incident_cells(self):
         r"""Find cells that are incident to this edge.
 
@@ -355,21 +410,6 @@ cdef class Delaunay3_edge:
         cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
         it = self.T.incident_cells(self.x)
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
-        out.assign(self.T, it)
-        return out
-
-    def incident_vertices(self):
-        r"""Find vertices that are incident to this edge.
-
-        Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                edge.
-
-        """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
-        it.push_back(self.x.v1())
-        it.push_back(self.x.v2())
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -517,6 +557,207 @@ cdef class Delaunay3_edge_vector:
         cdef Delaunay3_edge out
         if self.i < self.n:
             out = Delaunay3_edge()
+            out.assign(self.T, self.v[self.i])
+            self.i += 1
+            return out
+        else:
+            raise StopIteration()
+
+
+cdef class Delaunay3_facet:
+    r"""Wrapper class for a triangulation facet.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            that this facet belongs to. 
+        x (:obj:`Delaunay_with_info_3[uint32_t].Facet`): C++ facet object 
+            Direct interaction with this object is not recommended. 
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef Delaunay_with_info_3[uint32_t].Facet x
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     Delaunay_with_info_3[uint32_t].Facet x):
+        r"""Assign C++ objects to attributes.
+
+            Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+                that this facet belongs to. 
+            x (:obj:`Delaunay_with_info_3[uint32_t].Facet`): C++ facet object 
+                Direct interaction with this object is not recommended. 
+
+        """
+        self.T = T
+        self.x = x
+
+    def __richcmp__(Delaunay3_facet self, Delaunay3_facet solf, int op):
+        if (op == 2):
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def is_infinite(self):
+        r"""Determine if the facet is incident to the infinite vertex.
+        
+        Returns:
+            bool: True if the facet is incident to the infinite vertex, False 
+                otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    property area:
+        r"""float64: The area of the facet. If infinite, -1 is returned"""
+        def __get__(self):
+            return -1
+
+
+cdef class Delaunay3_facet_iter:
+    r"""Wrapper class for a triangulation facet iterator.
+
+    Args:
+        T (Delaunay3): Triangulation that this facet belongs to.
+        facet (:obj:`str`, optional): String specifying the facet that 
+            should be referenced. Valid options include: 
+                'all_begin': The first facet in an iteration over all facets.
+                'all_end': The last facet in an iteration over all facets.
+ 
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            that this facet belongs to. 
+        x (:obj:`Delaunay_with_info_3[uint32_t].All_facets_iter`): C++ facet  
+            object. Direct interaction with this object is not recommended. 
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef Delaunay_with_info_3[uint32_t].All_facets_iter x
+
+    def __cinit__(self, Delaunay3 T, str facet = None):
+        self.T = T.T
+        if facet == 'all_begin':
+            self.x = self.T.all_facets_begin()
+        elif facet == 'all_end':
+            self.x = self.T.all_facets_end()
+
+    def __richcmp__(Delaunay3_facet_iter self, Delaunay3_facet_iter solf, 
+                    int op):
+        if (op == 2):
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def is_infinite(self):
+        r"""Determine if the facet is incident to the the infinite vertex.
+        
+        Returns:
+            bool: True if the facet is incident to the infinite vertex, False 
+                otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    def increment(self):
+        r"""Advance to the next facet in the triangulation."""
+        preincrement(self.x)
+
+    def decrement(self):
+        r"""Advance to the previous facet in the triangulation."""
+        predecrement(self.x)
+
+    property facet:
+        r"""Delaunay3_facet: Corresponding facet object."""
+        def __get__(self):
+            cdef Delaunay3_facet out = Delaunay3_facet()
+            out.assign(self.T, Delaunay_with_info_3[uint32_t].Facet(self.x))
+            return out
+
+
+cdef class Delaunay3_facet_range:
+    r"""Wrapper class for iterating over a range of triangulation facets.
+
+    Args:
+        xstart (Delaunay3_facet_iter): The starting facet.  
+        xstop (Delaunay3_facet_iter): Final facet that will end the iteration. 
+        finite (:obj:`bool`, optional): If True, only finite facets are 
+            iterated over. Otherwise, all facets are iterated over. Defaults 
+            False.
+
+    Attributes:
+        x (Delaunay3_facet_iter): The currentfacet. 
+        xstop (Delaunay3_facet_iter): Final facet that will end the iteration. 
+        finite (bool): If True, only finite facets are iterater over. Otherwise
+            all facets are iterated over. 
+
+    """
+    cdef Delaunay3_facet_iter x
+    cdef Delaunay3_facet_iter xstop
+    cdef pybool finite
+    def __cinit__(self, Delaunay3_facet_iter xstart, 
+                  Delaunay3_facet_iter xstop,
+                  pybool finite = False):
+        self.x = xstart
+        self.xstop = xstop
+        self.finite = finite
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.finite:
+            while (self.x != self.xstop) and self.x.is_infinite():
+                self.x.increment()
+        cdef Delaunay3_facet out = self.x.facet
+        if self.x != self.xstop:
+            self.x.increment()
+            return out
+        else:
+            raise StopIteration()
+
+cdef class Delaunay3_facet_vector:
+    r"""Wrapper class for a vector of facets.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            Direct interaction with this object is not recommended.
+        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Facet]`): Vector of C++ 
+            facets.
+        n (int): The number of facets in the vector.
+        i (int): The index of the currect facet.
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef vector[Delaunay_with_info_3[uint32_t].Facet] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     vector[Delaunay_with_info_3[uint32_t].Facet] v):
+        r"""Assign C++ attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+                Direct interaction with this object is not recommended.
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Facet]`): Vector of 
+                C++ facets.
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay3_facet out
+        if self.i < self.n:
+            out = Delaunay3_facet()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -766,6 +1007,10 @@ cdef class Delaunay3:
         r"""int: The number of finite edges in the triangulation."""
         return self.T.num_finite_edges()
     @property
+    def num_finite_facets(self):
+        r"""int: The number of finite facets in the triangulation."""
+        return self.T.num_finite_facets()
+    @property
     def num_finite_cells(self):
         r"""int: The number of finite cells in the triangulation."""
         return self.T.num_finite_cells()
@@ -777,6 +1022,10 @@ cdef class Delaunay3:
     def num_infinite_edges(self):
         r"""int: The number of infinite edges in the triangulation."""
         return self.T.num_infinite_edges()
+    @property
+    def num_infinite_facets(self):
+        r"""int: The number of infinite facets in the triangulation."""
+        return self.T.num_infinite_facets()
     @property
     def num_infinite_cells(self):
         r"""int: The number of infinite cells in the triangulation."""
@@ -791,6 +1040,11 @@ cdef class Delaunay3:
         r"""int: The total number of edges (finite + infinite) in the 
         triangulation."""
         return self.T.num_edges()
+    @property
+    def num_facets(self):
+        r"""int: The total number of facets (finite + infinite) in the 
+        triangulation."""
+        return self.T.num_facets()
     @property
     def num_cells(self):
         r"""int: The total number of cells (finite + infinite) in the 
@@ -963,6 +1217,29 @@ cdef class Delaunay3:
         triangulation."""
         return Delaunay3_edge_range(self.all_edges_begin,
                                     self.all_edges_end, finite = True)
+
+    @property
+    def all_facets_begin(self):
+        r"""Delaunay3_facet_iter: Starting facet for all facets in the 
+        triangulation."""
+        return Delaunay3_facet_iter(self, 'all_begin')
+    @property
+    def all_facets_end(self):
+        r"""Delaunay3_facet_iter: Final facet for all facets in the 
+        triangulation."""
+        return Delaunay3_facet_iter(self, 'all_end')
+    @property
+    def all_facets(self):
+        r"""Delaunay3_facet_range: Iterable for all facets in the 
+        triangulation."""
+        return Delaunay3_facet_range(self.all_facets_begin,
+                                     self.all_facets_end)
+    @property
+    def finite_facets(self):
+        r"""Delaunay3_facet_range: Iterable for finite facets in the 
+        triangulation."""
+        return Delaunay3_facet_range(self.all_facets_begin,
+                                     self.all_facets_end, finite = True)
 
     @property
     def all_cells_begin(self):

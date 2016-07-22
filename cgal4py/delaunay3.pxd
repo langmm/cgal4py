@@ -16,16 +16,20 @@ cdef extern from "c_delaunay3.hpp":
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
         uint32_t num_finite_verts()
         uint32_t num_finite_edges()
+        uint32_t num_finite_facets()
         uint32_t num_finite_cells()
         uint32_t num_infinite_verts()
         uint32_t num_infinite_edges()
+        uint32_t num_infinite_facets()
         uint32_t num_infinite_cells()
         uint32_t num_verts()
         uint32_t num_edges()
+        uint32_t num_facets()
         uint32_t num_cells()
 
         cppclass Vertex
         cppclass Edge
+        cppclass Facet
         cppclass Cell
 
         void insert(double *, Info *val, uint32_t n) except +
@@ -77,6 +81,22 @@ cdef extern from "c_delaunay3.hpp":
             bool operator==(Edge other)
             bool operator!=(Edge other)
 
+        cppclass All_facets_iter:
+            All_facets_iter()
+            All_facets_iter& operator++()
+            All_facets_iter& operator--()
+            bool operator==(All_facets_iter other)
+            bool operator!=(All_facets_iter other)
+        All_facets_iter all_facets_begin()
+        All_facets_iter all_facets_end()
+
+        cppclass Facet:
+            Facet()
+            Facet(All_facets_iter it)
+            Facet(Cell x, int i1)
+            bool operator==(Facet other)
+            bool operator!=(Facet other)
+
         cppclass All_cells_iter:
             All_cells_iter()
             All_cells_iter& operator++()
@@ -94,15 +114,21 @@ cdef extern from "c_delaunay3.hpp":
 
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)
+        bool is_infinite(Facet x)
         bool is_infinite(Cell x)
         bool is_infinite(All_verts_iter x)
         bool is_infinite(All_edges_iter x)
+        bool is_infinite(All_facets_iter x)
         bool is_infinite(All_cells_iter x)
 
-        vector[Cell] incident_cells(Vertex x)
-        vector[Edge] incident_edges(Vertex x)
         vector[Vertex] incident_vertices(Vertex x)
+        vector[Edge] incident_edges(Vertex x)
+        vector[Facet] incident_facets(Vertex x)
+        vector[Cell] incident_cells(Vertex x)
 
+        vector[Vertex] incident_vertices(Edge x)
+        vector[Edge] incident_edges(Edge x)
+        vector[Facet] incident_facets(Edge x)
         vector[Cell] incident_cells(Edge x)
 
         Vertex nearest_vertex(double* pos)

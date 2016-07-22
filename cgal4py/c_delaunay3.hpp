@@ -24,22 +24,26 @@ class Delaunay_with_info_3
 {
  public:
   typedef CGAL::Delaunay_triangulation_3<K, CGAL::Triangulation_data_structure_3<CGAL::Triangulation_vertex_base_with_info_3<Info_, K>, Cb3>> Delaunay;
-  //CGAL::Triangulation_cell_base_with_circumcenter_3<K>>> Delaunay;
   typedef typename Delaunay::Point                     Point;
-  typedef typename Delaunay::Edge                      Edge_handle; // not really a handle, just for disambiguation
   typedef typename Delaunay::Vertex_handle             Vertex_handle;
+  typedef typename Delaunay::Edge                      Edge_handle;  // not really a handle, just for disambiguation
+  typedef typename Delaunay::Facet                     Facet_handle; // not really a handle, just for disambiguation
   typedef typename Delaunay::Cell_handle               Cell_handle;
   typedef typename Delaunay::Vertex_iterator           Vertex_iterator;
-  typedef typename Delaunay::Cell_iterator             Cell_iterator;
   typedef typename Delaunay::Edge_iterator             Edge_iterator;
+  typedef typename Delaunay::Facet_iterator            Facet_iterator;
+  typedef typename Delaunay::Cell_iterator             Cell_iterator;
   typedef typename Delaunay::All_vertices_iterator     All_vertices_iterator;
-  typedef typename Delaunay::All_cells_iterator        All_cells_iterator;
   typedef typename Delaunay::All_edges_iterator        All_edges_iterator;
+  typedef typename Delaunay::All_facets_iterator       All_facets_iterator;
+  typedef typename Delaunay::All_cells_iterator        All_cells_iterator;
   typedef typename Delaunay::Finite_vertices_iterator  Finite_vertices_iterator;
   typedef typename Delaunay::Finite_edges_iterator     Finite_edges_iterator;
-  typedef typename Delaunay::Tetrahedron               Tetrahedron;
+  typedef typename Delaunay::Finite_facets_iterator    Finite_facets_iterator;
+  typedef typename Delaunay::Finite_cells_iterator     Finite_cells_iterator;
   typedef typename Delaunay::Facet_circulator          Facet_circulator;
   typedef typename Delaunay::Cell_circulator           Cell_circulator;
+  typedef typename Delaunay::Tetrahedron               Tetrahedron;
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Cell_handle,int>    Cell_hash;
   typedef Info_ Info;
@@ -48,16 +52,20 @@ class Delaunay_with_info_3
   Delaunay_with_info_3(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
   uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
   uint32_t num_finite_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
+  uint32_t num_finite_facets() { return static_cast<uint32_t>(T.number_of_finite_facets()); }
   uint32_t num_finite_cells() { return static_cast<uint32_t>(T.number_of_finite_cells()); }
   uint32_t num_infinite_verts() { return 1; }
   uint32_t num_infinite_edges() { return (T.number_of_edges() - T.number_of_finite_edges()); }
+  uint32_t num_infinite_facets() { return (T.number_of_facets() - T.number_of_finite_facets()); }
   uint32_t num_infinite_cells() { return (T.number_of_cells() - T.number_of_finite_cells()); }
   uint32_t num_verts() { return (T.number_of_vertices() + num_infinite_verts()); }
   uint32_t num_edges() { return T.number_of_edges(); }
+  uint32_t num_facets() { return T.number_of_facets(); }
   uint32_t num_cells() { return T.number_of_cells(); }
 
   class Vertex;
   class Edge;
+  class Facet;
   class Cell;
 
   void insert(double *pts, Info *val, uint32_t n)
@@ -113,6 +121,7 @@ class Delaunay_with_info_3
     { return *this; }
   };
 
+  // Vertex construct
   class All_verts_iter {
   public:
     All_vertices_iterator _x = All_vertices_iterator();
@@ -140,6 +149,8 @@ class Delaunay_with_info_3
     Vertex_handle _x = Vertex_handle();
     Vertex() { _x = Vertex_handle(); }
     Vertex(Vertex_handle x) { _x = x; }
+    // Vertex(All_vertices_iterator x) { _x = static_cast<Vertex_handle>(x); }
+    // Vertex(Finite_vertices_iterator x) { _x = static_cast<Vertex_handle>(x); }
     Vertex(All_verts_iter x) { _x = static_cast<Vertex_handle>(x._x); }
     bool operator==(Vertex other) { return (_x == other._x); }
     bool operator!=(Vertex other) { return (_x != other._x); }
@@ -154,6 +165,7 @@ class Delaunay_with_info_3
     }
   };
 
+  // Edge construct
   class All_edges_iter {
   public:
     All_edges_iterator _x = All_edges_iterator();
@@ -178,6 +190,9 @@ class Delaunay_with_info_3
   public:
     Edge_handle _x = Edge_handle();
     Edge() {}
+    Edge(Edge_handle x) { _x = x; }
+    Edge(All_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
+    Edge(Finite_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
     Edge(All_edges_iter x) { _x = static_cast<Edge_handle>(*(x._x)); }
     Edge(Cell x, int i1, int i2) { _x = Edge_handle(x._x, i1, i2); }
     Vertex v1() const { 
@@ -192,6 +207,44 @@ class Delaunay_with_info_3
     bool operator!=(Edge other) { return (_x != other._x); }
   };
 
+
+  // Facet construct
+  class All_facets_iter {
+  public:
+    All_facets_iterator _x = All_facets_iterator();
+    All_facets_iter() { _x = All_facets_iterator(); }
+    All_facets_iter(All_facets_iterator x) { _x = x; }
+    All_facets_iter& operator*() { return *this; }
+    All_facets_iter& operator++() {
+      _x++;
+      return *this;
+    }
+    All_facets_iter& operator--() {
+      _x--;
+      return *this;
+    }
+    bool operator==(All_facets_iter other) { return (_x == other._x); }
+    bool operator!=(All_facets_iter other) { return (_x != other._x); }
+  };
+  All_facets_iter all_facets_begin() { return All_facets_iter(T.all_facets_begin()); }
+  All_facets_iter all_facets_end() { return All_facets_iter(T.all_facets_end()); }
+
+  class Facet {
+  public:
+    Facet_handle _x = Facet_handle();
+    Facet() {}
+    Facet(Facet_handle x) { _x = x; }
+    Facet(All_facets_iterator x) { _x = static_cast<Facet_handle>(*x); }
+    Facet(Finite_facets_iterator x) { _x = static_cast<Facet_handle>(*x); }
+    Facet(Facet_circulator x) { _x = static_cast<Facet_handle>(*x); }
+    Facet(All_facets_iter x) { _x = static_cast<Facet_handle>(*(x._x)); }
+    Facet(Cell x, int i1) { _x = Facet_handle(x._x, i1); }
+    bool operator==(Facet other) { return (_x == other._x); }
+    bool operator!=(Facet other) { return (_x != other._x); }
+  };
+
+
+  // Cell construct
   class All_cells_iter {
   public:
     All_cells_iterator _x = All_cells_iterator();
@@ -219,24 +272,34 @@ class Delaunay_with_info_3
     Cell_handle _x = Cell_handle();
     Cell() { _x = Cell_handle(); }
     Cell(Cell_handle x) { _x = x; }
+    // Cell(All_cells_iterator x) { _x = static_cast<Cell_handle>(x); }
+    // Cell(Finite_cells_iterator x) { _x = static_cast<Cell_handle>(x); }
+    Cell(Cell_circulator x) { _x = static_cast<Cell_handle>(x); }
     Cell(All_cells_iter x) { _x = static_cast<Cell_handle>(x._x); }
     bool operator==(Cell other) { return (_x == other._x); }
     bool operator!=(Cell other) { return (_x != other._x); }
   };
 
+  // Testing incidence to the infinite vertex
   bool is_infinite(Vertex x) { return T.is_infinite(x._x); }
   bool is_infinite(Edge x) { return T.is_infinite(x._x); }
+  bool is_infinite(Facet x) { return T.is_infinite(x._x); }
   bool is_infinite(Cell x) { return T.is_infinite(x._x); }
   bool is_infinite(All_verts_iter x) { return T.is_infinite(x._x); }
   bool is_infinite(All_edges_iter x) { 
     const Edge_iterator e = x._x;
     return T.is_infinite(*e);
   }
+  bool is_infinite(All_facets_iter x) {
+    const Facet_iterator f = x._x;
+    return T.is_infinite(*f);
+  }
   bool is_infinite(All_cells_iter x) { return T.is_infinite(x._x); }
 
-  std::vector<Cell> incident_cells(Vertex x) {
-    std::vector<Cell> out;
-    T.incident_cells(x._x, wrap_insert_iterator<Cell,Cell_handle>(out));
+  // Parts incident to a vertex
+  std::vector<Vertex> incident_vertices(Vertex x) {
+    std::vector<Vertex> out;
+    T.adjacent_vertices(x._x, wrap_insert_iterator<Vertex,Vertex_handle>(out));
     return out;
   }
   std::vector<Edge> incident_edges(Vertex x) {
@@ -244,19 +307,56 @@ class Delaunay_with_info_3
     T.incident_edges(x._x, wrap_insert_iterator<Edge,Edge_handle>(out));
     return out;
   }
-  std::vector<Vertex> incident_vertices(Vertex x) {
-    std::vector<Vertex> out;
-    T.adjacent_vertices(x._x, wrap_insert_iterator<Vertex,Vertex_handle>(out));
+  std::vector<Facet> incident_facets(Vertex x) {
+    std::vector<Facet> out;
+    T.incident_facets(x._x, wrap_insert_iterator<Facet,Facet_handle>(out));
+    return out;
+  }
+  std::vector<Cell> incident_cells(Vertex x) {
+    std::vector<Cell> out;
+    T.incident_cells(x._x, wrap_insert_iterator<Cell,Cell_handle>(out));
     return out;
   }
 
+  // Parts incident to an edge
+  std::vector<Vertex> incident_vertices(Edge x) {
+    std::vector<Vertex> out;
+    out.push_back(x.v1());
+    out.push_back(x.v2());
+    return out;
+  }
+  std::vector<Edge> incident_edges(Edge x) {
+    uint32_t i;
+    std::vector<Edge> out1, out2, out;
+    T.incident_edges(x.v1()._x, wrap_insert_iterator<Edge,Edge_handle>(out1));
+    T.incident_edges(x.v2()._x, wrap_insert_iterator<Edge,Edge_handle>(out2));
+    for (i = 0; i < out1.size(); i++) {
+      if (out1[i] != x)
+	out.push_back(out1[i]);
+    }
+    for (i = 0; i < out2.size(); i++) {
+      if (out2[i] != x)
+	out.push_back(out2[i]);
+    }
+    return out;
+  }
+  std::vector<Facet> incident_facets(Edge x) {
+    std::vector<Facet> out;
+    Facet_circulator cc = T.incident_facets(x._x), done(cc);
+    if (cc == 0)
+      return out;
+    do {
+      out.push_back(Facet(cc));
+    } while (++cc != done);
+    return out;
+  }
   std::vector<Cell> incident_cells(Edge x) {
     std::vector<Cell> out;
     Cell_circulator cc = T.incident_cells(x._x), done(cc);
     if (cc == 0)
       return out;
     do {
-      out.push_back(Cell(static_cast<Cell_handle>(cc)));
+      out.push_back(Cell(cc));
     } while (++cc != done);
     return out;
   }
