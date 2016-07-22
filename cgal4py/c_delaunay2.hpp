@@ -178,6 +178,13 @@ class Delaunay_with_info_2
     Vertex _x1 = Vertex();
     Vertex _x2 = Vertex();
     Edge() {}
+    Edge(Edge_circulator it) {
+      int i = it->second;
+      int i1 = (i + 2) % 3;
+      int i2 = (i + 1) % 3;
+      _x1 = Vertex(it->first->vertex(i1));
+      _x2 = Vertex(it->first->vertex(i2));
+    }
     Edge(All_edges_iter it) {
       int i = it._x->second;
       int i1 = (i + 2) % 3;
@@ -291,6 +298,17 @@ class Delaunay_with_info_2
     do {
       out.push_back(Cell(static_cast<Face_handle>(fc)));
     } while (++fc != done);
+    return out;
+  }
+
+  std::vector<Edge> incident_edges(Vertex x) {
+    std::vector<Edge> out;
+    Edge_circulator ec = T.incident_edges(x._x), done(ec);
+    if (ec == 0)
+      return out;
+    do {
+      out.push_back(Edge(ec));
+    } while (++ec != done);
     return out;
   }
   

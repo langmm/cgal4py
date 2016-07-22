@@ -221,6 +221,19 @@ def test_vert_incident_cells():
     print(count)
     assert(count == 42)
 
+def test_edge_incident_edges():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_verts:
+        c0 = 0
+        for e in v.incident_edges():
+            c0 += 1
+            count += 1
+        print(v.index, c0)
+    print(count)
+    assert(count == 42)
+
 def test_vert_incident_verts():
     T = Delaunay2()
     T.insert(pts)

@@ -108,6 +108,7 @@ cdef extern from "c_delaunay2.hpp":
         bool is_infinite(All_cells_iter x)
 
         vector[Cell] incident_cells(Vertex x)
+        vector[Edge] incident_edges(Vertex x)
         vector[Vertex] incident_vertices(Vertex x)
 
         Vertex nearest_vertex(double* pos)

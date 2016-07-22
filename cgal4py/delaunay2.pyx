@@ -100,6 +100,19 @@ cdef class Delaunay2_vertex:
         out.assign(self.T, it)
         return out
 
+    def incident_edges(self):
+        r"""Find edges that are incident to this vertex.
+
+        Returns:
+            Delaunay2_edge_vector: Iterator over edges incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        out.assign(self.T, it)
+        return out
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this vertex.
 
