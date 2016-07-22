@@ -30,8 +30,9 @@ cdef extern from "c_delaunay3.hpp":
 
         void insert(double *, Info *val, uint32_t n) except +
         void remove(Vertex) except +
-        Vertex move(Vertex v, double *pos)
-        Vertex move_if_no_collision(Vertex v, double *pos)
+        void clear() except + 
+        Vertex move(Vertex v, double *pos) except + 
+        Vertex move_if_no_collision(Vertex v, double *pos) except +
 
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +

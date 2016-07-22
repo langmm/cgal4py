@@ -829,6 +829,10 @@ cdef class Delaunay3:
         """
         self.T.remove(x.x)
 
+    def clear(self):
+        r"""Removes all vertices and cells from the triangulation."""
+        self.T.clear()
+
     def move(self, Delaunay3_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 

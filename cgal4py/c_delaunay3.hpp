@@ -71,6 +71,7 @@ class Delaunay_with_info_3
     T.insert( points.begin(),points.end() );
   }
   void remove(Vertex v) { T.remove(v._x); }
+  void clear() { T.clear(); }
 
   Vertex move(Vertex v, double *pos) {
     Point p = Point(pos[0], pos[1], pos[2]);

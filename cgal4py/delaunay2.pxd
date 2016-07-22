@@ -28,10 +28,11 @@ cdef extern from "c_delaunay2.hpp":
         cppclass Edge
         cppclass Cell
 
-        void insert(double *, Info *val, uint32_t n)
-        void remove(Vertex v)
-        Vertex move(Vertex v, double *pos)
-        Vertex move_if_no_collision(Vertex v, double *pos)
+        void insert(double *, Info *val, uint32_t n) except +
+        void remove(Vertex v) except +
+        void clear() except +
+        Vertex move(Vertex v, double *pos) except +
+        Vertex move_if_no_collision(Vertex v, double *pos) except +
 
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +

@@ -49,6 +49,14 @@ def test_remove():
     T.remove(v)
     assert(T.num_verts == (nverts-1))
 
+def test_clear():
+    T = Delaunay3()
+    T.insert(pts)
+    T.clear()
+    print(T.num_finite_verts, T.num_cells)
+    assert(T.num_finite_verts == 0)
+    assert(T.num_cells == 0)
+
 def test_move():
     T = Delaunay3()
     T.insert(pts)
