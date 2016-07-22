@@ -16,6 +16,9 @@ pts_dup = np.concatenate([pts, np.reshape(pts[0,:],(1,pts.shape[1]))])
 nverts_fin = pts.shape[0]
 nverts_inf = 1
 nverts = nverts_fin + nverts_inf
+nedges_fin = 26
+nedges_inf = 8
+nedges = nedges_fin + nedges_inf
 ncells_fin = 12
 ncells_inf = 12
 ncells = ncells_fin + ncells_inf
@@ -87,6 +90,20 @@ def test_num_verts_dup():
     assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
 
+def test_num_edges():
+    T = Delaunay3()
+    T.insert(pts)
+    assert(T.num_finite_edges == nedges_fin)
+    assert(T.num_infinite_edges == nedges_inf)
+    assert(T.num_edges == nedges)
+
+def test_num_edges_dup():
+    T = Delaunay3()
+    T.insert(pts_dup)
+    assert(T.num_finite_edges == nedges_fin)
+    assert(T.num_infinite_edges == nedges_inf)
+    assert(T.num_edges == nedges)
+
 def test_num_cells():
     T = Delaunay3()
     T.insert(pts)
@@ -124,6 +141,31 @@ def test_finite_verts():
         assert((not v.is_infinite()))
         count += 1
     assert(count == T.num_finite_verts)
+
+def test_all_edges():
+    T = Delaunay3()
+    T.insert(pts)
+    count_fin = count_inf = 0
+    for e in T.all_edges:
+        if e.is_infinite():
+            count_inf += 1
+        else:
+            count_fin += 1
+    count = count_fin + count_inf
+    print(count_fin, count_inf)
+    assert(count_fin == T.num_finite_edges)
+    assert(count_inf == T.num_infinite_edges)
+    assert(count == T.num_edges)
+
+def test_finite_edges():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for e in T.finite_edges:
+        assert((not e.is_infinite()))
+        count += 1
+    print(count)
+    assert(count == T.num_finite_edges)
 
 def test_all_cells():
     T = Delaunay3()

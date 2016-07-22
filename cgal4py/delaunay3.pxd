@@ -25,6 +25,7 @@ cdef extern from "c_delaunay3.hpp":
         uint32_t num_cells()
 
         cppclass Vertex
+        cppclass Edge
         cppclass Cell
 
         void insert(double *, Info *val, uint32_t n) except +
@@ -57,6 +58,24 @@ cdef extern from "c_delaunay3.hpp":
             vector[double] point()
             Info info()
 
+        cppclass All_edges_iter:
+            All_edges_iter()
+            All_edges_iter& operator++()
+            All_edges_iter& operator--()
+            bool operator==(All_edges_iter other)
+            bool operator!=(All_edges_iter other)
+        All_edges_iter all_edges_begin()
+        All_edges_iter all_edges_end()
+
+        cppclass Edge:
+            Edge()
+            Edge(All_edges_iter it)
+            Edge(Cell x, int i1, int i2)
+            Vertex v1()
+            Vertex v2()
+            bool operator==(Edge other)
+            bool operator!=(Edge other)
+
         cppclass All_cells_iter:
             All_cells_iter()
             All_cells_iter& operator++()
@@ -73,16 +92,23 @@ cdef extern from "c_delaunay3.hpp":
             bool operator!=(Cell other)
 
         bool is_infinite(Vertex x)
+        bool is_infinite(Edge x)
         bool is_infinite(Cell x)
         bool is_infinite(All_verts_iter x)
+        bool is_infinite(All_edges_iter x)
         bool is_infinite(All_cells_iter x)
 
         vector[Cell] incident_cells(Vertex x)
+        vector[Edge] incident_edges(Vertex x)
         vector[Vertex] incident_vertices(Vertex x)
+
+        vector[Cell] incident_cells(Edge x)
 
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)
         double dual_volume(const Vertex v)
+        double length(const Edge e)
+
 
 cdef class Delaunay3:
     cdef int n

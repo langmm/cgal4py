@@ -21,6 +21,7 @@ from cython.operator cimport dereference
 from cython.operator cimport preincrement, predecrement
 from libc.stdint cimport uint32_t, uint64_t
 
+
 cdef class Delaunay3_vertex:
     r"""Wrapper class for a triangulation vertex.
 
@@ -99,11 +100,25 @@ cdef class Delaunay3_vertex:
         out.assign(self.T, it)
         return out
 
+    def incident_edges(self):
+        r"""Find edges that are incident to this vertex.
+
+        Returns:
+            Delaunay3_edge_vector: Iterator over edges incident to this vertex.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        out.assign(self.T, it)
+        return out
+
     def incident_vertices(self):
         r"""Find vertices that are adjacent to this vertex.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over cells incident to this vertex.
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                vertex.
 
         """
         cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
@@ -256,6 +271,252 @@ cdef class Delaunay3_vertex_vector:
         cdef Delaunay3_vertex out
         if self.i < self.n:
             out = Delaunay3_vertex()
+            out.assign(self.T, self.v[self.i])
+            self.i += 1
+            return out
+        else:
+            raise StopIteration()
+
+
+cdef class Delaunay3_edge:
+    r"""Wrapper class for a triangulation edge.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            that this edge belongs to. 
+        x (:obj:`Delaunay_with_info_3[uint32_t].Edge`): C++ edge object 
+            Direct interaction with this object is not recommended. 
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef Delaunay_with_info_3[uint32_t].Edge x
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     Delaunay_with_info_3[uint32_t].Edge x):
+        r"""Assign C++ objects to attributes.
+
+            Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+                that this edge belongs to. 
+            x (:obj:`Delaunay_with_info_3[uint32_t].Edge`): C++ edge object 
+                Direct interaction with this object is not recommended. 
+
+        """
+        self.T = T
+        self.x = x
+
+    def __richcmp__(Delaunay3_edge self, Delaunay3_edge solf, int op):
+        if (op == 2):
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def is_infinite(self):
+        r"""Determine if the edge is incident to the infinite vertex.
+        
+        Returns:
+            bool: True if the edge is incident to the infinite vertex, False 
+                otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    property vertex1:
+        r"""Delaunay3_vertex: The first vertex in the edge."""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Vertex x = self.x.v1()
+            cdef Delaunay3_vertex out = Delaunay3_vertex()
+            out.assign(self.T, x)
+            return out
+
+    property vertex2:
+        r"""Delaunay3_vertex: The second vertex in the edge."""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Vertex x = self.x.v2()
+            cdef Delaunay3_vertex out = Delaunay3_vertex()
+            out.assign(self.T, x)
+            return out
+
+    property length:
+        r"""float64: The length of the edge. If infinite, -1 is returned"""
+        def __get__(self):
+            cdef np.float64_t out = self.T.length(self.x)
+            return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this edge.
+
+        Returns:
+            Delaunay3_cell_vector: Iterator over cells incident to this edge.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this edge.
+
+        Returns:
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                edge.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it.push_back(self.x.v1())
+        it.push_back(self.x.v2())
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        out.assign(self.T, it)
+        return out
+
+
+cdef class Delaunay3_edge_iter:
+    r"""Wrapper class for a triangulation edge iterator.
+
+    Args:
+        T (Delaunay3): Triangulation that this edge belongs to.
+        edge (:obj:`str`, optional): String specifying the edge that 
+            should be referenced. Valid options include: 
+                'all_begin': The first edge in an iteration over all edges.
+                'all_end': The last edge in an iteration over all edges.
+ 
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            that this edge belongs to. 
+        x (:obj:`Delaunay_with_info_3[uint32_t].All_edges_iter`): C++ edge  
+            object. Direct interaction with this object is not recommended. 
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef Delaunay_with_info_3[uint32_t].All_edges_iter x
+
+    def __cinit__(self, Delaunay3 T, str edge = None):
+        self.T = T.T
+        if edge == 'all_begin':
+            self.x = self.T.all_edges_begin()
+        elif edge == 'all_end':
+            self.x = self.T.all_edges_end()
+
+    def __richcmp__(Delaunay3_edge_iter self, Delaunay3_edge_iter solf, 
+                    int op):
+        if (op == 2):
+            return <pybool>(self.x == solf.x)
+        elif (op == 3):
+            return <pybool>(self.x != solf.x)
+        else:
+            raise NotImplementedError
+
+    def is_infinite(self):
+        r"""Determine if the edge is incident to the the infinite vertex.
+        
+        Returns:
+            bool: True if the edge is incident to the infinite vertex, False 
+                otherwise.
+
+        """
+        return self.T.is_infinite(self.x)
+
+    def increment(self):
+        r"""Advance to the next edge in the triangulation."""
+        preincrement(self.x)
+
+    def decrement(self):
+        r"""Advance to the previous edge in the triangulation."""
+        predecrement(self.x)
+
+    property edge:
+        r"""Delaunay3_edge: Corresponding edge object."""
+        def __get__(self):
+            cdef Delaunay3_edge out = Delaunay3_edge()
+            out.assign(self.T, Delaunay_with_info_3[uint32_t].Edge(self.x))
+            return out
+
+
+cdef class Delaunay3_edge_range:
+    r"""Wrapper class for iterating over a range of triangulation edges.
+
+    Args:
+        xstart (Delaunay3_edge_iter): The starting edge.  
+        xstop (Delaunay3_edge_iter): Final edge that will end the iteration. 
+        finite (:obj:`bool`, optional): If True, only finite edges are 
+            iterated over. Otherwise, all edges are iterated over. Defaults 
+            False.
+
+    Attributes:
+        x (Delaunay3_edge_iter): The currentedge. 
+        xstop (Delaunay3_edge_iter): Final edge that will end the iteration. 
+        finite (bool): If True, only finite edges are iterater over. Otherwise
+            all edges are iterated over. 
+
+    """
+    cdef Delaunay3_edge_iter x
+    cdef Delaunay3_edge_iter xstop
+    cdef pybool finite
+    def __cinit__(self, Delaunay3_edge_iter xstart, 
+                  Delaunay3_edge_iter xstop,
+                  pybool finite = False):
+        self.x = xstart
+        self.xstop = xstop
+        self.finite = finite
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.finite:
+            while (self.x != self.xstop) and self.x.is_infinite():
+                self.x.increment()
+        cdef Delaunay3_edge out = self.x.edge
+        if self.x != self.xstop:
+            self.x.increment()
+            return out
+        else:
+            raise StopIteration()
+
+cdef class Delaunay3_edge_vector:
+    r"""Wrapper class for a vector of edges.
+
+    Attributes:
+        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            Direct interaction with this object is not recommended.
+        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Edge]`): Vector of C++ 
+            edges.
+        n (int): The number of edges in the vector.
+        i (int): The index of the currect edge.
+
+    """
+    cdef Delaunay_with_info_3[uint32_t] *T
+    cdef vector[Delaunay_with_info_3[uint32_t].Edge] v
+    cdef int n
+    cdef int i
+
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     vector[Delaunay_with_info_3[uint32_t].Edge] v):
+        r"""Assign C++ attributes.
+
+        Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+                Direct interaction with this object is not recommended.
+            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Edge]`): Vector of 
+                C++ edges.
+
+        """
+        self.T = T
+        self.v = v
+        self.n = v.size()
+        self.i = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        cdef Delaunay3_edge out
+        if self.i < self.n:
+            out = Delaunay3_edge()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -649,6 +910,29 @@ cdef class Delaunay3:
         triangulation."""
         return Delaunay3_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end, finite = True)
+
+    @property
+    def all_edges_begin(self):
+        r"""Delaunay3_edge_iter: Starting edge for all edges in the 
+        triangulation."""
+        return Delaunay3_edge_iter(self, 'all_begin')
+    @property
+    def all_edges_end(self):
+        r"""Delaunay3_edge_iter: Final edge for all edges in the 
+        triangulation."""
+        return Delaunay3_edge_iter(self, 'all_end')
+    @property
+    def all_edges(self):
+        r"""Delaunay3_edge_range: Iterable for all edges in the 
+        triangulation."""
+        return Delaunay3_edge_range(self.all_edges_begin,
+                                    self.all_edges_end)
+    @property
+    def finite_edges(self):
+        r"""Delaunay3_edge_range: Iterable for finite edges in the 
+        triangulation."""
+        return Delaunay3_edge_range(self.all_edges_begin,
+                                    self.all_edges_end, finite = True)
 
     @property
     def all_cells_begin(self):
