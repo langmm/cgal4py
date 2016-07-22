@@ -149,9 +149,9 @@ class Delaunay_with_info_2
       out.push_back(p.y());
       return out;
     }
-    Info info() {
-      return _x->info();
-    }
+    Info info() { return _x->info(); }
+    Cell cell() const { return Cell(_x->face()); }
+    void set_cell(Cell c) { _x->set_face(c._x); }
   };
 
   class All_edges_iter {

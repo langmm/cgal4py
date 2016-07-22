@@ -57,6 +57,8 @@ cdef extern from "c_delaunay2.hpp":
             bool operator!=(Vertex other)
             void point(double* out)
             Info info()
+            Cell cell()
+            void set_cell(Cell c)
 
         cppclass All_edges_iter:
             All_edges_iter()

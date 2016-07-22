@@ -66,6 +66,15 @@ cdef class Delaunay2_vertex:
         """
         return self.T.is_infinite(self.x)
 
+    def set_cell(self, Delaunay2_cell c):
+        r"""Assign this vertex's designated cell.
+
+        Args:
+            c (Delaunay2_cell): Cell that will be assigned as designated cell.
+
+        """
+        self.x.set_cell(c.x)
+
     property point:
         r""":obj:`ndarray` of :obj:`float64`: The cartesian (x,y) coordinates of 
         the vertex."""
@@ -80,11 +89,20 @@ cdef class Delaunay2_vertex:
             cdef np.uint64_t out = self.x.info()
             return out
 
-    property volume:
+    property dual_volume:
         r"""float64: The area of the dual Voronoi cell. If the area is 
         infinite, -1.0 is returned."""
         def __get__(self):
             cdef np.float64_t out = self.T.dual_area(self.x)
+            return out
+
+    property cell:
+        r"""Delaunay2_cell: The cell assigned to this vertex."""
+        def __get__(self):
+            cdef Delaunay_with_info_2[uint32_t].Cell c
+            c = self.x.cell()
+            cdef Delaunay2_cell out = Delaunay2_cell()
+            out.assign(self.T, c)
             return out
 
     def incident_vertices(self):
