@@ -197,6 +197,7 @@ def test_vert():
             assert(np.isclose(vol, -1))
         c = v.cell
         v.set_cell(c)
+        v.set_point(pnt)
 
 def test_edge():
     T = Delaunay2()

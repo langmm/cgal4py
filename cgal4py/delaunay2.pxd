@@ -59,6 +59,7 @@ cdef extern from "c_delaunay2.hpp":
             Info info()
             Cell cell()
             void set_cell(Cell c)
+            void set_point(double* x)
 
         cppclass All_edges_iter:
             All_edges_iter()

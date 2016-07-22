@@ -177,9 +177,35 @@ def test_clear():
     assert(T.num_cells == 0)
 
 def test_vert():
-    pass
+    T = Delaunay3()
+    T.insert(pts)
+    for v in T.all_verts:
+        idx = v.index
+        pnt = v.point
+        vol = v.dual_volume
+        print(idx,pnt,vol)
+        if idx == 0:
+            assert(np.isclose(vol, 4.5))
+        else:
+            assert(np.isclose(vol, -1.0))
+        c = v.cell
+        v.set_cell(c)
+        v.set_point(pnt)
+
 def test_edge():
-    pass
+    T = Delaunay3()
+    T.insert(pts)
+    for e in T.all_edges:
+        v1 = e.vertex1
+        v2 = e.vertex2
+        elen = e.length
+        print(v1.index, v2.index, elen)
+        if e.is_infinite():
+            assert(np.isclose(elen, -1.0))
+        else:
+            l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
+            assert(np.isclose(elen, l))
+
 def test_cell():
     T = Delaunay3()
     T.insert(pts)
@@ -373,23 +399,3 @@ def test_nearest_vertex():
     T.insert(pts)
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
-
-def test_dual_volume():
-    T = Delaunay3()
-    T.insert(pts)
-    for v in T.finite_verts:
-        print(v.index,v.volume)
-        if v.index == 0:
-            assert(np.isclose(v.volume, 4.5))
-        else:
-            assert(np.isclose(v.volume, -1.0))
-
-def test_edge_length():
-    T = Delaunay3()
-    T.insert(pts)
-    for e in T.all_edges:
-        if e.is_infinite():
-            assert(np.isclose(e.length, -1.0))
-        else:
-            l = np.sqrt(np.sum((pts[e.vertex1.index,:]-pts[e.vertex2.index,:])**2.0))
-            assert(np.isclose(e.length, l))

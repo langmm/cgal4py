@@ -62,6 +62,9 @@ cdef extern from "c_delaunay3.hpp":
             void point(double* out)
             vector[double] point()
             Info info()
+            Cell cell()
+            void set_point(double* x)
+            void set_cell(Cell c)
 
         cppclass All_edges_iter:
             All_edges_iter()

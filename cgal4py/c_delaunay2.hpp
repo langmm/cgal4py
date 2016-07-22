@@ -152,6 +152,10 @@ class Delaunay_with_info_2
     Info info() { return _x->info(); }
     Cell cell() const { return Cell(_x->face()); }
     void set_cell(Cell c) { _x->set_face(c._x); }
+    void set_point(double* x) {
+      Point p = Point(x[0], x[1]);
+      _x->set_point(p);
+    }
   };
 
   class All_edges_iter {

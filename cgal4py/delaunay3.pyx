@@ -66,6 +66,25 @@ cdef class Delaunay3_vertex:
         """
         return self.T.is_infinite(self.x)
 
+    def set_point(self, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Set this vertex's corrdinates.
+
+        Args:
+            pos (:obj:`ndarray` of float64): new x,y,z coordinates for vertex.
+
+        """
+        assert(len(pos) == 3)
+        self.x.set_point(&pos[0])
+
+    def set_cell(self, Delaunay3_cell c):
+        r"""Set the designated cell for this vertex.
+
+        Args:
+            c (Delaunay3_cell): Cell that should be set as the designated cell.
+
+        """
+        self.x.set_cell(c.x)
+
     property point:
         r""":obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
         of the vertex."""
@@ -80,11 +99,20 @@ cdef class Delaunay3_vertex:
             cdef np.uint64_t out = self.x.info()
             return out
 
-    property volume:
+    property dual_volume:
         r"""float64: The volume of the dual Voronoi cell. If the volume is 
         infinite, -1.0 is returned."""
         def __get__(self):
             cdef np.float64_t out = self.T.dual_volume(self.x)
+            return out
+
+    property cell:
+        r"""Delaunay3_cell: Designated cell for this vertex."""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Cell c
+            c = self.x.cell()
+            cdef Delaunay3_cell out = Delaunay3_cell()
+            out.assign(self.T, c)
             return out
 
     def incident_vertices(self):

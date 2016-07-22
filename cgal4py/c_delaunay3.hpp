@@ -148,8 +148,6 @@ class Delaunay_with_info_3
     Vertex_handle _x = Vertex_handle();
     Vertex() { _x = Vertex_handle(); }
     Vertex(Vertex_handle x) { _x = x; }
-    // Vertex(All_vertices_iterator x) { _x = static_cast<Vertex_handle>(x); }
-    // Vertex(Finite_vertices_iterator x) { _x = static_cast<Vertex_handle>(x); }
     Vertex(All_verts_iter x) { _x = static_cast<Vertex_handle>(x._x); }
     bool operator==(Vertex other) { return (_x == other._x); }
     bool operator!=(Vertex other) { return (_x != other._x); }
@@ -159,8 +157,12 @@ class Delaunay_with_info_3
       out[1] = p.y();
       out[2] = p.z();
     }
-    Info info() {
-      return _x->info();
+    Info info() { return _x->info(); }
+    Cell cell() { return Cell(_x->cell()); }
+    void set_cell(Cell c) { _x->set_cell(c._x); }
+    void set_point(double *x) {
+      Point p = Point(x[0], x[1], x[2]);
+      _x->set_point(p);
     }
   };
 

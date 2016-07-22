@@ -66,6 +66,16 @@ cdef class Delaunay2_vertex:
         """
         return self.T.is_infinite(self.x)
 
+    def set_point(self, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Set this vertex's coordinates.
+
+        Args:
+            pos (:obj:`ndarray` of float64): new x,y coordinates for this vertex.
+
+        """
+        assert(len(pos) == 2)
+        self.x.set_point(&pos[0])
+
     def set_cell(self, Delaunay2_cell c):
         r"""Assign this vertex's designated cell.
 
