@@ -778,6 +778,20 @@ cdef class Delaunay3_cell:
     cdef Delaunay_with_info_3[uint32_t] *T
     cdef Delaunay_with_info_3[uint32_t].Cell x
 
+    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
+                     Delaunay_with_info_3[uint32_t].Cell x):
+        r"""Assign C++ objects to attributes.
+
+            Args:
+            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+                that this cell belongs to. 
+            x (:obj:`Delaunay_with_info_3[uint32_t].Cell`): C++ cell object 
+                Direct interaction with this object is not recommended. 
+
+        """
+        self.T = T
+        self.x = x
+
     def __richcmp__(Delaunay3_cell self, Delaunay3_cell solf, int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -795,6 +809,163 @@ cdef class Delaunay3_cell:
 
         """
         return self.T.is_infinite(self.x)
+
+    def vertex(self, int i):
+        r"""Find the ith vertex that is incident to this cell. 
+
+        Args:
+            i (int): The index of the vertex that should be returned.
+
+        Returns:
+            Delaunay3_vertex: The ith vertex incident to this cell. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        v = self.x.vertex(i)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, v)
+        return out
+
+    def has_vertex(self, Delaunay3_vertex v, pybool return_index = False):
+        r"""Determine if a vertex belongs to this cell.
+
+        Args:
+            v (Delaunay3_vertex): Vertex to test ownership for. 
+            return_index (:obj:`bool`, optional): If True, the index of the 
+                vertex within the cell is returned in the event that it is a 
+                vertex of the cell. Otherwise, the index is not returned.  
+        
+        Returns:
+            bool: True if the vertex is part of the cell, False otherwise. In
+                the event that `return_index = True` and the vertex is a part of  
+                the cell, an integer specifying the index of the vertex within
+                the cell will be returned instead. 
+        """
+        cdef int i = -1
+        cdef cbool out
+        if return_index:
+            out = self.x.has_vertex(v.x, &i)
+            return i
+        else:
+            out = self.x.has_vertex(v.x)
+            return <pybool>out
+            
+    def index_vertex(self, Delaunay3_vertex v):
+        r"""Determine the index of a vertex within a cell. 
+
+        Args: 
+            v (Delaunay3_vertex): Vertex to find index for. 
+
+        Returns: 
+            int: Index of vertex within the cell. 
+
+        """
+        return self.x.index(v.x)
+
+    def neighbor(self, int i):
+        r"""Find the neighboring cell opposite the ith vertex of this cell. 
+
+        Args: 
+            i (int): The index of the neighboring cell that should be returned. 
+
+        Returns: 
+            Delaunay2_cell: The neighboring cell opposite the ith vertex. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Cell v
+        v = self.x.neighbor(i)
+        cdef Delaunay3_cell out = Delaunay3_cell()
+        out.assign(self.T, v)
+        return out
+
+    def has_neighbor(self, Delaunay3_cell v, pybool return_index = False):
+        r"""Determine if a cell is a neighbor to this cell. 
+
+        Args: 
+            v (Delaunay3_cell): Cell to test as a neighbor. 
+            return_index (:obj:`bool`, optional): If True, the index of the 
+                neighbor within the cell is returned in the event that it is a 
+                neighbor of the cell. Otherwise, the index is not returned. 
+
+        Returns: 
+            bool: True if the given cell is a neighbor, False otherwise. In 
+                the event that `return_index = True` and the v is a neighbor of 
+                this cell, an integer specifying the index of the neighbor to 
+                will be returned instead. 
+
+        """
+        cdef int i = -1
+        cdef cbool out = self.x.has_neighbor(v.x, &i)
+        if out and return_index:
+            return i
+        else:
+            return <pybool>out
+
+    def index_neighbor(self, Delaunay3_cell v):
+        r"""Determine the index of a neighboring cell. 
+
+        Args: 
+            v (Delaunay3_cell): Neighboring cell to find index for. 
+
+        Returns: 
+            int: Index of vertex opposite to neighboring cell. 
+
+        """
+        return self.x.index(v.x)
+
+    def set_vertex(self, int i, Delaunay3_vertex v):
+        r"""Set the ith vertex of this cell. 
+
+        Args: 
+            i (int): Index of this cell's vertex that should be set. 
+            v (Delauany3_vertex): Vertex to set ith vertex of this cell to. 
+
+        """
+        self.x.set_vertex(i, v.x)
+
+    def set_vertices(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
+                     Delaunay3_vertex v3, Delaunay3_vertex v4):
+        r"""Set this cell's vertices. 
+
+        Args: 
+            v1 (Delaunay2_vertex): 1st vertex of cell. 
+            v2 (Delaunay2_vertex): 2nd vertex of cell. 
+            v3 (Delaunay2_vertex): 3rd vertex of cell. 
+            v4 (Delaunay2_vertex): 4th vertex of cell. 
+
+        """
+        self.x.set_vertices(v1.x, v2.x, v3.x, v4.x)
+
+    def reset_vertices(self):
+        r"""Reset all of this cell's vertices."""
+        self.x.set_vertices()
+
+    def set_neighbor(self, int i, Delaunay3_cell n):
+        r"""Set the ith neighboring cell of this cell. 
+
+        Args: 
+            i (int): Index of this cell's neighbor that should be set. 
+            n (Delaunay3_cell): Cell to set ith neighbor of this cell to. 
+
+        """
+        self.x.set_neighbor(i, n.x)
+
+    def set_neighbors(self, Delaunay3_cell c1, Delaunay3_cell c2,
+                      Delaunay3_cell c3, Delaunay3_cell c4):
+        r"""Set this cell's neighboring cells. 
+
+        Args: 
+            c1 (Delaunay3_cell): 1st neighboring cell. 
+            c2 (Delaunay3_cell): 2nd neighboring cell. 
+            c3 (Delaunay3_cell): 3rd neighboring cell. 
+            c4 (Delaunay3_cell): 4th neighboring cell. 
+
+        """
+        self.x.set_neighbors(c1.x, c2.x, c3.x, c4.x)
+
+    def reset_neighbors(self):
+        r"""Reset all of this cell's neighboring cells."""
+        self.x.set_neighbors()
 
     property circumcenter:
         """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""

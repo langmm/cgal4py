@@ -109,8 +109,28 @@ cdef extern from "c_delaunay3.hpp":
         cppclass Cell:
             Cell()
             Cell(All_cells_iter c)
+            Cell(Vertex v1, Vertex v2, Vertex v3, Vertex v4)
+            Cell(Vertex v1, Vertex v2, Vertex v3, Vertex v4,
+                 Cell n1, Cell n2, Cell n3, Cell n4)
             bool operator==(Cell other)
             bool operator!=(Cell other)
+
+            Vertex vertex(int i)
+            bool has_vertex(Vertex v)
+            bool has_vertex(Vertex v, int *i)
+            int index(Vertex v)
+
+            Cell neighbor(int i)
+            bool has_neighbor(Cell c)
+            bool has_neighbor(Cell c, int *i)
+            int index(Cell c)
+
+            void set_vertex(int i, Vertex v)
+            void set_vertices()
+            void set_vertices(Vertex v1, Vertex v2, Vertex v3, Vertex v4)
+            void set_neighbor(int i, Cell c)
+            void set_neighbors()
+            void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4)
 
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)

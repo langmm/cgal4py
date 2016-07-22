@@ -176,6 +176,40 @@ def test_clear():
     assert(T.num_finite_verts == 0)
     assert(T.num_cells == 0)
 
+def test_vert():
+    pass
+def test_edge():
+    pass
+def test_cell():
+    T = Delaunay3()
+    T.insert(pts)
+    for c in T.all_cells:
+        v1 = c.vertex(0)
+        v2 = c.vertex(1)
+        v3 = c.vertex(2)
+        v4 = c.vertex(3)
+        print(c.has_vertex(v1))
+        print(c.has_vertex(v1, return_index = True))
+        print(c.index_vertex(v1))
+
+        c.reset_vertices()
+        c.set_vertex(0, v1)
+        c.set_vertices(v4, v3, v2, v1)
+
+        n1 = c.neighbor(0)
+        n2 = c.neighbor(1)
+        n3 = c.neighbor(2)
+        n4 = c.neighbor(3)
+        print(c.has_neighbor(n1))
+        print(c.has_neighbor(n1, return_index = True))
+        print(c.index_neighbor(n1))
+
+        c.reset_neighbors()
+        c.set_neighbor(0, n1)
+        c.set_neighbors(n4, n3, n2, n1)
+
+        print(c.circumcenter)
+
 def test_move():
     T = Delaunay3()
     T.insert(pts)
@@ -228,12 +262,6 @@ def test_io():
     assert(Tout.num_verts == Tin.num_verts)
     assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
-
-def test_circumcenter():
-    T = Delaunay3()
-    T.insert(pts)
-    for c in T.all_cells:
-        out = c.circumcenter
 
 def test_vert_incident_verts():
     T = Delaunay3()

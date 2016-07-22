@@ -10,7 +10,6 @@
 #include <math.h>
 #include <iostream>
 #include <fstream>
-// #include <CGAL/IO/io.h>
 #include <CGAL/Unique_hash_map.h>
 #include <stdint.h>
 
@@ -272,12 +271,36 @@ class Delaunay_with_info_3
     Cell_handle _x = Cell_handle();
     Cell() { _x = Cell_handle(); }
     Cell(Cell_handle x) { _x = x; }
-    // Cell(All_cells_iterator x) { _x = static_cast<Cell_handle>(x); }
-    // Cell(Finite_cells_iterator x) { _x = static_cast<Cell_handle>(x); }
     Cell(Cell_circulator x) { _x = static_cast<Cell_handle>(x); }
     Cell(All_cells_iter x) { _x = static_cast<Cell_handle>(x._x); }
+    Cell(Vertex v1, Vertex v2, Vertex v3, Vertex v4) {
+      _x = Cell_handle(v1._x, v2._x, v3._x, v4._x); }
+    Cell(Vertex v1, Vertex v2, Vertex v3, Vertex v4, 
+	 Cell n1, Cell n2, Cell n3, Cell n4) {
+      _x = Cell_handle(v1._x, v2._x, v3._x, v4._x,
+		       n1._x, n2._x, n3._x, n4._x);
+    }
     bool operator==(Cell other) { return (_x == other._x); }
     bool operator!=(Cell other) { return (_x != other._x); }
+
+    Vertex vertex(int i) { return Vertex(_x->vertex(i)); }
+    bool has_vertex(Vertex v) { return _x->has_vertex(v._x); }
+    bool has_vertex(Vertex v, int *i) { return _x->has_vertex(v._x, *i); }
+    int index(Vertex v) { return _x->index(v._x); }
+
+    Cell neighbor(int i) { return Cell(_x->neighbor(i)); }
+    bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
+    bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
+    int index(Cell c) const { return _x->index(c._x); }
+
+    void set_vertex(int i, Vertex v) { _x->set_vertex(i, v._x); }
+    void set_vertices() { _x->set_vertices(); }
+    void set_vertices(Vertex v1, Vertex v2, Vertex v3, Vertex v4) {
+      _x->set_vertices(v1._x, v2._x, v3._x, v4._x); }
+    void set_neighbor(int i, Cell c) { _x->set_neighbor(i, c._x); }
+    void set_neighbors() { _x->set_neighbors(); }
+    void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4) {
+      _x->set_neighbors(c1._x, c2._x, c3._x, c4._x); }
   };
 
   // Testing incidence to the infinite vertex
