@@ -3,6 +3,9 @@ import numpy as np
 import os
 from delaunay2 import Delaunay2
 
+# TODO:
+# - value test circumcenter
+
 pts = np.array([[-0.4941988586954018 , -0.07594397977563715],
                 [-0.06448037284989526,  0.4958248496365813 ],
                 [ 0.4911154367094632 ,  0.09383830681375946],
@@ -190,14 +193,33 @@ def test_cell():
     T = Delaunay2()
     T.insert(pts)
     for c in T.all_cells:
-        v = c.vertex(0)
-        print(c.has_vertex(v))
-        print(c.has_vertex(v, return_index = True))
-        print(c.index_vertex(v))
-        n = c.neighbor(0)
-        print(c.has_neighbor(n))
-        print(c.has_neighbor(n, return_index = True))
-        print(c.index_neighbor(n))
+        v1 = c.vertex(0)
+        v2 = c.vertex(1)
+        v3 = c.vertex(2)
+        print(c.has_vertex(v1))
+        print(c.has_vertex(v1, return_index = True))
+        print(c.index_vertex(v1))
+
+        c.reset_vertices()
+        c.set_vertex(0, v1)
+        c.set_vertices(v3, v2, v1)
+
+        n1 = c.neighbor(0)
+        n2 = c.neighbor(1)
+        n3 = c.neighbor(2)
+        print(c.has_neighbor(n1))
+        print(c.has_neighbor(n1, return_index = True))
+        print(c.index_neighbor(n1))
+
+        c.reset_neighbors()
+        c.set_neighbor(0, n1)
+        c.set_neighbors(n3, n2, n1)
+
+        c.reorient()
+        c.ccw_permute()
+        c.cw_permute()
+        print(c.dimension)
+        print(c.circumcenter)
 
 def test_move():
     T = Delaunay2()
@@ -240,13 +262,6 @@ def test_flippable():
     for c in T.all_cells:
         T.flip(c, 0)
     assert(T.num_edges == nedges)
-
-def test_circumcenter():
-    # TODO: value test
-    T = Delaunay2()
-    T.insert(pts)
-    for c in T.all_cells:
-        out = c.circumcenter()
 
 def test_vert_incident_verts():
     T = Delaunay2()

@@ -86,30 +86,36 @@ cdef extern from "c_delaunay2.hpp":
         All_cells_iter all_cells_begin()
         All_cells_iter all_cells_end()
 
-        cppclass Cell_circ:
-            Cell_circ()
-            Cell_circ& operator++()
-            Cell_circ& operator--()
-            bool operator==(Cell_circ other)
-            bool operator!=(Cell_circ other)
-            bool is_done()
-
         cppclass Cell:
             Cell()
             Cell(All_cells_iter c)
-            Cell(Cell_circ c)
             Cell(Vertex v1, Vertex v2, Vertex v3)
             Cell(Vertex v1, Vertex v2, Vertex v3, Cell c1, Cell c2, Cell c3)
             bool operator==(Cell other)
             bool operator!=(Cell other)
+
             Vertex vertex(int i)
             bool has_vertex(Vertex v)
             bool has_vertex(Vertex v, int *i)
             int index(Vertex v)
+
             Cell neighbor(int i)
             bool has_neighbor(Cell c)
             bool has_neighbor(Cell c, int *i)
             int index(Cell c)
+
+            void set_vertex(int i, Vertex v)
+            void set_vertices()
+            void set_vertices(Vertex v1, Vertex v2, Vertex v3)
+            void set_neighbor(int i, Cell c)
+            void set_neighbors()
+            void set_neighbors(Cell c1, Cell c2, Cell c3)
+
+            void reorient()
+            void ccw_permute()
+            void cw_permute()
+
+            int dimension() except + 
 
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)

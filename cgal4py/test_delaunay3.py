@@ -3,6 +3,11 @@ import numpy as np
 import os
 from delaunay3 import Delaunay3
 
+# TODO:
+# - answer test circumcenter
+# - answer test ability to flip
+
+
 pts = np.array([[ 0,  0,  0],
                 [-1, -1, -1],
                 [-1, -1,  1],
@@ -199,7 +204,6 @@ def test_move_if_no_collision():
     assert(T.num_verts == nverts)
 
 def test_flip():
-    # TODO: Answer checking on ability to flip
     T = Delaunay3()
     T.insert(pts)
     for c in T.all_cells:
@@ -226,11 +230,10 @@ def test_io():
     os.remove(fname)
 
 def test_circumcenter():
-    # TODO: value test
     T = Delaunay3()
     T.insert(pts)
     for c in T.all_cells:
-        out = c.circumcenter()
+        out = c.circumcenter
 
 def test_vert_incident_verts():
     T = Delaunay3()

@@ -224,6 +224,8 @@ class Delaunay_with_info_2
     }
   };
 
+
+  // Cell constructs
   class All_cells_iter {
   public:
     All_faces_iterator _x = All_faces_iterator();
@@ -244,51 +246,46 @@ class Delaunay_with_info_2
   All_cells_iter all_cells_begin() { return All_cells_iter(T.all_faces_begin()); }
   All_cells_iter all_cells_end() { return All_cells_iter(T.all_faces_end()); }
 
-  class Cell_circ {
-  public:
-    Face_circulator _x = Face_circulator();
-    Face_circulator _done = _x;
-    Cell_circ() {
-      _x = Face_circulator();
-      _done = _x;
-    }
-    Cell_circ(Face_circulator x) { _x = x; _done = x; }
-    Cell_circ& operator*() { return *this; }
-    Cell_circ& operator++() {
-      _x++;
-      return *this;
-    }
-    Cell_circ& operator--() {
-      _x--;
-      return *this;
-    }
-    bool operator==(Cell_circ other) { return (_x == other._x); }
-    bool operator!=(Cell_circ other) { return (_x != other._x); }
-    bool is_done() { return (_x == _done); }
-  };
-
   class Cell {
   public:
     Face_handle _x = Face_handle();
     Cell() { _x = Face_handle(); }
     Cell(Face_handle x) { _x = x; }
     Cell(All_cells_iter x) { _x = static_cast<Face_handle>(x._x); }
-    Cell(Cell_circ x) { _x = static_cast<Face_handle>(x._x); }
     Cell(Vertex v1, Vertex v2, Vertex v3) { _x = Face_handle(v1._x, v2._x, v3._x); }
     Cell(Vertex v1, Vertex v2, Vertex v3, Cell c1, Cell c2, Cell c3) {
       _x = Face_handle(v1._x, v2._x, v3._x, c1._x, c2._x, c3._x); }
     bool operator==(Cell other) { return (_x == other._x); }
     bool operator!=(Cell other) { return (_x != other._x); }
+
     Vertex vertex(int i) const { return Vertex(_x->vertex(i)); }
     bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
     bool has_vertex(Vertex v, int *i) const { return _x->has_vertex(v._x, *i); }
     int index(Vertex v) const { return _x->index(v._x); }
+
     Cell neighbor(int i) const { return Cell(_x->neighbor(i)); }
     bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
     bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
     int index(Cell c) const { return _x->index(c._x); }
+
+    void set_vertex(int i, Vertex v) { _x->set_vertex(i, v._x); }
+    void set_vertices() { _x->set_vertices(); }
+    void set_vertices(Vertex v1, Vertex v2, Vertex v3) {
+      _x->set_vertices(v1._x, v2._x, v3._x); }
+    void set_neighbor(int i, Cell c) { _x->set_neighbor(i, c._x); }
+    void set_neighbors() { _x->set_neighbors(); }
+    void set_neighbors(Cell c1, Cell c2, Cell c3) {
+      _x->set_neighbors(c1._x, c2._x, c3._x); }
+
+    void reorient() { _x->reorient(); }
+    void ccw_permute() { _x->ccw_permute(); }
+    void cw_permute() { _x->cw_permute(); }
+
+    int dimension() const { return _x->dimension(); }
   };
 
+
+  // Check if construct is incident to the infinite vertex
   bool is_infinite(Vertex x) const { return T.is_infinite(x._x); }
   bool is_infinite(Edge x) const { 
     if ((is_infinite(x._x1)) || (is_infinite(x._x2)))

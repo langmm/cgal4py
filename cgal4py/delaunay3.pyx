@@ -796,17 +796,12 @@ cdef class Delaunay3_cell:
         """
         return self.T.is_infinite(self.x)
 
-    def circumcenter(self):
-        r"""Determines the circumcenter of the cell.
-
-        Returns:
-            :obj:`ndarray` of float64: x,y cartesian coordinates of the cell's
-                circumcenter.
-
-        """
-        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
-        self.T.circumcenter(self.x, &out[0])
-        return out
+    property circumcenter:
+        """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""
+        def __get__(self):
+            cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+            self.T.circumcenter(self.x, &out[0])
+            return out
 
 
 cdef class Delaunay3_cell_iter:

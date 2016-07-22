@@ -656,18 +656,6 @@ cdef class Delaunay2_cell:
         else:
             return <pybool>out
 
-    def circumcenter(self):
-        r"""Determines the circumcenter of the cell.
-
-        Returns:
-            :obj:`ndarray` of float64: x,y cartesian coordinates of the cell's
-                circumcenter.
-
-        """
-        cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
-        self.T.circumcenter(self.x, &out[0])
-        return out
-
     def index_neighbor(self, Delaunay2_cell v):
         r"""Determine the index of a neighboring cell.
 
@@ -680,7 +668,81 @@ cdef class Delaunay2_cell:
         """
         return self.x.index(v.x)
 
+    def set_vertex(self, int i, Delaunay2_vertex v):
+        r"""Set the ith vertex of this cell.
 
+        Args:
+            i (int): Index of this cell's vertex that should be set.
+            v (Delauany2_vertex): Vertex to set ith vertex of this cell to.
+
+        """
+        self.x.set_vertex(i, v.x)
+
+    def set_vertices(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
+                     Delaunay2_vertex v3):
+        r"""Set this cell's vertices.
+
+        Args:
+            v1 (Delaunay2_vertex): 1st vertex of cell.
+            v2 (Delaunay2_vertex): 2nd vertex of cell.
+            v3 (Delaunay2_vertex): 3rd vertex of cell.
+
+        """
+        self.x.set_vertices(v1.x, v2.x, v3.x)
+
+    def reset_vertices(self):
+        r"""Reset all of this cell's vertices."""
+        self.x.set_vertices()
+
+    def set_neighbor(self, int i, Delaunay2_cell n):
+        r"""Set the ith neighboring cell of this cell.
+
+        Args:
+            i (int): Index of this cell's neighbor that should be set.
+            n (Delaunay2_cell): Cell to set ith neighbor of this cell to.
+
+        """
+        self.x.set_neighbor(i, n.x)
+
+    def set_neighbors(self, Delaunay2_cell c1, Delaunay2_cell c2, 
+                      Delaunay2_cell c3):
+        r"""Set this cell's neighboring cells.
+
+        Args:
+            c1 (Delaunay2_cell): 1st neighboring cell.
+            c2 (Delaunay2_cell): 2nd neighboring cell.
+            c3 (Delaunay2_cell): 3rd neighboring cell.
+
+        """
+        self.x.set_neighbors(c1.x, c2.x, c3.x)
+
+    def reset_neighbors(self):
+        r"""Reset all of this cell's neighboring cells."""
+        self.x.set_neighbors()
+
+    def reorient(self):
+        r"""Change the vertex order so that ccw and cw are switched."""
+        self.x.reorient()
+
+    def ccw_permute(self):
+        r"""Bring the last vertex to the front of the vertex order."""
+        self.x.ccw_permute()
+        
+    def cw_permute(self):
+        r"""Put the 1st vertex at the end of the vertex order."""
+        self.x.cw_permute()
+
+    property circumcenter:
+        r""":obj:`ndarray` of float64: x,y coordinates of cell circumcenter."""
+        def __get__(self):
+            cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
+            self.T.circumcenter(self.x, &out[0])
+            return out
+
+    property dimension:
+        r"""int: The number of dimensions that this cell occupies."""
+        def __get__(self):
+            return self.x.dimension()
 
 cdef class Delaunay2_cell_iter:
     r"""Wrapper class for a triangulation cell.
@@ -823,43 +885,6 @@ cdef class Delaunay2_cell_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay2_cell_circ:
-    r"""Wrapper class for a cell circulator.
-
-    Attributes:
-        T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ triangulation object.
-            Direct interaction with this object is not recommended.
-        x (:obj:`Delaunay_with_info_2[uint32_t].Cell_circ`): C++ object for 
-            continuously iterating over a set of cells.
-
-    """
-    cdef Delaunay_with_info_2[uint32_t] *T
-    cdef Delaunay_with_info_2[uint32_t].Cell_circ x
-
-    cdef void assign(self, Delaunay_with_info_2[uint32_t] *T, 
-                     Delaunay_with_info_2[uint32_t].Cell_circ x):
-        r"""Assign C++ objects to attributes.
-
-        Args:
-            T (:obj:`Delaunay_with_info_2[uint32_t]`): C++ triangulation object.
-                Direct interaction with this object is not recommended.  
-            x (:obj:`Delaunay_with_info_2[uint32_t].Cell_circ`): C++ object for 
-                continuously iterating over a set of cells.  
-
-        """
-        self.T = T
-        self.x = x
-        predecrement(self.x)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        preincrement(self.x)
-        cdef Delaunay2_cell out = Delaunay2_cell()
-        out.T = self.T
-        out.x = Delaunay_with_info_2[uint32_t].Cell(self.x)
-        return out
 
 cdef class Delaunay2:
     r"""Wrapper class for a 2D Delaunay triangulation.
