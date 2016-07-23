@@ -265,12 +265,12 @@ class Delaunay_with_info_2
     Vertex vertex(int i) const { return Vertex(_x->vertex(i)); }
     bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
     bool has_vertex(Vertex v, int *i) const { return _x->has_vertex(v._x, *i); }
-    int index(Vertex v) const { return _x->index(v._x); }
+    int ind(Vertex v) const { return _x->index(v._x); }
 
     Cell neighbor(int i) const { return Cell(_x->neighbor(i)); }
     bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
     bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
-    int index(Cell c) const { return _x->index(c._x); }
+    int ind(Cell c) const { return _x->index(c._x); }
 
     void set_vertex(int i, Vertex v) { _x->set_vertex(i, v._x); }
     void set_vertices() { _x->set_vertices(); }

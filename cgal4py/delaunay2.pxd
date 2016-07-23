@@ -100,12 +100,12 @@ cdef extern from "c_delaunay2.hpp":
             Vertex vertex(int i)
             bool has_vertex(Vertex v)
             bool has_vertex(Vertex v, int *i)
-            int index(Vertex v)
+            int ind(Vertex v)
 
             Cell neighbor(int i)
             bool has_neighbor(Cell c)
             bool has_neighbor(Cell c, int *i)
-            int index(Cell c)
+            int ind(Cell c)
 
             void set_vertex(int i, Vertex v)
             void set_vertices()

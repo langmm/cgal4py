@@ -222,7 +222,7 @@ def test_cell():
         v3 = c.vertex(2)
         print(c.has_vertex(v1))
         print(c.has_vertex(v1, return_index = True))
-        print(c.index_vertex(v1))
+        print(c.ind_vertex(v1))
 
         c.reset_vertices()
         c.set_vertex(0, v1)
@@ -233,7 +233,7 @@ def test_cell():
         n3 = c.neighbor(2)
         print(c.has_neighbor(n1))
         print(c.has_neighbor(n1, return_index = True))
-        print(c.index_neighbor(n1))
+        print(c.ind_neighbor(n1))
 
         c.reset_neighbors()
         c.set_neighbor(0, n1)

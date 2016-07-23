@@ -196,8 +196,13 @@ def test_edge():
     T = Delaunay3()
     T.insert(pts)
     for e in T.all_edges:
-        v1 = e.vertex1
-        v2 = e.vertex2
+        v1 = e.vertex(0)
+        v2 = e.vertex(1)
+        assert(v1 == e.vertex1)
+        assert(v2 == e.vertex2)
+        c = e.cell
+        i1 = e.ind1
+        i2 = e.ind2
         elen = e.length
         print(v1.index, v2.index, elen)
         if e.is_infinite():
@@ -205,6 +210,16 @@ def test_edge():
         else:
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
+
+def test_facet():
+    T = Delaunay3()
+    T.insert(pts)
+    for f in T.all_facets:
+        v1 = f.vertex(0)
+        v2 = f.vertex(1)
+        v3 = f.vertex(2)
+        c = f.cell
+        i = f.ind
 
 def test_cell():
     T = Delaunay3()
@@ -216,7 +231,7 @@ def test_cell():
         v4 = c.vertex(3)
         print(c.has_vertex(v1))
         print(c.has_vertex(v1, return_index = True))
-        print(c.index_vertex(v1))
+        print(c.ind_vertex(v1))
 
         c.reset_vertices()
         c.set_vertex(0, v1)
@@ -228,7 +243,7 @@ def test_cell():
         n4 = c.neighbor(3)
         print(c.has_neighbor(n1))
         print(c.has_neighbor(n1, return_index = True))
-        print(c.index_neighbor(n1))
+        print(c.ind_neighbor(n1))
 
         c.reset_neighbors()
         c.set_neighbor(0, n1)
@@ -392,6 +407,110 @@ def test_edge_incident_cells():
         print(c0)
     print(count)
     assert(count == 144)
+
+def test_facet_incident_verts():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_facets:
+        c0 = 0
+        for e in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 144)
+
+def test_facet_incident_edges():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_facets:
+        c0 = 0
+        for e in v.incident_edges():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 144)
+
+def test_facet_incident_facets():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_facets:
+        c0 = 0
+        for e in v.incident_facets():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 590)
+
+def test_facet_incident_cells():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_facets:
+        c0 = 0
+        for e in v.incident_cells():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 96)
+
+def test_cell_incident_verts():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 96)
+
+def test_cell_incident_edges():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_edges():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 144)
+
+def test_cell_incident_facets():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_facets():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 96)
+
+def test_cell_incident_cells():
+    T = Delaunay3()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_cells():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 72)
 
 def test_nearest_vertex():
     idx_test = 8

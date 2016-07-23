@@ -196,6 +196,17 @@ class Delaunay_with_info_3
     Edge(Finite_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
     Edge(All_edges_iter x) { _x = static_cast<Edge_handle>(*(x._x)); }
     Edge(Cell x, int i1, int i2) { _x = Edge_handle(x._x, i1, i2); }
+    bool operator==(Edge other) { return (_x == other._x); }
+    bool operator!=(Edge other) { return (_x != other._x); }
+    Cell cell() { return Cell(_x.first); }
+    int ind1() { return _x.second; }
+    int ind2() { return _x.third; }
+    Vertex vertex(int i) {
+      if ((i % 2) == 0)
+	return v1();
+      else
+	return v2();
+    }
     Vertex v1() const { 
       Vertex_handle v = _x.first->vertex(_x.second);
       return Vertex(v); 
@@ -204,8 +215,6 @@ class Delaunay_with_info_3
       Vertex_handle v = _x.first->vertex(_x.third);
       return Vertex(v); 
     }
-    bool operator==(Edge other) { return (_x == other._x); }
-    bool operator!=(Edge other) { return (_x != other._x); }
   };
 
 
@@ -242,6 +251,11 @@ class Delaunay_with_info_3
     Facet(Cell x, int i1) { _x = Facet_handle(x._x, i1); }
     bool operator==(Facet other) { return (_x == other._x); }
     bool operator!=(Facet other) { return (_x != other._x); }
+    Cell cell() { return Cell(_x.first); }
+    int ind() { return _x.second; }
+    Vertex vertex(int i) { 
+      return Vertex(cell().vertex((ind() + 1 + (i%3))%3)); 
+    }
   };
 
 
@@ -288,12 +302,12 @@ class Delaunay_with_info_3
     Vertex vertex(int i) { return Vertex(_x->vertex(i)); }
     bool has_vertex(Vertex v) { return _x->has_vertex(v._x); }
     bool has_vertex(Vertex v, int *i) { return _x->has_vertex(v._x, *i); }
-    int index(Vertex v) { return _x->index(v._x); }
+    int ind(Vertex v) { return _x->index(v._x); }
 
     Cell neighbor(int i) { return Cell(_x->neighbor(i)); }
     bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
     bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
-    int index(Cell c) const { return _x->index(c._x); }
+    int ind(Cell c) const { return _x->index(c._x); }
 
     void set_vertex(int i, Vertex v) { _x->set_vertex(i, v._x); }
     void set_vertices() { _x->set_vertices(); }
@@ -302,7 +316,8 @@ class Delaunay_with_info_3
     void set_neighbor(int i, Cell c) { _x->set_neighbor(i, c._x); }
     void set_neighbors() { _x->set_neighbors(); }
     void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4) {
-      _x->set_neighbors(c1._x, c2._x, c3._x, c4._x); }
+      _x->set_neighbors(c1._x, c2._x, c3._x, c4._x); 
+    }
   };
 
   // Testing incidence to the infinite vertex
@@ -383,6 +398,75 @@ class Delaunay_with_info_3
     do {
       out.push_back(Cell(cc));
     } while (++cc != done);
+    return out;
+  }
+
+  // Constructs incident to a facet
+  std::vector<Vertex> incident_vertices(Facet x) {
+    std::vector<Vertex> out;
+    for (int i = 0; i < 3; i++) {
+      out.push_back(x.vertex(i));
+    }
+    return out;
+  }
+  std::vector<Edge> incident_edges(Facet x) {
+    std::vector<Edge> out;
+    int i1, i2;
+    for (int i = 0; i < 3; i++) {
+      i1 = (x.ind() + i + 1) % 3;
+      i2 = (x.ind() + i + 2) % 3;
+      out.push_back(Edge(x.cell(), i1, i2));
+    }
+    return out;
+  }
+  std::vector<Facet> incident_facets(Facet x) {
+    std::vector<Facet> out;
+    std::vector<Edge> edges = incident_edges(x);
+    for (uint32_t i = 0; i < edges.size(); i++) {
+      Facet_circulator cc = T.incident_facets(edges[i]._x), done(cc);
+      if (cc != 0) {
+	do {
+	  if (Facet(cc) != x)
+	    out.push_back(Facet(cc));
+	} while (++cc != done);
+      }
+    } 
+    return out;
+  }
+  std::vector<Cell> incident_cells(Facet x) {
+    std::vector<Cell> out;
+    out.push_back(x.cell());
+    out.push_back(x.cell().neighbor(x.ind()));
+    return out;
+  }
+
+  // Constructs incident to a cell
+  std::vector<Vertex> incident_vertices(Cell x) {
+    std::vector<Vertex> out;
+    for (int i = 0; i < 4; i++)
+      out.push_back(x.vertex(i));
+    return out;
+  }
+  std::vector<Edge> incident_edges(Cell x) {
+    std::vector<Edge> out;
+    int i1, i2;
+    for (i1 = 0; i1 < 4; i1++) {
+      for (i2 = (i1+1); i2 < 4; i2++) {
+	out.push_back(Edge(x, i1, i2));
+      }
+    }
+    return out;
+  }
+  std::vector<Facet> incident_facets(Cell x) {
+    std::vector<Facet> out;
+    for (int i = 0; i < 4; i++)
+      out.push_back(Facet(x, i));
+    return out;
+  }
+  std::vector<Cell> incident_cells(Cell x) {
+    std::vector<Cell> out;
+    for (int i = 0; i < 3; i++)
+      out.push_back(x.neighbor(i));
     return out;
   }
 

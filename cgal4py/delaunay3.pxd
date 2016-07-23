@@ -79,10 +79,14 @@ cdef extern from "c_delaunay3.hpp":
             Edge()
             Edge(All_edges_iter it)
             Edge(Cell x, int i1, int i2)
-            Vertex v1()
-            Vertex v2()
             bool operator==(Edge other)
             bool operator!=(Edge other)
+            Cell cell()
+            int ind1()
+            int ind2()
+            Vertex vertex(int i)
+            Vertex v1()
+            Vertex v2()
 
         cppclass All_facets_iter:
             All_facets_iter()
@@ -99,6 +103,9 @@ cdef extern from "c_delaunay3.hpp":
             Facet(Cell x, int i1)
             bool operator==(Facet other)
             bool operator!=(Facet other)
+            Cell cell()
+            int ind()
+            Vertex vertex(int i)
 
         cppclass All_cells_iter:
             All_cells_iter()
@@ -121,12 +128,12 @@ cdef extern from "c_delaunay3.hpp":
             Vertex vertex(int i)
             bool has_vertex(Vertex v)
             bool has_vertex(Vertex v, int *i)
-            int index(Vertex v)
+            int ind(Vertex v)
 
             Cell neighbor(int i)
             bool has_neighbor(Cell c)
             bool has_neighbor(Cell c, int *i)
-            int index(Cell c)
+            int ind(Cell c)
 
             void set_vertex(int i, Vertex v)
             void set_vertices()
@@ -153,6 +160,16 @@ cdef extern from "c_delaunay3.hpp":
         vector[Edge] incident_edges(Edge x)
         vector[Facet] incident_facets(Edge x)
         vector[Cell] incident_cells(Edge x)
+
+        vector[Vertex] incident_vertices(Facet x)
+        vector[Edge] incident_edges(Facet x)
+        vector[Facet] incident_facets(Facet x)
+        vector[Cell] incident_cells(Facet x)
+
+        vector[Vertex] incident_vertices(Cell x)
+        vector[Edge] incident_edges(Cell x)
+        vector[Facet] incident_facets(Cell x)
+        vector[Cell] incident_cells(Cell x)
 
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)

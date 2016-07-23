@@ -633,7 +633,7 @@ cdef class Delaunay2_cell:
             out = self.x.has_vertex(v.x)
             return <pybool>out
 
-    def index_vertex(self, Delaunay2_vertex v):
+    def ind_vertex(self, Delaunay2_vertex v):
         r"""Determine the index of a vertex within a cell.
 
         Args:
@@ -643,7 +643,7 @@ cdef class Delaunay2_cell:
             int: Index of vertex within the cell.
 
         """
-        return self.x.index(v.x)
+        return self.x.ind(v.x)
 
     def neighbor(self, int i):
         r"""Find the neighboring cell opposite the ith vertex of this cell. 
@@ -684,7 +684,7 @@ cdef class Delaunay2_cell:
         else:
             return <pybool>out
 
-    def index_neighbor(self, Delaunay2_cell v):
+    def ind_neighbor(self, Delaunay2_cell v):
         r"""Determine the index of a neighboring cell.
 
         Args:
@@ -694,7 +694,7 @@ cdef class Delaunay2_cell:
             int: Index of vertex opposite to neighboring cell.
 
         """
-        return self.x.index(v.x)
+        return self.x.ind(v.x)
 
     def set_vertex(self, int i, Delaunay2_vertex v):
         r"""Set the ith vertex of this cell.

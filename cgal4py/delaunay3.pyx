@@ -364,6 +364,22 @@ cdef class Delaunay3_edge:
         """
         return self.T.is_infinite(self.x)
 
+    def vertex(self, int i):
+        r"""Get the ith vertex on this edge.
+
+        Args:
+            i (int): Index of vertex to return.
+
+        Returns:
+            Delaunay3_vertex: ith vertex on this edge.
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex x
+        x = self.x.vertex(i)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, x)
+        return out
+
     property vertex1:
         r"""Delaunay3_vertex: The first vertex in the edge."""
         def __get__(self):
@@ -379,6 +395,25 @@ cdef class Delaunay3_edge:
             cdef Delaunay3_vertex out = Delaunay3_vertex()
             out.assign(self.T, x)
             return out
+
+    property cell:
+        r"""Delaunay3_cell: The cell this edge is assigned to."""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Cell c
+            c = self.x.cell()
+            cdef Delaunay3_cell out = Delaunay3_cell()
+            out.assign(self.T, c)
+            return out
+
+    property ind1:
+        r"""int: The index of the 1st vertex of this edge in its cell."""
+        def __get__(self):
+            return self.x.ind1()
+
+    property ind2:
+        r"""int: The index of the 2nd vertex of this edge in its cell."""
+        def __get__(self):
+            return self.x.ind2()
 
     property length:
         r"""float64: The length of the edge. If infinite, -1 is returned"""
@@ -396,8 +431,6 @@ cdef class Delaunay3_edge:
         """
         cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        # it.push_back(self.x.v1())
-        # it.push_back(self.x.v2())
         cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
@@ -637,10 +670,94 @@ cdef class Delaunay3_facet:
         """
         return self.T.is_infinite(self.x)
 
+    def vertex(self, int i):
+        r"""Get the ith vertex incident to this facet.
+
+        Args:
+            i (int): Index of vertex that should be returned.
+
+        Returns:
+            Delaunay_vertex: ith vertex of this facet.
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        v = self.x.vertex(i)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, v)
+        return out
+
     property area:
         r"""float64: The area of the facet. If infinite, -1 is returned"""
         def __get__(self):
             return -1
+
+    property cell:
+        r"""Delaunay3_cell: The cell this facet is assigned to."""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Cell c
+            c = self.x.cell()
+            cdef Delaunay3_cell out = Delaunay3_cell()
+            out.assign(self.T, c)
+            return out
+
+    property ind:
+        r"""int: The index of the vertex this facet is opposite on its cell."""
+        def __get__(self):
+            return self.x.ind()
+        
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this facet.
+
+        Returns:
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                facet.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_edges(self):
+        r"""Find edges that are incident to this facet.
+
+        Returns:
+            Delaunay3_edge_vector: Iterator over edges incident to this facet. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_facets(self):
+        r"""Find facets that are incident to this facet.
+
+        Returns:
+            Delaunay3_facet_vector: Iterator over facets incident to this facet. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        it = self.T.incident_facets(self.x)
+        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this facet.
+
+        Returns:
+            Delaunay3_cell_vector: Iterator over cells incident to this facet.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        out.assign(self.T, it)
+        return out
+
 
 
 cdef class Delaunay3_facet_iter:
@@ -878,7 +995,7 @@ cdef class Delaunay3_cell:
             out = self.x.has_vertex(v.x)
             return <pybool>out
             
-    def index_vertex(self, Delaunay3_vertex v):
+    def ind_vertex(self, Delaunay3_vertex v):
         r"""Determine the index of a vertex within a cell. 
 
         Args: 
@@ -888,7 +1005,7 @@ cdef class Delaunay3_cell:
             int: Index of vertex within the cell. 
 
         """
-        return self.x.index(v.x)
+        return self.x.ind(v.x)
 
     def neighbor(self, int i):
         r"""Find the neighboring cell opposite the ith vertex of this cell. 
@@ -929,7 +1046,7 @@ cdef class Delaunay3_cell:
         else:
             return <pybool>out
 
-    def index_neighbor(self, Delaunay3_cell v):
+    def ind_neighbor(self, Delaunay3_cell v):
         r"""Determine the index of a neighboring cell. 
 
         Args: 
@@ -939,7 +1056,7 @@ cdef class Delaunay3_cell:
             int: Index of vertex opposite to neighboring cell. 
 
         """
-        return self.x.index(v.x)
+        return self.x.ind(v.x)
 
     def set_vertex(self, int i, Delaunay3_vertex v):
         r"""Set the ith vertex of this cell. 
@@ -1001,6 +1118,59 @@ cdef class Delaunay3_cell:
             cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
             self.T.circumcenter(self.x, &out[0])
             return out
+
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this cell.
+
+        Returns:
+            Delaunay3_vertex_vector: Iterator over vertices incident to this 
+                cell.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_edges(self):
+        r"""Find edges that are incident to this cell.
+
+        Returns:
+            Delaunay3_edge_vector: Iterator over edges incident to this cell. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_facets(self):
+        r"""Find facets that are incident to this cell.
+
+        Returns:
+            Delaunay3_facet_vector: Iterator over facets incident to this cell. 
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        it = self.T.incident_facets(self.x)
+        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this cell.
+
+        Returns:
+            Delaunay3_cell_vector: Iterator over cells incident to this cell.
+
+        """
+        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        out.assign(self.T, it)
+        return out
 
 
 cdef class Delaunay3_cell_iter:
