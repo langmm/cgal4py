@@ -369,6 +369,31 @@ class Delaunay_with_info_2
     return out1;
   }
 
+  // Constructs incident to a cell
+  std::vector<Vertex> incident_vertices(Cell x) {
+    uint32_t i;
+    std::vector<Vertex> out;
+    for (i = 0; i < 3; i++) 
+      out.push_back(x.vertex(i));
+    return out;
+  }
+  std::vector<Edge> incident_edges(Cell x) {
+    uint32_t i1, i2;
+    std::vector<Edge> out;
+     for (i1 = 0; i1 < 3; i1++) {
+      i2 = (i1 + 1) % 3;
+      out.push_back(Edge(x.vertex(i1), x.vertex(i2)));
+    }
+    return out;
+  }
+  std::vector<Cell> incident_cells(Cell x) {
+    uint32_t i;
+    std::vector<Cell> out;
+    for (i = 0; i < 3; i++)
+      out.push_back(x.neighbor(i));
+    return out;
+  }
+
   Vertex nearest_vertex(double* pos) {
     Point p = Point(pos[0], pos[1]);
     Vertex out = Vertex(T.nearest_vertex(p));

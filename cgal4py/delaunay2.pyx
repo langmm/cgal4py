@@ -772,6 +772,47 @@ cdef class Delaunay2_cell:
         def __get__(self):
             return self.x.dimension()
 
+    def incident_vertices(self):
+        r"""Find vertices that are incident to this cell.
+
+        Returns:
+            Delaunay2_vertex_vector: Iterator over vertices incident to this 
+                cell.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Vertex] it
+        it = self.T.incident_vertices(self.x)
+        cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
+        out.assign(self.T, it)
+        return out
+        
+    def incident_edges(self):
+        r"""Find edges that are incident to this cell.
+
+        Returns:
+            Delaunay2_edge_vector: Iterator over edges incident to this cell.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Edge] it
+        it = self.T.incident_edges(self.x)
+        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        out.assign(self.T, it)
+        return out
+
+    def incident_cells(self):
+        r"""Find cells that are incident to this cell.
+
+        Returns:
+            Delaunay2_cell_vector: Iterator over cells incident to thiscell.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] it
+        it = self.T.incident_cells(self.x)
+        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        out.assign(self.T, it)
+        return out
+
+
 cdef class Delaunay2_cell_iter:
     r"""Wrapper class for a triangulation cell.
 

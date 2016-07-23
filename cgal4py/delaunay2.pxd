@@ -135,6 +135,10 @@ cdef extern from "c_delaunay2.hpp":
         vector[Edge] incident_edges(Edge x)
         vector[Cell] incident_cells(Edge x)
 
+        vector[Vertex] incident_vertices(Cell x)
+        vector[Edge] incident_edges(Cell x)
+        vector[Cell] incident_cells(Cell x)
+
         Vertex nearest_vertex(double* pos)
         void circumcenter(Cell x, double* out)
         double dual_area(const Vertex v)

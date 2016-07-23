@@ -365,6 +365,45 @@ def test_edge_incident_cells():
     print(count)
     assert(count == 100)
 
+def test_cell_incident_verts():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_vertices():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 42)
+
+def test_cell_incident_edges():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_edges():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 42)
+
+def test_cell_incident_cells():
+    T = Delaunay2()
+    T.insert(pts)
+    count = 0
+    for v in T.all_cells:
+        c0 = 0
+        for e in v.incident_cells():
+            c0 += 1
+            count += 1
+        print(c0)
+    print(count)
+    assert(count == 42)
+
 def test_nearest_vertex():
     idx_test = 7
     T = Delaunay2()
