@@ -430,5 +430,6 @@ def test_plot():
     fname_test = "test_plot2D.png"
     T = Delaunay2()
     T.insert(pts)
-    T.plot(plotfile=fname_test)
+    axs = T.plot(plotfile=fname_test)
     os.remove(fname_test)
+    T.plot(axs=axs, title='Test')

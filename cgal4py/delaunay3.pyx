@@ -1333,6 +1333,25 @@ cdef class Delaunay3:
             Direct interaction with this object is not recommended. 
 
     """
+
+    _props_to_clear_on_update = {}
+
+    @staticmethod
+    def _dependent_property(fget):
+        attr = '_'+fget.__name__
+        def wrapped_fget(solf):
+            if attr not in solf._props_to_clear_on_update:
+                solf._props_to_clear_on_update[attr] = fget(solf)
+            return solf._props_to_clear_on_update[attr]
+        return property(wrapped_fget, None, None, fget.__doc__)
+
+    @staticmethod
+    def _update_to_tess(func):
+        def wrapped_func(solf, *args, **kwargs):
+            solf._props_to_clear_on_update.clear()
+            return func(solf, *args, **kwargs)
+        return wrapped_func
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__(self):
@@ -1350,6 +1369,7 @@ cdef class Delaunay3:
         cdef char* cfname = fname
         self.T.write_to_file(cfname)
 
+    @_update_to_tess
     def read_from_file(self, fname):
         r"""Read serialized tessellation information from a file.
 
@@ -1362,59 +1382,60 @@ cdef class Delaunay3:
         self.T.read_from_file(cfname)
         self.n = self.num_finite_verts
 
-    @property
+    @_dependent_property
     def num_finite_verts(self): 
         r"""int: The number of finite vertices in the triangulation."""
         return self.T.num_finite_verts()
-    @property
+    @_dependent_property
     def num_finite_edges(self):
         r"""int: The number of finite edges in the triangulation."""
         return self.T.num_finite_edges()
-    @property
+    @_dependent_property
     def num_finite_facets(self):
         r"""int: The number of finite facets in the triangulation."""
         return self.T.num_finite_facets()
-    @property
+    @_dependent_property
     def num_finite_cells(self):
         r"""int: The number of finite cells in the triangulation."""
         return self.T.num_finite_cells()
-    @property
+    @_dependent_property
     def num_infinite_verts(self):
         r"""int: The number of infinite vertices in the triangulation."""
         return self.T.num_infinite_verts()
-    @property
+    @_dependent_property
     def num_infinite_edges(self):
         r"""int: The number of infinite edges in the triangulation."""
         return self.T.num_infinite_edges()
-    @property
+    @_dependent_property
     def num_infinite_facets(self):
         r"""int: The number of infinite facets in the triangulation."""
         return self.T.num_infinite_facets()
-    @property
+    @_dependent_property
     def num_infinite_cells(self):
         r"""int: The number of infinite cells in the triangulation."""
         return self.T.num_infinite_cells()
-    @property
+    @_dependent_property
     def num_verts(self): 
         r"""int: The total number of vertices (finite + infinite) in the 
         triangulation."""
         return self.T.num_verts()
-    @property
+    @_dependent_property
     def num_edges(self):
         r"""int: The total number of edges (finite + infinite) in the 
         triangulation."""
         return self.T.num_edges()
-    @property
+    @_dependent_property
     def num_facets(self):
         r"""int: The total number of facets (finite + infinite) in the 
         triangulation."""
         return self.T.num_facets()
-    @property
+    @_dependent_property
     def num_cells(self):
         r"""int: The total number of cells (finite + infinite) in the 
         triangulation."""
         return self.T.num_cells()
 
+    @_update_to_tess
     def insert(self, np.ndarray[double, ndim=2, mode="c"] pts not None):
         r"""Insert points into the triangulation.
 
@@ -1438,6 +1459,28 @@ cdef class Delaunay3:
             print "There were {} duplicates".format(self.n-self.num_finite_verts)
         # assert(self.n == self.num_finite_verts)
 
+    @_update_to_tess
+    def clear(self):
+        r"""Removes all vertices and cells from the triangulation."""
+        self.T.clear()
+
+    @_dependent_property
+    def vertices(self):
+        r"""ndarray: The x,y,z coordinates of the vertices"""
+        cdef np.ndarray[np.float64_t, ndim=2] out
+        out = np.zeros([self.n, 3], 'float64')
+        self.T.info_ordered_vertices(&out[0,0])
+        return out
+
+    @_dependent_property
+    def edges(self):
+        r""":obj:`ndarray` of uint64: Vertex index pairs for edges."""
+        cdef np.ndarray[np.uint32_t, ndim=2] out
+        out = np.zeros([self.num_finite_edges, 2], 'uint32')
+        self.T.edge_info(&out[0,0])
+        return out
+
+    @_update_to_tess
     def remove(self, Delaunay3_vertex x):
         r"""Remove a vertex from the triangulation. 
 
@@ -1447,10 +1490,7 @@ cdef class Delaunay3:
         """
         self.T.remove(x.x)
 
-    def clear(self):
-        r"""Removes all vertices and cells from the triangulation."""
-        self.T.clear()
-
+    @_update_to_tess
     def move(self, Delaunay3_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 
@@ -1472,6 +1512,7 @@ cdef class Delaunay3:
         out.assign(self.T, v)
         return out
 
+    @_update_to_tess
     def move_if_no_collision(self, Delaunay3_vertex x,
                              np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location only if there is not already a 
@@ -1494,6 +1535,7 @@ cdef class Delaunay3:
         out.assign(self.T, v)
         return out
 
+    @_update_to_tess
     def flip(self, Delaunay3_cell x, int i):
         r"""Flip the facet incident to cell x and neighbor i of cell x. This 
         method first checks if the facet can be flipped.
@@ -1509,6 +1551,7 @@ cdef class Delaunay3:
         """
         return <pybool>self.T.flip(x.x, i)
 
+    @_update_to_tess
     def flip_flippable(self, Delaunay3_cell x, int i):
         r"""Same as :meth:`Delaunay3.flip`, but assumes that facet is flippable 
         and does not check.
@@ -1642,20 +1685,4 @@ cdef class Delaunay3:
         v.assign(self.T, vc)
         return v
 
-    def edge_info(self, max_incl, idx):
-        return self._edge_info(max_incl, idx)
-    cdef object _edge_info(self, int max_incl, np.uint64_t[:] idx):
-        cdef object edge_list = []
-        cdef vector[pair[uint32_t,uint32_t]] edge_vect
-        cdef int j
-        cdef uint32_t i1, i2
-        self.T.edge_info(edge_vect)
-        for j in xrange(<int>edge_vect.size()):
-            i1 = edge_vect[j].first
-            i2 = edge_vect[j].second
-            if idx[i2] < idx[i1]:
-                i1, i2 = i2, i1
-            if i1 < (<uint32_t>max_incl):
-                edge_list.append(np.array([i1,i2],'int64'))
-        return np.array(edge_list)
 

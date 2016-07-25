@@ -43,7 +43,9 @@ cdef extern from "c_delaunay3.hpp":
 
         Vertex get_vertex(Info index) except +
 
-        void edge_info(vector[pair[Info,Info]]& edges)
+        void info_ordered_vertices(double* pos)
+        void vertex_info(Info* verts)
+        void edge_info(Info* edges)
 
         cppclass All_verts_iter:
             All_verts_iter()
@@ -183,4 +185,3 @@ cdef class Delaunay3:
     cdef int n
     cdef Delaunay_with_info_3[uint32_t] *T
     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
-    cdef object _edge_info(self, int max_incl, np.uint64_t[:])

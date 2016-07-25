@@ -978,9 +978,6 @@ cdef class Delaunay2:
             if attr not in solf._props_to_clear_on_update:
                 solf._props_to_clear_on_update[attr] = fget(solf)
             return solf._props_to_clear_on_update[attr]
-            # if not hasattr(solf, attr):
-            #     setattr(solf, attr, fget(solf))
-            # return getattr(solf, attr)
         return property(wrapped_fget, None, None, fget.__doc__)
 
     @staticmethod

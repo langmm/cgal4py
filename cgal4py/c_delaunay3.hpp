@@ -672,13 +672,36 @@ class Delaunay_with_info_3
       is.close();
     }
   }
-  void edge_info(std::vector< std::pair<Info,Info> >& edges)
-  {
+
+  void info_ordered_vertices(double* pos) {
+    Info i;
+    Point p;
+    for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
+      i = it->info();
+      p = it->point();
+      pos[3*i + 0] = p.x();
+      pos[3*i + 1] = p.y();
+      pos[3*i + 2] = p.z();
+    }
+  }
+
+  void vertex_info(Info* verts) {
+    int i = 0;
+    for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
+      verts[i] = it->info();
+      i++;
+    }
+  }
+  
+  void edge_info(Info* edges) {
+    int i = 0;
     Info i1, i2;
     for (Finite_edges_iterator it = T.finite_edges_begin(); it != T.finite_edges_end(); it++) {
       i1 = it->first->vertex(it->second)->info();
       i2 = it->first->vertex(it->third)->info();
-      edges.push_back( std::make_pair( i1, i2 ) );
+      edges[2*i + 0] = i1;
+      edges[2*i + 1] = i2;
+      i++;
     }
   }
 
