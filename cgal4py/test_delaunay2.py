@@ -411,3 +411,24 @@ def test_nearest_vertex():
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
 
+def test_vertices():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.vertices
+    assert(v.shape[0] == pts.shape[0])
+    assert(v.shape[1] == pts.shape[1])
+    assert(np.allclose(pts, v))
+
+def test_edges():
+    T = Delaunay2()
+    T.insert(pts)
+    e = T.edges
+    assert(e.shape[0] == T.num_finite_edges)
+    assert(e.shape[1] == 2)
+
+def test_plot():
+    fname_test = "test_plot2D.png"
+    T = Delaunay2()
+    T.insert(pts)
+    T.plot(plotfile=fname_test)
+    os.remove(fname_test)

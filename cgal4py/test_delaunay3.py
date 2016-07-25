@@ -179,15 +179,19 @@ def test_clear():
 def test_vert():
     T = Delaunay3()
     T.insert(pts)
-    for v in T.all_verts:
+    for v in T.finite_verts:
         idx = v.index
         pnt = v.point
         vol = v.dual_volume
         print(idx,pnt,vol)
+        # if not v.is_infinite():
+            # assert(np.allclose(pnt, pts[idx,:]))
         if idx == 0:
             assert(np.isclose(vol, 4.5))
         else:
             assert(np.isclose(vol, -1.0))
+        # else:
+        #     assert(np.isclose(vol, -1.0))
         c = v.cell
         v.set_cell(c)
         v.set_point(pnt)

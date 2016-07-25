@@ -600,15 +600,37 @@ class Delaunay_with_info_2
     }
   }
 
-  void edge_info(std::vector< std::pair<Info,Info> >& edges)
-  {
+  void info_ordered_vertices(double* pos) {
+    Info i;
+    Point p;
+    for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
+      i = it->info();
+      p = it->point();
+      pos[2*i + 0] = p.x();
+      pos[2*i + 1] = p.y();
+    }
+  }
+
+  void vertex_info(Info* verts) {
+    int i = 0;
+    for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
+      verts[i] = it->info();
+      i++;
+    }
+  }
+
+  void edge_info(Info* edges) {
+    int i = 0;
     Info i1, i2;
     for (Finite_edges_iterator it = T.finite_edges_begin(); it != T.finite_edges_end(); it++) {
       i1 = it->first->vertex(T.cw(it->second))->info();
       i2 = it->first->vertex(T.ccw(it->second))->info();
-      edges.push_back( std::make_pair( i1, i2 ) );
+      edges[2*i + 0] = i1;
+      edges[2*i + 1] = i2;
+      i++;
     }
   }
+
   void outgoing_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly,
                        std::vector<Info>& rx, std::vector<Info>& ry,
