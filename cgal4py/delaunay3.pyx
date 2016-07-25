@@ -11,6 +11,8 @@ import cython
 import numpy as np
 cimport numpy as np
 
+from . import plot
+
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libcpp.set cimport set as cset
@@ -1381,6 +1383,16 @@ cdef class Delaunay3:
         cdef char* cfname = fname
         self.T.read_from_file(cfname)
         self.n = self.num_finite_verts
+
+    def plot(self, *args, **kwargs):
+        r"""Plot the triangulation. 
+
+        Args:                                                                                                                                                                        
+            *args: All arguments are passed to :func:`plot.plot3D`.
+            **kwargs: All keyword arguments are passed to :func:`plot.plot3D`.
+
+        """
+        plot.plot3D(self, *args, **kwargs)
 
     @_dependent_property
     def num_finite_verts(self): 

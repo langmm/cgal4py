@@ -537,3 +537,11 @@ def test_edges():
     e = T.edges
     assert(e.shape[0] == T.num_finite_edges)
     assert(e.shape[1] == 2)
+
+def test_plot():
+    fname_test = "test_plot3D.png"
+    T = Delaunay3()
+    T.insert(pts)
+    axs = T.plot(plotfile=fname_test)
+    os.remove(fname_test)
+    T.plot(axs=axs, title='Test')
