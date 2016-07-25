@@ -196,24 +196,44 @@ class Delaunay_with_info_3
     Edge(Finite_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
     Edge(All_edges_iter x) { _x = static_cast<Edge_handle>(*(x._x)); }
     Edge(Cell x, int i1, int i2) { _x = Edge_handle(x._x, i1, i2); }
-    bool operator==(Edge other) { return (_x == other._x); }
-    bool operator!=(Edge other) { return (_x != other._x); }
-    Cell cell() { return Cell(_x.first); }
-    int ind1() { return _x.second; }
-    int ind2() { return _x.third; }
+    Cell cell() const { return Cell(_x.first); }
+    int ind1() const { return _x.second; }
+    int ind2() const { return _x.third; }
     Vertex vertex(int i) {
       if ((i % 2) == 0)
 	return v1();
       else
 	return v2();
     }
-    Vertex v1() const { 
-      Vertex_handle v = _x.first->vertex(_x.second);
-      return Vertex(v); 
+    Vertex_handle _v1() const { return _x.first->vertex(_x.second); }
+    Vertex_handle _v2() const { return _x.first->vertex(_x.third); }
+    Vertex v1() const { return Vertex(_v1()); }
+    Vertex v2() const { return Vertex(_v2()); }
+    bool operator==(Edge other) {
+      Vertex_handle x1 = _v1(), x2 = _v2();
+      Vertex_handle o1 = other._v1(), o2 = other._v2();
+      if ((x1 == o1) && (x2 == o2))
+        return true;
+      else if ((x1 == o2) && (x2 == o1))
+        return true;
+      else
+        return false;
     }
-    Vertex v2() const { 
-      Vertex_handle v = _x.first->vertex(_x.third);
-      return Vertex(v); 
+    bool operator!=(Edge other) {
+      Vertex_handle x1 = _v1(), x2 = _v2();
+      Vertex_handle o1 = other._v1(), o2 = other._v2();
+      if (x1 == o1) {
+        if (x2 != o2)
+          return true;
+        else
+          return false;
+      } else if (x1 == o2) {
+        if (x2 != o1)
+          return true;
+        else
+          return false;
+      } else
+        return true;
     }
   };
 
@@ -249,12 +269,39 @@ class Delaunay_with_info_3
     Facet(Facet_circulator x) { _x = static_cast<Facet_handle>(*x); }
     Facet(All_facets_iter x) { _x = static_cast<Facet_handle>(*(x._x)); }
     Facet(Cell x, int i1) { _x = Facet_handle(x._x, i1); }
-    bool operator==(Facet other) { return (_x == other._x); }
-    bool operator!=(Facet other) { return (_x != other._x); }
     Cell cell() { return Cell(_x.first); }
     int ind() { return _x.second; }
     Vertex vertex(int i) { 
       return Vertex(cell().vertex((ind() + 1 + (i%3))%3)); 
+    }
+    bool operator==(Facet other) {
+      Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
+      Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
+      if ((x1 == o1) && (((x2 == o2) && (x3 == o3)) || ((x2 == o3) && (x3 == o2))))
+        return true;
+      else if ((x1 == o2) && (((x2 == o1) && (x3 == o3)) || ((x2 == o3) && (x3 == o1))))
+        return true;
+      else if ((x1 == o3) && (((x2 == o2) && (x3 == o1)) || ((x2 == o1) && (x3 == o2))))
+	return true;
+      else
+        return false;
+    }
+    bool operator!=(Facet other) {
+      Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
+      Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
+      if ((x1 != o1) && (x1 != o2) && (x1 != o3))
+	return true;
+      if ((x2 != o1) && (x2 != o2) && (x2 != o3))
+	return true;
+      if ((x3 != o1) && (x3 != o2) && (x3 != o3))
+	return true;
+      if ((o1 != x1) && (o1 != x2) && (o1 != x3))
+	return true;
+      if ((o2 != x1) && (o2 != x2) && (o2 != x3))
+	return true;
+      if ((o3 != x1) && (o3 != x2) && (o3 != x3))
+	return true;
+      return false;
     }
   };
 

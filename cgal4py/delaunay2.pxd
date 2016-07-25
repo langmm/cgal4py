@@ -37,7 +37,7 @@ cdef extern from "c_delaunay2.hpp":
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +
 
-        Vertex get_vertex(Info index)
+        Vertex get_vertex(Info index) except +
 
         void info_ordered_vertices(double* pos)
         void vertex_info(Info* verts)
@@ -147,6 +147,8 @@ cdef extern from "c_delaunay2.hpp":
         double length(const Edge e)
         bool flip(Cell x, int i)
         void flip_flippable(Cell x, int i)
+        vector[Edge] get_boundary_of_conflicts(double* pos, Cell start)
+        vector[Cell] get_conflicts(double* pos, Cell start)
 
 cdef class Delaunay2:
     cdef int n

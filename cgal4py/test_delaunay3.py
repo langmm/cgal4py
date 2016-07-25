@@ -184,14 +184,10 @@ def test_vert():
         pnt = v.point
         vol = v.dual_volume
         print(idx,pnt,vol)
-        # if not v.is_infinite():
-            # assert(np.allclose(pnt, pts[idx,:]))
         if idx == 0:
             assert(np.isclose(vol, 4.5))
         else:
             assert(np.isclose(vol, -1.0))
-        # else:
-        #     assert(np.isclose(vol, -1.0))
         c = v.cell
         v.set_cell(c)
         v.set_point(pnt)
@@ -208,10 +204,10 @@ def test_edge():
         i1 = e.ind1
         i2 = e.ind2
         elen = e.length
-        print(v1.index, v2.index, elen)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
         else:
+            print(v1.index, v2.index, elen)
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
 
@@ -384,7 +380,7 @@ def test_edge_incident_edges():
             count += 1
         print(c0)
     print(count)
-    assert(count == 469)
+    assert(count == 404)
 
 def test_edge_incident_facets():
     T = Delaunay3()
@@ -449,7 +445,7 @@ def test_facet_incident_facets():
             count += 1
         print(c0)
     print(count)
-    assert(count == 590)
+    assert(count == 450)
 
 def test_facet_incident_cells():
     T = Delaunay3()

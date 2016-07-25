@@ -23,6 +23,7 @@ class Delaunay_with_info_2
   typedef Info_ Info;
   typedef typename Delaunay::Point                     Point;
   typedef typename Delaunay::Vertex_handle             Vertex_handle;
+  typedef typename Delaunay::Edge                      Edge_handle;
   typedef typename Delaunay::Face_handle               Face_handle;
   typedef typename Delaunay::Vertex_circulator         Vertex_circulator;
   typedef typename Delaunay::Edge_circulator           Edge_circulator;
@@ -41,17 +42,17 @@ class Delaunay_with_info_2
   Delaunay T;
   Delaunay_with_info_2() {};
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
-  uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  uint32_t num_finite_edges() {
+  uint32_t num_finite_verts() const { return static_cast<uint32_t>(T.number_of_vertices()); }
+  uint32_t num_finite_edges() const {
     Finite_edges_iterator it = T.finite_edges_begin();
     uint32_t count = 0;
     for ( ; it != T.finite_edges_end(); it++)
       count++;
     return count;
   }
-  uint32_t num_finite_cells() { return static_cast<uint32_t>(T.number_of_faces()); }
-  uint32_t num_infinite_verts() { return static_cast<uint32_t>(1); }
-  uint32_t num_infinite_edges() {
+  uint32_t num_finite_cells() const { return static_cast<uint32_t>(T.number_of_faces()); }
+  uint32_t num_infinite_verts() const { return static_cast<uint32_t>(1); }
+  uint32_t num_infinite_edges() const {
     Edge_circulator ec = T.incident_edges(T.infinite_vertex()), done(ec);
     if (ec == 0)
       return 0;
@@ -61,7 +62,7 @@ class Delaunay_with_info_2
     } while (++ec != done);
     return count;
   }
-  uint32_t num_infinite_cells() {
+  uint32_t num_infinite_cells() const {
     Face_circulator fc = T.incident_faces(T.infinite_vertex()), done(fc);
     if (fc == 0)
       return 0;
@@ -71,9 +72,9 @@ class Delaunay_with_info_2
     } while (++fc != done);
     return count;
   }
-  uint32_t num_verts() { return (num_finite_verts() + num_infinite_verts()); }
-  uint32_t num_edges() { return (num_finite_edges() + num_infinite_edges()); }
-  uint32_t num_cells() { return (num_finite_cells() + num_infinite_cells()); }
+  uint32_t num_verts() const { return (num_finite_verts() + num_infinite_verts()); }
+  uint32_t num_edges() const { return (num_finite_edges() + num_infinite_edges()); }
+  uint32_t num_cells() const { return (num_finite_cells() + num_infinite_cells()); }
 
   class Vertex;
   class Cell;
@@ -100,7 +101,7 @@ class Delaunay_with_info_2
     return Vertex(T.move_if_no_collision(v._x, p));
   }
 
-  Vertex get_vertex(Info index) {
+  Vertex get_vertex(Info index) const {
     Finite_vertices_iterator it = T.finite_vertices_begin();
     for ( ; it != T.finite_vertices_end(); it++) {
       if (it->info() == index)
@@ -108,6 +109,28 @@ class Delaunay_with_info_2
     }
     return Vertex(T.infinite_vertex());
   }
+
+  template <typename Wrap, typename Wrap_handle>
+  class wrap_insert_iterator
+  {
+  protected:
+    std::vector<Wrap>* container;
+
+  public:
+    explicit wrap_insert_iterator (std::vector<Wrap>& x) : container(&x) {}
+    wrap_insert_iterator& operator= (Wrap_handle value) {
+      Wrap value_wrap = Wrap();
+      value_wrap._x = value;
+      container->push_back(value_wrap);
+      return *this;
+    }
+    wrap_insert_iterator& operator* ()
+    { return *this; }
+    wrap_insert_iterator& operator++ ()
+    { return *this; }
+    wrap_insert_iterator operator++ (int)
+    { return *this; }
+  };
 
   class All_verts_iter {
   public:
@@ -123,11 +146,11 @@ class Delaunay_with_info_2
       _x--;
       return *this;
     }
-    bool operator==(All_verts_iter other) { return (_x == other._x); }
-    bool operator!=(All_verts_iter other) { return (_x != other._x); }
+    bool operator==(All_verts_iter other) const { return (_x == other._x); }
+    bool operator!=(All_verts_iter other) const { return (_x != other._x); }
   };
-  All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
-  All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
+  All_verts_iter all_verts_begin() const { return All_verts_iter(T.all_vertices_begin()); }
+  All_verts_iter all_verts_end() const { return All_verts_iter(T.all_vertices_end()); }
 
   class Vertex {
   public:
@@ -135,21 +158,14 @@ class Delaunay_with_info_2
     Vertex() { _x = Vertex_handle(); }
     Vertex(Vertex_handle x) { _x = x; }
     Vertex(All_verts_iter x) { _x = static_cast<Vertex_handle>(x._x); }
-    bool operator==(Vertex other) { return (_x == other._x); }
-    bool operator!=(Vertex other) { return (_x != other._x); }
-    void point(double* out) {
+    bool operator==(Vertex other) const { return (_x == other._x); }
+    bool operator!=(Vertex other) const { return (_x != other._x); }
+    void point(double* out) const {
       Point p = _x->point();
       out[0] = p.x();
       out[1] = p.y();
     }
-    std::vector<double> point() {
-      std::vector<double> out;
-      Point p = _x->point();
-      out.push_back(p.x());
-      out.push_back(p.y());
-      return out;
-    }
-    Info info() { return _x->info(); }
+    Info info() const { return _x->info(); }
     Cell cell() const { return Cell(_x->face()); }
     void set_cell(Cell c) { _x->set_face(c._x); }
     void set_point(double* x) {
@@ -172,59 +188,51 @@ class Delaunay_with_info_2
       _x--;
       return *this;
     }
-    bool operator==(All_edges_iter other) { return (_x == other._x); }
-    bool operator!=(All_edges_iter other) { return (_x != other._x); }
+    bool operator==(All_edges_iter other) const { return (_x == other._x); }
+    bool operator!=(All_edges_iter other) const { return (_x != other._x); }
   };
-  All_edges_iter all_edges_begin() { return All_edges_iter(T.all_edges_begin()); }
-  All_edges_iter all_edges_end() { return All_edges_iter(T.all_edges_end()); }
+  All_edges_iter all_edges_begin() const { return All_edges_iter(T.all_edges_begin()); }
+  All_edges_iter all_edges_end() const { return All_edges_iter(T.all_edges_end()); }
 
   class Edge {
   public:
-    Vertex _x1 = Vertex();
-    Vertex _x2 = Vertex();
+    Edge_handle _x = Edge_handle();
     Edge() {}
-    Edge(Edge_circulator it) {
-      int i = it->second;
-      int i1 = (i + 2) % 3;
-      int i2 = (i + 1) % 3;
-      _x1 = Vertex(it->first->vertex(i1));
-      _x2 = Vertex(it->first->vertex(i2));
-    }
-    Edge(All_edges_iter it) {
-      int i = it._x->second;
-      int i1 = (i + 2) % 3;
-      int i2 = (i + 1) % 3;
-      _x1 = Vertex(it._x->first->vertex(i1));
-      _x2 = Vertex(it._x->first->vertex(i2));
-    }
-    Edge(Vertex x1, Vertex x2) { _x1 = x1; _x2 = x2; }
-    Edge(Cell x, int i) {
-      _x1 = x.vertex(T.cw(i));
-      _x2 = x.vertex(T.ccw(i));
-    }
-    Vertex v1() { return _x1; }
-    Vertex v2() { return _x2; }
+    Edge(Edge_handle x) { _x = x; }
+    Edge(All_edges_iterator x) { _x = Edge_handle(x->first, x->second); } 
+    Edge(Finite_edges_iterator x) { _x = Edge_handle(x->first, x->second); } 
+    Edge(Edge_circulator x) { _x = Edge_handle(x->first, x->second); }
+    Edge(All_edges_iter x) { _x = Edge_handle(x._x->first, x._x->second); }
+    Edge(Cell x, int i) { _x = Edge_handle(x._x, i); }
+    Vertex_handle _v1() const { return _x.first->vertex((_x.second+2)%3); }
+    Vertex_handle _v2() const { return _x.first->vertex((_x.second+1)%3); }
+    Vertex v1() const { return Vertex(_v1()); }
+    Vertex v2() const { return Vertex(_v2()); }
     bool operator==(Edge other) { 
-      if ((_x1 == other._x1) && (_x2 == other._x2))
-	return true;
-      else if ((_x1 == other._x2) && (_x2 == other._x1))
-	return true;
+      Vertex_handle x1 = _v1(), x2 = _v2();
+      Vertex_handle o1 = other._v1(), o2 = other._v2();
+      if ((x1 == o1) && (x2 == o2))
+    	return true;
+      else if ((x1 == o2) && (x2 == o1))
+    	return true;
       else
-	return false;
+    	return false;
     }
     bool operator!=(Edge other) { 
-      if (_x1 == other._x1) {
-	if (_x2 != other._x2)
-	  return true;
-	else
-	  return false;
-      } else if (_x1 == other._x2) {
-	if (_x2 != other._x1)
-	  return true;
-	else
-	  return false;
+      Vertex_handle x1 = _v1(), x2 = _v2();
+      Vertex_handle o1 = other._v1(), o2 = other._v2();
+      if (x1 == o1) {
+    	if (x2 != o2)
+    	  return true;
+    	else
+    	  return false;
+      } else if (x1 == o2) {
+    	if (x2 != o1)
+    	  return true;
+    	else
+    	  return false;
       } else
-	return true;
+    	return true;
     }
   };
 
@@ -244,11 +252,11 @@ class Delaunay_with_info_2
       _x--;
       return *this;
     }
-    bool operator==(All_cells_iter other) { return (_x == other._x); }
-    bool operator!=(All_cells_iter other) { return (_x != other._x); }
+    bool operator==(All_cells_iter other) const { return (_x == other._x); }
+    bool operator!=(All_cells_iter other) const { return (_x != other._x); }
   };
-  All_cells_iter all_cells_begin() { return All_cells_iter(T.all_faces_begin()); }
-  All_cells_iter all_cells_end() { return All_cells_iter(T.all_faces_end()); }
+  All_cells_iter all_cells_begin() const { return All_cells_iter(T.all_faces_begin()); }
+  All_cells_iter all_cells_end() const { return All_cells_iter(T.all_faces_end()); }
 
   class Cell {
   public:
@@ -259,8 +267,8 @@ class Delaunay_with_info_2
     Cell(Vertex v1, Vertex v2, Vertex v3) { _x = Face_handle(v1._x, v2._x, v3._x); }
     Cell(Vertex v1, Vertex v2, Vertex v3, Cell c1, Cell c2, Cell c3) {
       _x = Face_handle(v1._x, v2._x, v3._x, c1._x, c2._x, c3._x); }
-    bool operator==(Cell other) { return (_x == other._x); }
-    bool operator!=(Cell other) { return (_x != other._x); }
+    bool operator==(Cell other) const { return (_x == other._x); }
+    bool operator!=(Cell other) const { return (_x != other._x); }
 
     Vertex vertex(int i) const { return Vertex(_x->vertex(i)); }
     bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
@@ -291,12 +299,7 @@ class Delaunay_with_info_2
 
   // Check if construct is incident to the infinite vertex
   bool is_infinite(Vertex x) const { return T.is_infinite(x._x); }
-  bool is_infinite(Edge x) const { 
-    if ((is_infinite(x._x1)) || (is_infinite(x._x2)))
-      return true;
-    else
-      return false;
-  }
+  bool is_infinite(Edge x) const { return T.is_infinite(x._x); }
   bool is_infinite(Cell x) const { return T.is_infinite(x._x); }
   bool is_infinite(All_verts_iter x) const { return T.is_infinite(x._x); }
   bool is_infinite(All_edges_iter x) const { return T.is_infinite(x._x); }
@@ -304,7 +307,7 @@ class Delaunay_with_info_2
 
 
   // Constructs incident to a vertex
-  std::vector<Vertex> incident_vertices(Vertex x) {
+  std::vector<Vertex> incident_vertices(Vertex x) const {
     std::vector<Vertex> out;
     Vertex_circulator vc = T.incident_vertices(x._x), done(vc);
     if (vc == 0)
@@ -314,7 +317,7 @@ class Delaunay_with_info_2
     } while (++vc != done);
     return out;
   }
-  std::vector<Edge> incident_edges(Vertex x) {
+  std::vector<Edge> incident_edges(Vertex x) const {
     std::vector<Edge> out;
     Edge_circulator ec = T.incident_edges(x._x), done(ec);
     if (ec == 0)
@@ -324,7 +327,7 @@ class Delaunay_with_info_2
     } while (++ec != done);
     return out;
   }
-  std::vector<Cell> incident_cells(Vertex x) {
+  std::vector<Cell> incident_cells(Vertex x) const {
     std::vector<Cell> out;
     Face_circulator fc = T.incident_faces(x._x), done(fc);
     if (fc == 0)
@@ -336,13 +339,13 @@ class Delaunay_with_info_2
   }
 
   // Constructs incident to an edge
-  std::vector<Vertex> incident_vertices(Edge x) {
+  std::vector<Vertex> incident_vertices(Edge x) const {
     std::vector<Vertex> out;
     out.push_back(x.v1());
     out.push_back(x.v2());
     return out;
   }
-  std::vector<Edge> incident_edges(Edge x) {
+  std::vector<Edge> incident_edges(Edge x) const {
     uint32_t i;
     std::vector<Edge> out1, out2, out;
     out1 = incident_edges(x.v1());
@@ -357,36 +360,35 @@ class Delaunay_with_info_2
     }
     return out;
   }
-  std::vector<Cell> incident_cells(Edge x) {
+  std::vector<Cell> incident_cells(Edge x) const {
     uint32_t i;
     std::vector<Cell> out1, out2;
-    out1 = incident_cells(x.v1());
-    out2 = incident_cells(x.v2());
+    Vertex v1 = x.v1(), v2 = x.v2();
+    out1 = incident_cells(v1);
+    out2 = incident_cells(v2);
     for (i = 0; i < out2.size(); i++) {
-      if ((!out2[i].has_vertex(x.v1())) && (!out2[i].has_vertex(x.v2())))
+      if ((!out2[i].has_vertex(v1)) && (!out2[i].has_vertex(v2)))
 	out1.push_back(out2[i]);
     }
     return out1;
   }
 
   // Constructs incident to a cell
-  std::vector<Vertex> incident_vertices(Cell x) {
+  std::vector<Vertex> incident_vertices(Cell x) const {
     uint32_t i;
     std::vector<Vertex> out;
     for (i = 0; i < 3; i++) 
       out.push_back(x.vertex(i));
     return out;
   }
-  std::vector<Edge> incident_edges(Cell x) {
-    uint32_t i1, i2;
+  std::vector<Edge> incident_edges(Cell x) const {
+    // uint32_t i1, i2;
     std::vector<Edge> out;
-     for (i1 = 0; i1 < 3; i1++) {
-      i2 = (i1 + 1) % 3;
-      out.push_back(Edge(x.vertex(i1), x.vertex(i2)));
-    }
+    for (int i = 0; i < 3; i++)
+      out.push_back(Edge(x, i));
     return out;
   }
-  std::vector<Cell> incident_cells(Cell x) {
+  std::vector<Cell> incident_cells(Cell x) const {
     uint32_t i;
     std::vector<Cell> out;
     for (i = 0; i < 3; i++)
@@ -394,19 +396,19 @@ class Delaunay_with_info_2
     return out;
   }
 
-  Vertex nearest_vertex(double* pos) {
+  Vertex nearest_vertex(double* pos) const {
     Point p = Point(pos[0], pos[1]);
     Vertex out = Vertex(T.nearest_vertex(p));
     return out;
   }
 
-  void circumcenter(Cell x, double* out) {
+  void circumcenter(Cell x, double* out) const {
     Point p = T.circumcenter(x._x);
     out[0] = p.x();
     out[1] = p.y();
   }
 
-  double dual_area(const Vertex v) {
+  double dual_area(const Vertex v) const {
 
     Face_circulator fstart = T.incident_faces(v._x);
     Face_circulator fcit = fstart;
@@ -432,11 +434,12 @@ class Delaunay_with_info_2
     return vol;
   }
 
-  double length(const Edge e) {
+  double length(const Edge e) const {
     if (is_infinite(e))
       return -1.0;
-    Point p1 = e._x1._x->point();
-    Point p2 = e._x2._x->point();
+    Vertex_handle v1 = e._v1(), v2 = e._v2();
+    Point p1 = v1->point();
+    Point p2 = v2->point();
     double out = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, p2)));
     return out;
   }
@@ -449,7 +452,34 @@ class Delaunay_with_info_2
     T.flip(x._x, i); 
   }
 
-  void write_to_file(const char* filename)
+  std::vector<Edge> get_boundary_of_conflicts(double* pos, Cell start) const {
+    std::vector<Edge> out;
+    Point p = Point(pos[0], pos[1]);
+    T.get_boundary_of_conflicts(p, wrap_insert_iterator<Edge,Edge_handle>(out), 
+				start._x);
+    return out;
+  }
+  std::vector<Cell> get_conflicts(double* pos, Cell start) const {
+    std::vector<Cell> out;
+    Point p = Point(pos[0], pos[1]);
+    T.get_conflicts(p, wrap_insert_iterator<Cell,Face_handle>(out), start._x);
+    return out;
+  }
+  std::pair<std::vector<Cell>,std::vector<Edge>>
+    get_conflicts_and_boundary(double* pos, Cell start) const {
+    std::pair<std::vector<Cell>,std::vector<Edge>> out;
+    std::vector<Cell> fit;
+    std::vector<Edge> eit;
+    Point p = Point(pos[0], pos[1]);
+    out = T.get_conflicts_and_boundary(p, 
+				       wrap_insert_iterator<Cell,Face_handle>(fit), 
+				       wrap_insert_iterator<Edge,Edge_handle>(eit), 
+				       start._x);
+    return out;
+  }
+									    
+
+  void write_to_file(const char* filename) const
   {
     std::ofstream os(filename, std::ios::binary);
     if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
@@ -600,7 +630,7 @@ class Delaunay_with_info_2
     }
   }
 
-  void info_ordered_vertices(double* pos) {
+  void info_ordered_vertices(double* pos) const {
     Info i;
     Point p;
     for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
@@ -611,7 +641,7 @@ class Delaunay_with_info_2
     }
   }
 
-  void vertex_info(Info* verts) {
+  void vertex_info(Info* verts) const {
     int i = 0;
     for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
       verts[i] = it->info();
@@ -619,7 +649,7 @@ class Delaunay_with_info_2
     }
   }
 
-  void edge_info(Info* edges) {
+  void edge_info(Info* edges) const {
     int i = 0;
     Info i1, i2;
     for (Finite_edges_iterator it = T.finite_edges_begin(); it != T.finite_edges_end(); it++) {
@@ -634,7 +664,7 @@ class Delaunay_with_info_2
   void outgoing_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly,
                        std::vector<Info>& rx, std::vector<Info>& ry,
-                       std::vector<Info>& alln)
+                       std::vector<Info>& alln) const
   {
     Vertex_handle v;
     Info hv;
