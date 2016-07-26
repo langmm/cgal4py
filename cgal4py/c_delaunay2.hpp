@@ -9,6 +9,7 @@
 #include <math.h>
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <CGAL/Unique_hash_map.h>
 #include <stdint.h>
 
@@ -404,9 +405,14 @@ class Delaunay_with_info_2
   }
 
   void circumcenter(Cell x, double* out) const {
-    Point p = T.circumcenter(x._x);
-    out[0] = p.x();
-    out[1] = p.y();
+    if (T.is_infinite(x._x)) {
+      out[0] = std::numeric_limits<double>::infinity();
+      out[1] = std::numeric_limits<double>::infinity();
+    } else {
+      Point p = T.circumcenter(x._x);
+      out[0] = p.x();
+      out[1] = p.y();
+    }
   }
 
   double dual_area(const Vertex v) const {
@@ -414,8 +420,6 @@ class Delaunay_with_info_2
     Face_circulator fstart = T.incident_faces(v._x);
     Face_circulator fcit = fstart;
     std::vector<Point> pts;
-
-
     pts.push_back(T.circumcenter(fstart));
     fcit++;
     for ( ; fcit != fstart; fcit++) {
@@ -425,7 +429,6 @@ class Delaunay_with_info_2
       pts.push_back(dual);
     }
     pts.push_back(T.circumcenter(fstart));
-
     double vol = 0.0;
     Point orig = v._x->point();
     for (uint32_t i=0 ; i<pts.size()-1 ; i++) {
@@ -479,7 +482,17 @@ class Delaunay_with_info_2
     out = std::make_pair(fit, eit);
     return out;
   }
-									    
+
+  int side_of_oriented_circle(Cell f, const double* pos) const {
+    if (T.is_infinite(f._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1])) {
+      return 1;
+    } else {
+      Point p = Point(pos[0], pos[1]);
+      return (int)T.side_of_oriented_circle(f._x, p);
+    }
+  }
 
   void write_to_file(const char* filename) const
   {

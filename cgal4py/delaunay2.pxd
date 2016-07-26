@@ -152,6 +152,8 @@ cdef extern from "c_delaunay2.hpp":
         vector[Cell] get_conflicts(double* pos, Cell start)
         pair[vector[Cell],vector[Edge]] get_conflicts_and_boundary(double* pos, Cell start)
 
+        int side_of_oriented_circle(Cell f, const double* pos) const
+
 cdef class Delaunay2:
     cdef int n
     cdef Delaunay_with_info_2[uint32_t] *T

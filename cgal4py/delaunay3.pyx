@@ -237,7 +237,7 @@ cdef class Delaunay3_vertex_iter:
         r"""Delaunay3_vertex: Corresponding vertex object."""
         def __get__(self):
             cdef Delaunay3_vertex out = Delaunay3_vertex()
-            out.assign(self.T, Delaunay_with_info_3[uint32_t].Vertex(self.x))
+            out.assign(self.T, Delaunay_with_info_3[uint32_t].Vertex(self.x)) 
             return out
 
 
@@ -267,18 +267,18 @@ cdef class Delaunay3_vertex_range:
         self.x = xstart
         self.xstop = xstop
         self.finite = finite
-        self.x.decrement()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.x.increment()
+        cdef Delaunay3_vertex out
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_vertex out = self.x.vertex
         if self.x != self.xstop:
+            out = self.x.vertex
+            self.x.increment()
             return out
         else:
             raise StopIteration()
@@ -596,8 +596,9 @@ cdef class Delaunay3_edge_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_edge out = self.x.edge
+        cdef Delaunay3_edge out
         if self.x != self.xstop:
+            out = self.x.edge
             self.x.increment()
             return out
         else:
@@ -798,6 +799,20 @@ cdef class Delaunay3_facet:
         out.assign(self.T, it)
         return out
 
+    # Currently segfaults inside CGAL function
+    # def side_of_circle(self, np.ndarray[np.float64_t, ndim=1] pos):
+    #     r"""Determine where a point is with repect to this facet's 
+    #         circumcircle. 
+    #
+    #     Args: 
+    #         pos (:obj:`ndarray` of np.float64): x,y,z coordinates. 
+    # 
+    #     Returns: 
+    #         int: -1, 0, or 1 if `pos` is within, on, or inside this facet's 
+    #             circumcircle respectively. 
+    # 
+    #     """
+    #     return self.T.side_of_circle(self.x, &pos[0])
 
 
 cdef class Delaunay3_facet_iter:
@@ -896,8 +911,9 @@ cdef class Delaunay3_facet_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_facet out = self.x.facet
+        cdef Delaunay3_facet out
         if self.x != self.xstop:
+            out = self.x.facet
             self.x.increment()
             return out
         else:
@@ -1228,6 +1244,20 @@ cdef class Delaunay3_cell:
         out.assign(self.T, it)
         return out
 
+    def side_of_sphere(self, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Determine where a point is with repect to this cell's 
+            circumsphere. 
+
+        Args: 
+            pos (:obj:`ndarray` of np.float64): x,y,z coordinates. 
+
+        Returns: 
+            int: -1, 0, or 1 if `pos` is within, on, or inside this cell's 
+                circumsphere respectively. 
+
+        """
+        return self.T.side_of_sphere(self.x, &pos[0])
+
 
 cdef class Delaunay3_cell_iter:
     r"""Wrapper class for a triangulation cell iteration.
@@ -1316,18 +1346,18 @@ cdef class Delaunay3_cell_range:
         self.x = xstart
         self.xstop = xstop
         self.finite = finite
-        self.x.decrement()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.x.increment()
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_cell out = self.x.cell
+        cdef Delaunay3_cell out
         if self.x != self.xstop:
+            out = self.x.cell
+            self.x.increment()
             return out
         else:
             raise StopIteration()

@@ -1,11 +1,12 @@
+# TODO:
+# - answer test circumcenter
+# - answer test ability to flip
+# - clarify equality between facets defined using different cells
+
 from nose import with_setup
 import numpy as np
 import os
 from delaunay3 import Delaunay3
-
-# TODO:
-# - answer test circumcenter
-# - answer test ability to flip
 
 
 pts = np.array([[ 0,  0,  0],
@@ -180,11 +181,15 @@ def test_clear():
 def test_vert():
     T = Delaunay3()
     T.insert(pts)
+    vold = None
     for v in T.all_verts:
         idx = v.index
         pnt = v.point
         vol = v.dual_volume
         print(v,idx,pnt,vol)
+        assert(v == v)
+        if vold is not None:
+            assert(v != vold)
         if v.is_infinite():
             assert(idx == np.iinfo(np.uint32).max)
             assert(np.isinf(pnt).all())
@@ -195,13 +200,15 @@ def test_vert():
                 assert(np.isclose(vol, 4.5))
             else:
                 assert(np.isclose(vol, -1.0))
-        c = v.cell
-        v.set_cell(c)
-        v.set_point(pnt)
+            c = v.cell
+            v.set_cell(c)
+            v.set_point(pnt)
+        vold = v
 
 def test_edge():
     T = Delaunay3()
     T.insert(pts)
+    eold = None
     for e in T.all_edges:
         v1 = e.vertex(0)
         v2 = e.vertex(1)
@@ -212,28 +219,56 @@ def test_edge():
         i2 = e.ind2
         elen = e.length
         print(e, v1.index, v2.index, elen)
+        assert(e == e)
+        if eold is not None:
+            assert(e != eold)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
         else:
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
+        eold = e
 
 def test_facet():
     T = Delaunay3()
     T.insert(pts)
+    fold = None
     for f in T.all_facets:
         v1 = f.vertex(0)
         v2 = f.vertex(1)
         v3 = f.vertex(2)
         c = f.cell
         i = f.ind
-        print(f, v1.index, v2.index, c, i)
+        print(f, v1.index, v2.index, v3.index, i)
+        assert(f == f)
+        # There are currently repeat facets (repeated once for each incident cell)
+        # if fold is not None:
+        #     assert(f != fold)
+        # # This segfaults inside CGAL function call
+        # print(f.side_of_circle((v1.point+v2.point+v3.point)/3), (v1.point+v2.point+v3.point)/3)
+        # print(f.side_of_circle(v1.point), v1.point)
+        # print(f.side_of_circle((5*v1.point-v2.point-v3.point)/3), (5*v1.point-v2.point-v3.point)/3)
+        # if f.is_infinite():
+        #     assert(f.side_of_circle((v1.point+v2.point+v3.point)/3) == -1)
+        #     assert(f.side_of_circle(v1.point) == -1)
+        #     assert(f.side_of_circle((5*v1.point-v2.point-v3.point)/3) == -1)
+        # else:
+        #     # This segfaults...
+        #     assert(f.side_of_circle((v1.point+v2.point+v3.point)/3) == -1)
+        #     assert(f.side_of_circle(v1.point) == 0)
+        #     assert(f.side_of_circle((5*v1.point-v2.point-v3.point)/3) == 1)
+
+        fold = f
 
 def test_cell():
     T = Delaunay3()
     T.insert(pts)
+    cold = None
     for c in T.all_cells:
         print(c, c.circumcenter)
+        assert(c == c)
+        if cold is not None:
+            assert(c != cold)
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
@@ -258,6 +293,19 @@ def test_cell():
         c.set_neighbor(0, n1)
         c.set_neighbors(n4, n3, n2, n1)
 
+        print(c.side_of_sphere(c.circumcenter), c.circumcenter)
+        print(c.side_of_sphere(v1.point), v1.point)
+        if c.is_infinite():
+            assert(np.isinf(c.circumcenter).all())
+            assert(c.side_of_sphere(c.circumcenter) == -1)
+            assert(c.side_of_sphere(v1.point) == -1)
+            # assert(c.side_of_sphere(2*v1.point - c.circumcenter) == -1)
+        else:
+            print(c.side_of_sphere(2*v1.point - c.circumcenter), 2*v1.point - c.circumcenter)
+            assert(c.side_of_sphere(c.circumcenter) == -1)
+            assert(c.side_of_sphere(v1.point) == 0)
+            assert(c.side_of_sphere(2*v1.point - c.circumcenter) == 1)
+        cold = c
 
 def test_move():
     T = Delaunay3()

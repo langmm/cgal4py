@@ -302,18 +302,18 @@ cdef class Delaunay2_vertex_range:
         self.x = xstart
         self.xstop = xstop
         self.finite = finite
-        self.x.decrement()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.x.increment()
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_vertex out = self.x.vertex
+        cdef Delaunay2_vertex out
         if self.x != self.xstop:
+            out = self.x.vertex
+            self.x.increment()
             return out
         else:
             raise StopIteration()
@@ -567,18 +567,18 @@ cdef class Delaunay2_edge_range:
         self.x = xstart
         self.xstop = xstop
         self.finite = finite
-        self.x.decrement()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.x.increment()
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_edge out = self.x.edge
+        cdef Delaunay2_edge out
         if self.x != self.xstop:
+            out = self.x.edge
+            self.x.increment()
             return out
         else:
             raise StopIteration()
@@ -854,6 +854,20 @@ cdef class Delaunay2_cell:
         out.assign(self.T, it)
         return out
 
+    def side_of_circle(self, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Determine where a point is with repect to this cell's 
+            circumcircle.
+
+        Args:
+            pos (:obj:`ndarray` of np.float64): x,y coordinates.
+
+        Returns:
+            int: -1, 0, or 1 if `pos` is within, on, or inside this cell's 
+                circumcircle respectively.
+
+        """
+        return self.T.side_of_oriented_circle(self.x, &pos[0])
+
 
 cdef class Delaunay2_cell_iter:
     r"""Wrapper class for a triangulation cell.
@@ -990,18 +1004,18 @@ cdef class Delaunay2_cell_range:
         self.x = xstart
         self.xstop = xstop
         self.finite = finite
-        self.x.decrement()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        self.x.increment()
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_cell out = self.x.cell
+        cdef Delaunay2_cell out
         if self.x != self.xstop:
+            out = self.x.cell
+            self.x.increment()
             return out
         else:
             raise StopIteration()

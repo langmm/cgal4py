@@ -52,6 +52,7 @@ cdef extern from "c_delaunay3.hpp":
             All_verts_iter& operator--()
             bool operator==(All_verts_iter other)
             bool operator!=(All_verts_iter other)
+            Vertex vertex()
         All_verts_iter all_verts_begin()
         All_verts_iter all_verts_end()
 
@@ -180,6 +181,9 @@ cdef extern from "c_delaunay3.hpp":
         void flip_flippable(Cell x, int i)
 
         pair[vector[Cell],vector[Facet]] find_conflicts(double* pos, Cell start)
+
+        # int side_of_circle(const Facet f, const double* pos)
+        int side_of_sphere(const Cell c, const double* pos)
 
 cdef class Delaunay3:
     cdef int n

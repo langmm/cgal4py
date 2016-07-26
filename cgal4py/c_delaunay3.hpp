@@ -10,6 +10,7 @@
 #include <math.h>
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <CGAL/Unique_hash_map.h>
 #include <stdint.h>
 
@@ -140,6 +141,7 @@ class Delaunay_with_info_3
     }
     bool operator==(All_verts_iter other) { return (_x == other._x); }
     bool operator!=(All_verts_iter other) { return (_x != other._x); }
+    Vertex vertex() { return Vertex((Vertex_handle)_x); }
   };
   All_verts_iter all_verts_begin() { return All_verts_iter(T.all_vertices_begin()); }
   All_verts_iter all_verts_end() { return All_verts_iter(T.all_vertices_end()); }
@@ -270,12 +272,12 @@ class Delaunay_with_info_3
     Facet(Facet_circulator x) { _x = static_cast<Facet_handle>(*x); }
     Facet(All_facets_iter x) { _x = static_cast<Facet_handle>(*(x._x)); }
     Facet(Cell x, int i1) { _x = Facet_handle(x._x, i1); }
-    Cell cell() { return Cell(_x.first); }
-    int ind() { return _x.second; }
-    Vertex vertex(int i) { 
+    Cell cell() const { return Cell(_x.first); }
+    int ind() const { return _x.second; }
+    Vertex vertex(int i) const { 
       return Vertex(cell().vertex((ind() + 1 + (i%3))%3)); 
     }
-    bool operator==(Facet other) {
+    bool operator==(Facet other) const {
       Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
       Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
       if ((x1 == o1) && (((x2 == o2) && (x3 == o3)) || ((x2 == o3) && (x3 == o2))))
@@ -287,7 +289,7 @@ class Delaunay_with_info_3
       else
         return false;
     }
-    bool operator!=(Facet other) {
+    bool operator!=(Facet other) const {
       Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
       Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
       if ((x1 != o1) && (x1 != o2) && (x1 != o3))
@@ -525,10 +527,16 @@ class Delaunay_with_info_3
   }
 
   void circumcenter(Cell x, double* out) {
-    Point p = x._x->circumcenter();
-    out[0] = p.x();
-    out[1] = p.y();
-    out[2] = p.z();
+    if (T.is_infinite(x._x)) {
+      out[0] = std::numeric_limits<double>::infinity();
+      out[1] = std::numeric_limits<double>::infinity();
+      out[2] = std::numeric_limits<double>::infinity();
+    } else {
+      Point p = x._x->circumcenter();
+      out[0] = p.x();
+      out[1] = p.y();
+      out[2] = p.z();
+    }
   }
 
   double dual_volume(const Vertex v) {
@@ -586,6 +594,29 @@ class Delaunay_with_info_3
 		     wrap_insert_iterator<Cell,Cell_handle>(cit));
     out = std::make_pair(cit, fit);
     return out;
+  }
+
+  // Currently segfaults inside CGAL function call
+  // int side_of_circle(const Facet f, const double* pos) const {
+  //   if (T.is_infinite(f._x))
+  //     return -1;
+  //   else if (std::isinf(pos[0]) || std::isinf(pos[1]) || std::isinf(pos[2])) 
+  //     return 1;
+  //   else {
+  //     Point p = Point(pos[0], pos[1], pos[2]);
+  //     return -(int)(T.side_of_circle(f.cell()._x, f.ind(), p));
+  //     // return (int)(-T.side_of_circle(f._x, p));
+  //   }
+  // }
+  int side_of_sphere(const Cell c, const double* pos) const {
+    if (T.is_infinite(c._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1]) || std::isinf(pos[2])) 
+      return 1;
+    else {
+      Point p = Point(pos[0], pos[1], pos[2]);
+      return (int)(-T.side_of_sphere(c._x, p));
+    }
   }
 
   void write_to_file(const char* filename)

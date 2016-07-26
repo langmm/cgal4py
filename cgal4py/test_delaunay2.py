@@ -1,10 +1,11 @@
+# TODO:
+# - value test circumcenter
+
 from nose import with_setup
 import numpy as np
 import os
 from delaunay2 import Delaunay2
 
-# TODO:
-# - value test circumcenter
 
 pts = np.array([[-0.4941988586954018 , -0.07594397977563715],
                 [-0.06448037284989526,  0.4958248496365813 ],
@@ -192,13 +193,13 @@ def test_vert():
     T.insert(pts)
     vold = None
     for v in T.all_verts:
-        assert(v == v)
-        if vold is not None:
-            assert(v != vold)
         pnt = v.point
         idx = v.index
         vol = v.dual_volume
         print(v, idx, pnt, vol)
+        assert(v == v)
+        if vold is not None:
+            assert(v != vold)
         if v.is_infinite():
             assert(np.isinf(pnt).all())
             assert(idx == np.iinfo(np.uint32).max)
@@ -207,30 +208,39 @@ def test_vert():
             assert(np.allclose(pnt, pts[idx,:]))
             if idx >= 4:
                 assert(np.isclose(vol, -1))
-        c = v.cell
-        v.set_cell(c)
-        v.set_point(pnt)
+            c = v.cell
+            v.set_cell(c)
+            v.set_point(pnt)
         vold = v
 
 def test_edge():
     T = Delaunay2()
     T.insert(pts)
+    eold = None
     for e in T.all_edges:
         v1 = e.vertex1
         v2 = e.vertex2
         elen = e.length
         print(e, v1.index, v2.index, elen)
+        assert(e == e)
+        if eold is not None:
+            assert(e != eold)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
         else:
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
+        eold = e
 
 def test_cell():
     T = Delaunay2()
     T.insert(pts)
+    cold = None
     for c in T.all_cells:
         print(c, c.dimension, c.circumcenter)
+        assert(c == c)
+        if cold is not None:
+            assert(c != cold)
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
@@ -253,9 +263,25 @@ def test_cell():
         c.set_neighbor(0, n1)
         c.set_neighbors(n3, n2, n1)
 
+        print(c.side_of_circle(c.circumcenter))
+        print(c.side_of_circle(v1.point))
+        print(c.side_of_circle(2*v1.point-c.circumcenter), 2*v1.point-c.circumcenter)
+        if c.is_infinite():
+            assert(np.isinf(c.circumcenter).all())
+            assert(c.side_of_circle(c.circumcenter) == -1)
+            assert(c.side_of_circle(v1.point) == -1)
+            assert(c.side_of_circle(2*v1.point-c.circumcenter) == -1)
+        else:
+            assert(c.side_of_circle(c.circumcenter) == -1)
+            assert(c.side_of_circle(v1.point) == 0)
+            assert(c.side_of_circle(2*v1.point-c.circumcenter) == 1)
+
         c.reorient()
         c.ccw_permute()
         c.cw_permute()
+
+        cold = c
+
 
 def test_move():
     T = Delaunay2()
