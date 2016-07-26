@@ -1,5 +1,3 @@
-# cython: linetrace=True
-# distutils: define_macros=CYTHON_TRACE=1
 """
 delaunay3.pyx
 
@@ -51,6 +49,10 @@ cdef class Delaunay3_vertex:
         self.T = T
         self.x = x
 
+    def __repr__(self):
+        return "Delaunay3_vertex[{} at {:+7.2e},{:+7.2e},{:+7.2e}]".format(
+            self.index, *list(self.point))
+
     def __richcmp__(Delaunay3_vertex self, Delaunay3_vertex solf, int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -92,13 +94,20 @@ cdef class Delaunay3_vertex:
         of the vertex."""
         def __get__(self):
             cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
-            self.x.point(&out[0])
+            if self.is_infinite():
+                out[:] = np.float('inf')
+            else:
+                self.x.point(&out[0])
             return out
 
     property index:
-        r"""uint64: The index of the vertex point in the input array."""
+        r"""uint32: The index of the vertex point in the input array."""
         def __get__(self):
-            cdef np.uint64_t out = self.x.info()
+            cdef np.uint32_t out
+            if self.is_infinite():
+                out = np.iinfo(np.uint32).max
+            else:
+                out = self.x.info()
             return out
 
     property dual_volume:
@@ -320,6 +329,16 @@ cdef class Delaunay3_vertex_vector:
         else:
             raise StopIteration()
 
+    def __getitem__(self, i):
+        cdef Delaunay3_vertex out
+        if isinstance(i, int):
+            out = Delaunay3_vertex()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay3_vertex_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
+
 
 cdef class Delaunay3_edge:
     r"""Wrapper class for a triangulation edge.
@@ -347,6 +366,10 @@ cdef class Delaunay3_edge:
         """
         self.T = T
         self.x = x
+
+    def __repr__(self):
+        return "Delaunay3_edge[{},{}]".format(repr(self.vertex1),
+                                              repr(self.vertex2))
 
     def __richcmp__(Delaunay3_edge self, Delaunay3_edge solf, int op):
         if (op == 2):
@@ -626,6 +649,16 @@ cdef class Delaunay3_edge_vector:
         else:
             raise StopIteration()
 
+    def __getitem__(self, i):
+        cdef Delaunay3_edge out
+        if isinstance(i, int):
+            out = Delaunay3_edge()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay3_edge_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
+
 
 cdef class Delaunay3_facet:
     r"""Wrapper class for a triangulation facet.
@@ -653,6 +686,11 @@ cdef class Delaunay3_facet:
         """
         self.T = T
         self.x = x
+
+    def __repr__(self):
+        return "Delaunay3_facet[{},{},{}]".format(repr(self.vertex(0)),
+                                                  repr(self.vertex(1)),
+                                                  repr(self.vertex(2)))
 
     def __richcmp__(Delaunay3_facet self, Delaunay3_facet solf, int op):
         if (op == 2):
@@ -911,6 +949,16 @@ cdef class Delaunay3_facet_vector:
         else:
             raise StopIteration()
 
+    def __getitem__(self, i):
+        cdef Delaunay3_facet out
+        if isinstance(i, int):
+            out = Delaunay3_facet()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay3_facet_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
+
 
 cdef class Delaunay3_cell:
     r"""Wrapper class for a triangulation cell.
@@ -938,6 +986,12 @@ cdef class Delaunay3_cell:
         """
         self.T = T
         self.x = x
+
+    def __repr__(self):
+        return "Delaunay2_cell[{},{},{},{}]".format(repr(self.vertex(0)),
+                                                    repr(self.vertex(1)),
+                                                    repr(self.vertex(2)),
+                                                    repr(self.vertex(3)))
 
     def __richcmp__(Delaunay3_cell self, Delaunay3_cell solf, int op):
         if (op == 2):
@@ -1324,6 +1378,16 @@ cdef class Delaunay3_cell_vector:
             return out
         else:
             raise StopIteration()
+
+    def __getitem__(self, i):
+        cdef Delaunay3_cell out
+        if isinstance(i, int):
+            out = Delaunay3_cell()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay3_cell_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
 
 
 cdef class Delaunay3:

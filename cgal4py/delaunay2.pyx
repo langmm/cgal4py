@@ -1,5 +1,3 @@
-# cython: linetrace=True
-# distutils: define_macros=CYTHON_TRACE=1
 """
 delaunay2.pyx
 
@@ -53,6 +51,10 @@ cdef class Delaunay2_vertex:
         self.T = T
         self.x = x
 
+    def __repr__(self):
+        return "Delaunay2_vertex[{} at {:+7.2e},{:+7.2e}]".format(
+            self.index, *list(self.point))
+
     def __richcmp__(Delaunay2_vertex self, Delaunay2_vertex solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
@@ -94,13 +96,20 @@ cdef class Delaunay2_vertex:
         the vertex."""
         def __get__(self):
             cdef np.ndarray[np.float64_t] out = np.zeros(2, 'float64')
-            self.x.point(&out[0])
+            if self.is_infinite():
+                out[:] = np.float('inf')
+            else:
+                self.x.point(&out[0])
             return out
 
     property index:
-        r"""uint64: The index of the vertex point in the input array."""
+        r"""uint32: The index of the vertex point in the input array."""
         def __get__(self):
-            cdef np.uint64_t out = self.x.info()
+            cdef np.uint32_t out
+            if self.is_infinite():
+                out = np.iinfo(np.uint32).max
+            else:
+                out = self.x.info()
             return out
 
     property dual_volume:
@@ -257,6 +266,16 @@ cdef class Delaunay2_vertex_vector:
         else:
             raise StopIteration()
 
+    def __getitem__(self, i):
+        cdef Delaunay2_vertex out
+        if isinstance(i, int):
+            out = Delaunay2_vertex()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay2_vertex_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
+
 
 cdef class Delaunay2_vertex_range:
     r"""Wrapper class for iterating over a range of triangulation vertices
@@ -326,6 +345,10 @@ cdef class Delaunay2_edge:
         """
         self.T = T
         self.x = x
+
+    def __repr__(self):
+        return "Delaunay2_edge[{},{}]".format(repr(self.vertex1), 
+                                              repr(self.vertex2))
 
     def __richcmp__(Delaunay2_edge self, Delaunay2_edge solf, int op):
         if (op == 2): 
@@ -508,6 +531,16 @@ cdef class Delaunay2_edge_vector:
         else:
             raise StopIteration()
 
+    def __getitem__(self, i):
+        cdef Delaunay2_edge out
+        if isinstance(i, int):
+            out = Delaunay2_edge()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay2_edge_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
+
 
 cdef class Delaunay2_edge_range:
     r"""Wrapper class for iterating over a range of triangulation edges.
@@ -585,6 +618,11 @@ cdef class Delaunay2_cell:
             return <pybool>(self.x != solf.x)
         else:
             raise NotImplementedError
+
+    def __repr__(self):
+        return "Delaunay2_cell[{},{},{}]".format(repr(self.vertex(0)),
+                                                 repr(self.vertex(1)),
+                                                 repr(self.vertex(2)))
 
     def is_infinite(self):
         r"""Determine if the cell is incident to the infinite vertex.
@@ -915,6 +953,16 @@ cdef class Delaunay2_cell_vector:
             return out
         else:
             raise StopIteration()
+
+    def __getitem__(self, i):
+        cdef Delaunay2_cell out
+        if isinstance(i, int):
+            out = Delaunay2_cell()
+            out.assign(self.T, self.v[i])
+            return out
+        else:
+            raise TypeError("Delaunay2_cell_vector indices must be itegers, "+
+                            "not {}".format(type(i)))
 
 
 cdef class Delaunay2_cell_range:
@@ -1298,3 +1346,82 @@ cdef class Delaunay2:
         v.assign(self.T, vc)
         return v
 
+    def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
+                                  Delaunay2_cell start):
+        r"""Get the edges of the cell in conflict with a given point.
+
+        Args:
+            pos (:obj:`ndarray` of float64): x,y coordinates.
+            start (Delaunay2_cell): Cell to start list of edges at.
+
+        Returns:
+            :obj:`list` of Delaunay2_edge: Edges of the cell in conflict with 
+                 pos.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Edge] ev
+        ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
+        cdef object out = []
+        cdef np.uint32_t i
+        cdef Delaunay2_edge x
+        for i in range(ev.size()):
+            x = Delaunay2_edge()
+            x.assign(self.T, ev[i])
+            out.append(x)
+        return out
+        
+    def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
+                      Delaunay2_cell start):
+        r"""Get the cells that are in conflict with a given point.
+
+        Args:
+            pos (:obj:`ndarray` of float64): x,y coordinates. 
+            start (Delaunay2_cell): Cell to start list of conflicts at.
+
+        Returns:
+            :obj:`list` of Delaunay2_cell: Cells in conflict with pos.
+
+        """
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] cv
+        cv = self.T.get_conflicts(&pos[0], start.x)
+        cdef object out = []
+        cdef np.uint32_t i
+        cdef Delaunay2_cell x
+        for i in range(cv.size()):
+            x = Delaunay2_cell()
+            x.assign(self.T, cv[i])
+            out.append(x)
+        return out
+
+    def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
+                                   Delaunay2_cell start):
+        r"""Get the cells and edges of cells that are in conflict with a given 
+            point.
+
+        Args:
+            pos (:obj:`ndarray` of float64): x,y coordinates.
+            start (Delaunay2_cell): Cell to start list of conflicts at.  
+        
+        Returns:
+            tuple: :obj:`list` of :obj:`Delaunay2_cell`s in conflict with pos 
+                and :obj:`list` of :obj:`Delaunay2_edge`s bounding the 
+                conflicting cells.
+
+        """
+        cdef pair[vector[Delaunay_with_info_2[uint32_t].Cell],
+                  vector[Delaunay_with_info_2[uint32_t].Edge]] cv
+        cv = self.T.get_conflicts_and_boundary(&pos[0], start.x)
+        cdef object out_cells = []
+        cdef object out_edges = []
+        cdef np.uint32_t i
+        cdef Delaunay2_cell c
+        cdef Delaunay2_edge e
+        for i in range(cv.first.size()):
+            c = Delaunay2_cell()
+            c.assign(self.T, cv.first[i])
+            out_cells.append(c)
+        for i in range(cv.second.size()):
+            e = Delaunay2_edge()
+            e.assign(self.T, cv.second[i])
+            out_edges.append(e)
+        return out_cells, out_edges

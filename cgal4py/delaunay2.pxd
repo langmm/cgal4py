@@ -1,7 +1,5 @@
 # distutils: language = c++
 # distutils: libraries = CGAL
-# cython: linetrace=True
-# distutils: define_macros=CYTHON_TRACE=1
 
 cimport numpy as np
 from libcpp.vector cimport vector
@@ -145,10 +143,13 @@ cdef extern from "c_delaunay2.hpp":
         void circumcenter(Cell x, double* out)
         double dual_area(const Vertex v)
         double length(const Edge e)
+
         bool flip(Cell x, int i)
         void flip_flippable(Cell x, int i)
+
         vector[Edge] get_boundary_of_conflicts(double* pos, Cell start)
         vector[Cell] get_conflicts(double* pos, Cell start)
+        pair[vector[Cell],vector[Edge]] get_conflicts_and_boundary(double* pos, Cell start)
 
 cdef class Delaunay2:
     cdef int n

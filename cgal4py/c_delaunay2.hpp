@@ -471,10 +471,11 @@ class Delaunay_with_info_2
     std::vector<Cell> fit;
     std::vector<Edge> eit;
     Point p = Point(pos[0], pos[1]);
-    out = T.get_conflicts_and_boundary(p, 
-				       wrap_insert_iterator<Cell,Face_handle>(fit), 
-				       wrap_insert_iterator<Edge,Edge_handle>(eit), 
-				       start._x);
+    T.get_conflicts_and_boundary(p, 
+				 wrap_insert_iterator<Cell,Face_handle>(fit), 
+				 wrap_insert_iterator<Edge,Edge_handle>(eit), 
+				 start._x);
+    out = std::make_pair(fit, eit);
     return out;
   }
 									    

@@ -4,6 +4,8 @@ plugins = Cython.Coverage
 exclude_lines =
     pragma: no cover
     if __name__ == .__main__.:
+    cdef void assign
+    plt.show()
 omit =
     *test*
     */scipy/*

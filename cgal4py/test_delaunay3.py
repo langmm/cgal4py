@@ -90,7 +90,6 @@ def test_all_verts():
         if v.is_infinite():
             count_inf += 1
         else:
-            assert(np.allclose(v.point, pts[v.index,:]))
             count_fin += 1
     count = count_fin + count_inf
     assert(count_fin == T.num_finite_verts)
@@ -179,15 +178,21 @@ def test_clear():
 def test_vert():
     T = Delaunay3()
     T.insert(pts)
-    for v in T.finite_verts:
+    for v in T.all_verts:
         idx = v.index
         pnt = v.point
         vol = v.dual_volume
-        print(idx,pnt,vol)
-        if idx == 0:
-            assert(np.isclose(vol, 4.5))
-        else:
+        print(v,idx,pnt,vol)
+        if v.is_infinite():
+            assert(idx == np.iinfo(np.uint32).max)
+            assert(np.isinf(pnt).all())
             assert(np.isclose(vol, -1.0))
+        else:
+            assert(np.allclose(pnt, pts[idx,:]))
+            if idx == 0:
+                assert(np.isclose(vol, 4.5))
+            else:
+                assert(np.isclose(vol, -1.0))
         c = v.cell
         v.set_cell(c)
         v.set_point(pnt)
@@ -204,10 +209,10 @@ def test_edge():
         i1 = e.ind1
         i2 = e.ind2
         elen = e.length
+        print(e, v1.index, v2.index, elen)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
         else:
-            print(v1.index, v2.index, elen)
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
 
@@ -220,18 +225,20 @@ def test_facet():
         v3 = f.vertex(2)
         c = f.cell
         i = f.ind
+        print(f, v1.index, v2.index, c, i)
 
 def test_cell():
     T = Delaunay3()
     T.insert(pts)
     for c in T.all_cells:
+        print(c, c.circumcenter)
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
         v4 = c.vertex(3)
-        print(c.has_vertex(v1))
-        print(c.has_vertex(v1, return_index = True))
-        print(c.ind_vertex(v1))
+        assert(c.has_vertex(v1))
+        assert(c.has_vertex(v1, return_index = True) == 0)
+        assert(c.ind_vertex(v1) == 0)
 
         c.reset_vertices()
         c.set_vertex(0, v1)
@@ -241,15 +248,14 @@ def test_cell():
         n2 = c.neighbor(1)
         n3 = c.neighbor(2)
         n4 = c.neighbor(3)
-        print(c.has_neighbor(n1))
-        print(c.has_neighbor(n1, return_index = True))
-        print(c.ind_neighbor(n1))
+        assert(c.has_neighbor(n1))
+        assert(c.has_neighbor(n1, return_index = True) == 0)
+        assert(c.ind_neighbor(n1) == 0)
 
         c.reset_neighbors()
         c.set_neighbor(0, n1)
         c.set_neighbors(n4, n3, n2, n1)
 
-        print(c.circumcenter)
 
 def test_move():
     T = Delaunay3()
@@ -313,7 +319,8 @@ def test_vert_incident_verts():
         for c in v.incident_vertices():
             c0 += 1
             count += 1
-        print(v.index, c0)
+        x = v.incident_vertices()[0]
+        print(v.index, c0, x)
     print(count)
     assert(count == 68)
     
@@ -326,7 +333,8 @@ def test_vert_incident_edges():
         for e in v.incident_edges():
             c0 += 1
             count += 1
-        print(v.index, c0)
+        x = v.incident_edges()[0]
+        print(v.index, c0, x)
     print(count)
     assert(count == 68)
 
@@ -339,7 +347,8 @@ def test_vert_incident_facets():
         for e in v.incident_facets():
             c0 += 1
             count += 1
-        print(v.index, c0)
+        x = v.incident_facets()[0]
+        print(v.index, c0, x)
     print(count)
     assert(count == 144)
 
@@ -538,6 +547,6 @@ def test_plot():
     fname_test = "test_plot3D.png"
     T = Delaunay3()
     T.insert(pts)
-    axs = T.plot(plotfile=fname_test)
+    axs = T.plot(plotfile=fname_test, title='Test')
     os.remove(fname_test)
-    T.plot(axs=axs, title='Test')
+    # T.plot(axs=axs)

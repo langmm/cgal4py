@@ -85,10 +85,10 @@ def test_all_verts():
     T.insert(pts)
     count_fin = count_inf = 0
     for v in T.all_verts:
+        print(v.index, v.point)
         if v.is_infinite():
             count_inf += 1
         else:
-            assert(np.allclose(v.point, pts[v.index,:]))
             count_fin += 1
     count = count_fin + count_inf
     assert(count_fin == T.num_finite_verts)
@@ -188,16 +188,27 @@ def test_remove():
 def test_vert():
     T = Delaunay2()
     T.insert(pts)
+    vold = None
     for v in T.all_verts:
+        assert(v == v)
+        if vold is not None:
+            assert(v != vold)
         pnt = v.point
         idx = v.index
         vol = v.dual_volume
-        print(idx, pnt, vol)
-        if idx >= 4:
+        print(v, idx, pnt, vol)
+        if v.is_infinite():
+            assert(np.isinf(pnt).all())
+            assert(idx == np.iinfo(np.uint32).max)
             assert(np.isclose(vol, -1))
+        else:
+            assert(np.allclose(pnt, pts[idx,:]))
+            if idx >= 4:
+                assert(np.isclose(vol, -1))
         c = v.cell
         v.set_cell(c)
         v.set_point(pnt)
+        vold = v
 
 def test_edge():
     T = Delaunay2()
@@ -206,7 +217,7 @@ def test_edge():
         v1 = e.vertex1
         v2 = e.vertex2
         elen = e.length
-        print(v1.index, v2.index, elen)
+        print(e, v1.index, v2.index, elen)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
         else:
@@ -217,12 +228,13 @@ def test_cell():
     T = Delaunay2()
     T.insert(pts)
     for c in T.all_cells:
+        print(c, c.dimension, c.circumcenter)
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
-        print(c.has_vertex(v1))
-        print(c.has_vertex(v1, return_index = True))
-        print(c.ind_vertex(v1))
+        assert(c.has_vertex(v1))
+        assert(c.has_vertex(v1, return_index = True) == 0)
+        assert(c.ind_vertex(v1) == 0)
 
         c.reset_vertices()
         c.set_vertex(0, v1)
@@ -231,9 +243,9 @@ def test_cell():
         n1 = c.neighbor(0)
         n2 = c.neighbor(1)
         n3 = c.neighbor(2)
-        print(c.has_neighbor(n1))
-        print(c.has_neighbor(n1, return_index = True))
-        print(c.ind_neighbor(n1))
+        assert(c.has_neighbor(n1))
+        assert(c.has_neighbor(n1, return_index = True) == 0)
+        assert(c.ind_neighbor(n1) == 0)
 
         c.reset_neighbors()
         c.set_neighbor(0, n1)
@@ -242,8 +254,6 @@ def test_cell():
         c.reorient()
         c.ccw_permute()
         c.cw_permute()
-        print(c.dimension)
-        print(c.circumcenter)
 
 def test_move():
     T = Delaunay2()
@@ -411,6 +421,33 @@ def test_nearest_vertex():
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
 
+def test_get_boundary_of_conflicts():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    edges = T.get_boundary_of_conflicts(p, c)
+    print(len(edges))
+
+def test_get_conflicts():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    cells = T.get_conflicts(p, c)
+    print(len(cells))
+
+def test_get_conflicts_and_boundary():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    cells, edges = T.get_conflicts_and_boundary(p, c)
+    print(len(cells), len(edges))
+
 def test_vertices():
     T = Delaunay2()
     T.insert(pts)
@@ -430,6 +467,6 @@ def test_plot():
     fname_test = "test_plot2D.png"
     T = Delaunay2()
     T.insert(pts)
-    axs = T.plot(plotfile=fname_test)
+    axs = T.plot(plotfile=fname_test, title='Test')
     os.remove(fname_test)
-    T.plot(axs=axs, title='Test')
+    # T.plot(axs=axs)
