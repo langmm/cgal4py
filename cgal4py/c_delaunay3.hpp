@@ -49,6 +49,7 @@ class Delaunay_with_info_3
   Delaunay T;
   Delaunay_with_info_3() {};
   Delaunay_with_info_3(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
+  bool is_valid() { return T.is_valid(); }
   uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
   uint32_t num_finite_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
   uint32_t num_finite_facets() { return static_cast<uint32_t>(T.number_of_finite_facets()); }

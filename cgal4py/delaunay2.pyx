@@ -1041,6 +1041,16 @@ cdef class Delaunay2:
         self.n = 0
         self.T = new Delaunay_with_info_2[uint32_t]()
 
+    def is_valid(self):
+        r"""Determine if the triangulation is a valid Delaunay triangulation.
+
+        Returns:
+            bool: True if the triangulation is valid, False otherwise.
+        
+        """
+
+        return <pybool>self.T.is_valid()
+
     def write_to_file(self, fname):
         r"""Write the serialized tessellation information to a file.
 

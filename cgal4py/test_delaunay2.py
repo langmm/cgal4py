@@ -31,10 +31,12 @@ def test_create():
 def test_insert():
     T = Delaunay2()
     T.insert(pts)
+    assert(T.is_valid())
 
 def test_insert_dup():
     T = Delaunay2()
     T.insert(pts_dup)
+    assert(T.is_valid())
 
 def test_num_verts():
     T = Delaunay2()

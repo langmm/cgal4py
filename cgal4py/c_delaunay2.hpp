@@ -42,6 +42,7 @@ class Delaunay_with_info_2
   Delaunay T;
   Delaunay_with_info_2() {};
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
+  bool is_valid() const { return T.is_valid(); }
   uint32_t num_finite_verts() const { return static_cast<uint32_t>(T.number_of_vertices()); }
   uint32_t num_finite_edges() const {
     Finite_edges_iterator it = T.finite_edges_begin();

@@ -12,6 +12,7 @@ cdef extern from "c_delaunay3.hpp":
     cdef cppclass Delaunay_with_info_3[Info]:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
+        bool is_valid()
         uint32_t num_finite_verts()
         uint32_t num_finite_edges()
         uint32_t num_finite_facets()
