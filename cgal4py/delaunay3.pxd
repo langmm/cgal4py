@@ -179,6 +179,7 @@ cdef extern from "c_delaunay3.hpp":
         bool flip(Cell x, int i)
         void flip_flippable(Cell x, int i)
 
+        pair[vector[Cell],vector[Facet]] find_conflicts(double* pos, Cell start)
 
 cdef class Delaunay3:
     cdef int n

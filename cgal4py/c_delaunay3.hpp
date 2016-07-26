@@ -575,6 +575,19 @@ class Delaunay_with_info_3
     T.flip_flippable(x._x, i);
   }
 
+  std::pair<std::vector<Cell>,std::vector<Facet>>
+    find_conflicts(double* pos, Cell start) const {
+    std::pair<std::vector<Cell>,std::vector<Facet>> out;
+    std::vector<Cell> cit;
+    std::vector<Facet> fit;
+    Point p = Point(pos[0], pos[1], pos[2]);
+    T.find_conflicts(p, start._x, 
+		     wrap_insert_iterator<Facet,Facet_handle>(fit),
+		     wrap_insert_iterator<Cell,Cell_handle>(cit));
+    out = std::make_pair(cit, fit);
+    return out;
+  }
+
   void write_to_file(const char* filename)
   {
     std::ofstream os(filename, std::ios::binary);

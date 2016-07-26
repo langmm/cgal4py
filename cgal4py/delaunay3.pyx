@@ -1771,4 +1771,83 @@ cdef class Delaunay3:
         v.assign(self.T, vc)
         return v
 
+    def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
+                                  Delaunay3_cell start):
+        r"""Get the facets bounding the zone in conflict with a given point. 
 
+        Args: 
+            pos (:obj:`ndarray` of float64): x,y,z coordinates. 
+            start (Delaunay3_cell): Cell to start list of facets at. 
+
+        Returns: 
+            :obj:`list` of Delaunay3_facet: Facets bounding the zone in conflict 
+                 with pos. 
+
+        """
+        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
+                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cv = self.T.find_conflicts(&pos[0], start.x)
+        cdef object out_facets = []
+        cdef np.uint32_t i
+        cdef Delaunay3_facet f
+        for i in range(cv.second.size()):
+            f = Delaunay3_facet()
+            f.assign(self.T, cv.second[i])
+            out_facets.append(f)
+        return out_facets
+
+    def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
+                      Delaunay3_cell start):
+        r"""Get the cells in conflict with a given point.
+
+        Args: 
+            pos (:obj:`ndarray` of float64): x,y,z coordinates. 
+            start (Delaunay3_cell): Cell to start list of facets at. 
+
+        Returns: 
+            :obj:`list` of Delaunay3_cell: Cells in conflict with pos. 
+
+        """
+        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
+                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cv = self.T.find_conflicts(&pos[0], start.x)
+        cdef object out_cells = []
+        cdef np.uint32_t i
+        cdef Delaunay3_cell c
+        for i in range(cv.first.size()):
+            c = Delaunay3_cell()
+            c.assign(self.T, cv.first[i])
+            out_cells.append(c)
+        return out_cells
+
+    def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
+                                   Delaunay3_cell start):
+        r"""Get the cells in conflict with a given point and the facets bounding 
+            the zone in conflict.
+
+        Args: 
+            pos (:obj:`ndarray` of float64): x,y,z coordinates. 
+            start (Delaunay3_cell): Cell to start list of facets at. 
+
+        Returns: 
+            tuple: :obj:`list` of `Delaunay3_cell`s in conflict with pos and 
+                :obj:`list` of `Delaunay3_facet`s bounding the zone in conflict.
+
+        """
+        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
+                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cv = self.T.find_conflicts(&pos[0], start.x)
+        cdef object out_facets = []
+        cdef object out_cells = []
+        cdef np.uint32_t i
+        cdef Delaunay3_cell c
+        cdef Delaunay3_facet f
+        for i in range(cv.first.size()):
+            c = Delaunay3_cell()
+            c.assign(self.T, cv.first[i])
+            out_cells.append(c)
+        for i in range(cv.second.size()):
+            f = Delaunay3_facet()
+            f.assign(self.T, cv.second[i])
+            out_facets.append(f)
+        return out_cells, out_facets

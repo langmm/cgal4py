@@ -530,6 +530,33 @@ def test_nearest_vertex():
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
 
+def test_get_boundary_of_conflicts():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    edges = T.get_boundary_of_conflicts(p, c)
+    print(len(edges))
+
+def test_get_conflicts():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    cells = T.get_conflicts(p, c)
+    print(len(cells))
+
+def test_get_conflicts_and_boundary():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.get_vertex(0)
+    c = v.incident_cells()[0]
+    p = c.circumcenter
+    cells, edges = T.get_conflicts_and_boundary(p, c)
+    print(len(cells), len(edges))
+
 def test_vertices():
     T = Delaunay3()
     T.insert(pts)
