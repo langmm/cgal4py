@@ -184,6 +184,9 @@ cdef extern from "c_delaunay3.hpp":
 
         # int side_of_circle(const Facet f, const double* pos)
         int side_of_sphere(const Cell c, const double* pos)
+        bool is_Gabriel(const Edge e)
+        bool is_Gabriel(const Facet f)
+
 
 cdef class Delaunay3:
     cdef int n

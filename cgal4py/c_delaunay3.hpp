@@ -1,3 +1,6 @@
+// TODO:
+// - Add support for argbitrary return objects so that dual can be added
+// - Line dual_support(Cell c, int i)
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
@@ -618,6 +621,9 @@ class Delaunay_with_info_3
       return (int)(-T.side_of_sphere(c._x, p));
     }
   }
+
+  bool is_Gabriel(const Edge e) { return T.is_Gabriel(e._x); }
+  bool is_Gabriel(const Facet f) { return T.is_Gabriel(f._x); }
 
   void write_to_file(const char* filename)
   {

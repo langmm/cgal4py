@@ -218,7 +218,9 @@ def test_edge():
         i1 = e.ind1
         i2 = e.ind2
         elen = e.length
-        print(e, v1.index, v2.index, elen)
+        inf = e.is_infinite()
+        gab = e.is_Gabriel()
+        print(e, v1.index, v2.index, elen, inf, gab)
         assert(e == e)
         if eold is not None:
             assert(e != eold)
@@ -239,7 +241,9 @@ def test_facet():
         v3 = f.vertex(2)
         c = f.cell
         i = f.ind
-        print(f, v1.index, v2.index, v3.index, i)
+        inf = f.is_infinite()
+        gab = f.is_Gabriel()
+        print(f, v1.index, v2.index, v3.index, i, inf, gab)
         assert(f == f)
         # There are currently repeat facets (repeated once for each incident cell)
         # if fold is not None:

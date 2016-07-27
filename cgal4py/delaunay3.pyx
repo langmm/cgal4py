@@ -389,6 +389,16 @@ cdef class Delaunay3_edge:
         """
         return self.T.is_infinite(self.x)
 
+    def is_Gabriel(self):
+        r"""Determines if the edge is Gabriel (does not contain any other 
+            vertices in it's smallest circumsphere).
+
+        Returns:
+            bool: True if the edge is Gabriel, False otherwise.
+
+        """
+        return <pybool>self.T.is_Gabriel(self.x)
+
     def vertex(self, int i):
         r"""Get the ith vertex on this edge.
 
@@ -710,6 +720,16 @@ cdef class Delaunay3_facet:
 
         """
         return self.T.is_infinite(self.x)
+
+    def is_Gabriel(self):
+        r"""Determines if the facet is Gabriel (does not contain any other 
+            vertices in it's smallest circumsphere).
+
+        Returns:
+            bool: True if the facet is Gabriel, False otherwise.
+
+        """
+        return <pybool>self.T.is_Gabriel(self.x)
 
     def vertex(self, int i):
         r"""Get the ith vertex incident to this facet.
