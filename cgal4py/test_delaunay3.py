@@ -245,9 +245,9 @@ def test_facet():
         gab = f.is_Gabriel()
         print(f, v1.index, v2.index, v3.index, i, inf, gab)
         assert(f == f)
-        # There are currently repeat facets (repeated once for each incident cell)
-        # if fold is not None:
-        #     assert(f != fold)
+        if fold is not None:
+            assert(f != fold)
+
         # # This segfaults inside CGAL function call
         # print(f.side_of_circle((v1.point+v2.point+v3.point)/3), (v1.point+v2.point+v3.point)/3)
         # print(f.side_of_circle(v1.point), v1.point)
@@ -508,7 +508,7 @@ def test_facet_incident_facets():
             count += 1
         print(c0)
     print(count)
-    assert(count == 450)
+    assert(count == 466)
 
 def test_facet_incident_cells():
     T = Delaunay3()

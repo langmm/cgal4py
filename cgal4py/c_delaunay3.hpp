@@ -215,32 +215,34 @@ class Delaunay_with_info_3
     Vertex_handle _v2() const { return _x.first->vertex(_x.third); }
     Vertex v1() const { return Vertex(_v1()); }
     Vertex v2() const { return Vertex(_v2()); }
-    bool operator==(Edge other) {
-      Vertex_handle x1 = _v1(), x2 = _v2();
-      Vertex_handle o1 = other._v1(), o2 = other._v2();
-      if ((x1 == o1) && (x2 == o2))
-        return true;
-      else if ((x1 == o2) && (x2 == o1))
-        return true;
-      else
-        return false;
-    }
-    bool operator!=(Edge other) {
-      Vertex_handle x1 = _v1(), x2 = _v2();
-      Vertex_handle o1 = other._v1(), o2 = other._v2();
-      if (x1 == o1) {
-        if (x2 != o2)
-          return true;
-        else
-          return false;
-      } else if (x1 == o2) {
-        if (x2 != o1)
-          return true;
-        else
-          return false;
-      } else
-        return true;
-    }
+    bool operator==(Edge other) const { return (_x == other._x); }
+    bool operator!=(Edge other) const { return (_x != other._x); }
+    // bool operator==(Edge other) const {
+    //   Vertex_handle x1 = _v1(), x2 = _v2();
+    //   Vertex_handle o1 = other._v1(), o2 = other._v2();
+    //   if ((x1 == o1) && (x2 == o2))
+    //     return true;
+    //   else if ((x1 == o2) && (x2 == o1))
+    //     return true;
+    //   else
+    //     return false;
+    // }
+    // bool operator!=(Edge other) const {
+    //   Vertex_handle x1 = _v1(), x2 = _v2();
+    //   Vertex_handle o1 = other._v1(), o2 = other._v2();
+    //   if (x1 == o1) {
+    //     if (x2 != o2)
+    //       return true;
+    //     else
+    //       return false;
+    //   } else if (x1 == o2) {
+    //     if (x2 != o1)
+    //       return true;
+    //     else
+    //       return false;
+    //   } else
+    //     return true;
+    // }
   };
 
 
@@ -280,35 +282,37 @@ class Delaunay_with_info_3
     Vertex vertex(int i) const { 
       return Vertex(cell().vertex((ind() + 1 + (i%3))%3)); 
     }
-    bool operator==(Facet other) const {
-      Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
-      Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
-      if ((x1 == o1) && (((x2 == o2) && (x3 == o3)) || ((x2 == o3) && (x3 == o2))))
-        return true;
-      else if ((x1 == o2) && (((x2 == o1) && (x3 == o3)) || ((x2 == o3) && (x3 == o1))))
-        return true;
-      else if ((x1 == o3) && (((x2 == o2) && (x3 == o1)) || ((x2 == o1) && (x3 == o2))))
-	return true;
-      else
-        return false;
-    }
-    bool operator!=(Facet other) const {
-      Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
-      Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
-      if ((x1 != o1) && (x1 != o2) && (x1 != o3))
-	return true;
-      if ((x2 != o1) && (x2 != o2) && (x2 != o3))
-	return true;
-      if ((x3 != o1) && (x3 != o2) && (x3 != o3))
-	return true;
-      if ((o1 != x1) && (o1 != x2) && (o1 != x3))
-	return true;
-      if ((o2 != x1) && (o2 != x2) && (o2 != x3))
-	return true;
-      if ((o3 != x1) && (o3 != x2) && (o3 != x3))
-	return true;
-      return false;
-    }
+    bool operator==(Facet other) const { return (_x == other._x); }
+    bool operator!=(Facet other) const { return (_x != other._x); }
+    // bool operator==(Facet other) const {
+    //   Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
+    //   Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
+    //   if ((x1 == o1) && (((x2 == o2) && (x3 == o3)) || ((x2 == o3) && (x3 == o2))))
+    //     return true;
+    //   else if ((x1 == o2) && (((x2 == o1) && (x3 == o3)) || ((x2 == o3) && (x3 == o1))))
+    //     return true;
+    //   else if ((x1 == o3) && (((x2 == o2) && (x3 == o1)) || ((x2 == o1) && (x3 == o2))))
+    // 	return true;
+    //   else
+    //     return false;
+    // }
+    // bool operator!=(Facet other) const {
+    //   Vertex x1 = vertex(0), x2 = vertex(1), x3 = vertex(2);
+    //   Vertex o1 = other.vertex(0), o2 = other.vertex(1), o3 = other.vertex(2);
+    //   if ((x1 != o1) && (x1 != o2) && (x1 != o3))
+    // 	return true;
+    //   if ((x2 != o1) && (x2 != o2) && (x2 != o3))
+    // 	return true;
+    //   if ((x3 != o1) && (x3 != o2) && (x3 != o3))
+    // 	return true;
+    //   if ((o1 != x1) && (o1 != x2) && (o1 != x3))
+    // 	return true;
+    //   if ((o2 != x1) && (o2 != x2) && (o2 != x3))
+    // 	return true;
+    //   if ((o3 != x1) && (o3 != x2) && (o3 != x3))
+    // 	return true;
+    //   return false;
+    // }
   };
 
 
@@ -373,6 +377,43 @@ class Delaunay_with_info_3
     }
   };
 
+  bool are_equal(const Facet f1, const Facet f2) const {
+    // return T.are_equal(f1._x, f2._x);
+    Vertex x1 = f1.vertex(0), x2 = f1.vertex(1), x3 = f1.vertex(2);
+    Vertex o1 = f2.vertex(0), o2 = f2.vertex(1), o3 = f2.vertex(2);
+    if (x1 == o1) {
+      if ((x2 == o2) && (x3 == o3))
+	return true;
+      else if ((x2 == o3) && (x3 == o2))
+	return true;
+      else
+	return false;
+    } else if (x1 == o2) {
+      if ((x2 == o1) && (x3 == o3))
+	return true;
+      else if ((x2 == o3) && (x3 == o1))
+	return true;
+      else
+	return false;
+    } else if (x1 == o3) {
+      if ((x2 == o2) && (x3 == o1))
+	return true;
+      else if ((x2 == o1) && (x3 == o2))
+	return true;
+      else
+	return false;
+    } else
+      return false;
+  }
+  bool are_equal(const Edge e1, const Edge e2) const {
+    if ((e1.v1() == e2.v1()) && (e1.v2() == e2.v2()))
+      return true;
+    else if ((e1.v1() == e2.v2()) && (e1.v2() == e2.v1()))
+      return true;
+    else
+      return false;
+  }
+
   // Testing incidence to the infinite vertex
   bool is_infinite(Vertex x) { return T.is_infinite(x._x); }
   bool is_infinite(Edge x) { return T.is_infinite(x._x); }
@@ -424,11 +465,13 @@ class Delaunay_with_info_3
     T.incident_edges(x.v1()._x, wrap_insert_iterator<Edge,Edge_handle>(out1));
     T.incident_edges(x.v2()._x, wrap_insert_iterator<Edge,Edge_handle>(out2));
     for (i = 0; i < out1.size(); i++) {
-      if (out1[i] != x)
+      if (!(are_equal(x, out1[i])))
+      // if (out1[i] != x)
 	out.push_back(out1[i]);
     }
     for (i = 0; i < out2.size(); i++) {
-      if (out2[i] != x)
+      if (!(are_equal(x, out2[i])))
+      // if (out2[i] != x)
 	out.push_back(out2[i]);
     }
     return out;
@@ -465,11 +508,14 @@ class Delaunay_with_info_3
   std::vector<Edge> incident_edges(Facet x) {
     std::vector<Edge> out;
     int i1, i2;
-    for (int i = 0; i < 3; i++) {
-      i1 = (x.ind() + i + 1) % 3;
-      i2 = (x.ind() + i + 2) % 3;
+    for (int i = 1; i < 3; i++) {
+      i1 = (x.ind() + i + 0) % 4;
+      i2 = (x.ind() + i + 1) % 4;
       out.push_back(Edge(x.cell(), i1, i2));
     }
+    i1 = (x.ind() + 3) % 4;
+    i2 = (x.ind() + 1) % 4;
+    out.push_back(Edge(x.cell(), i1, i2));
     return out;
   }
   std::vector<Facet> incident_facets(Facet x) {
@@ -479,7 +525,7 @@ class Delaunay_with_info_3
       Facet_circulator cc = T.incident_facets(edges[i]._x), done(cc);
       if (cc != 0) {
 	do {
-	  if (Facet(cc) != x)
+	  if (!(are_equal(Facet(cc), x)))
 	    out.push_back(Facet(cc));
 	} while (++cc != done);
       }

@@ -144,6 +144,9 @@ cdef extern from "c_delaunay3.hpp":
             void set_neighbors()
             void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4)
 
+        bool are_equal(const Edge e1, const Edge e2) 
+        bool are_equal(const Facet f1, const Facet f2) 
+
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)
         bool is_infinite(Facet x)
