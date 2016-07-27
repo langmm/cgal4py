@@ -316,14 +316,23 @@ def test_flip():
     for c in T.all_cells:
         out = T.flip(c, 0)
         assert(out == True)
+    print(T.num_edges, nedges)
     assert(T.num_edges == nedges)
+    for e in T.all_edges:
+        out = e.flip()
+        assert(out == True)
+    print(T.num_edges, nedges)
 
 def test_flippable():
     T = Delaunay2()
     T.insert(pts)
     for c in T.all_cells:
         T.flip(c, 0)
+    print(T.num_edges, nedges)
     assert(T.num_edges == nedges)
+    for e in T.all_edges:
+        e.flip()
+    print(T.num_edges, nedges)
 
 def test_vert_incident_verts():
     T = Delaunay2()

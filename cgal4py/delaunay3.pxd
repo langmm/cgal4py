@@ -12,6 +12,7 @@ cdef extern from "c_delaunay3.hpp":
     cdef cppclass Delaunay_with_info_3[Info]:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
+        bool updated
         bool is_valid()
         uint32_t num_finite_verts()
         uint32_t num_finite_edges()
@@ -180,8 +181,15 @@ cdef extern from "c_delaunay3.hpp":
         void circumcenter(Cell x, double* out)
         double dual_volume(const Vertex v)
         double length(const Edge e)
+
+        bool flip(Cell x, int i, int j)
+        bool flip(Edge x)
         bool flip(Cell x, int i)
+        bool flip(Facet x)
+        void flip_flippable(Cell x, int i, int j)
+        void flip_flippable(Edge x)
         void flip_flippable(Cell x, int i)
+        void flip_flippable(Facet x)
 
         pair[vector[Cell],vector[Facet]] find_conflicts(double* pos, Cell start)
 

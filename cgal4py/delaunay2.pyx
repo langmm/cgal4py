@@ -79,6 +79,7 @@ cdef class Delaunay2_vertex:
             pos (:obj:`ndarray` of float64): new x,y coordinates for this vertex.
 
         """
+        self.T.updated = <cbool>True
         assert(len(pos) == 2)
         self.x.set_point(&pos[0])
 
@@ -89,6 +90,7 @@ cdef class Delaunay2_vertex:
             c (Delaunay2_cell): Cell that will be assigned as designated cell.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_cell(c.x)
 
     property point:
@@ -432,7 +434,25 @@ cdef class Delaunay2_edge:
         out.assign(self.T, it)
         return out
 
-        
+    def flip(self):
+        r"""Flip this edge to the other diagonal of the quadrilateral formed by 
+        the two cells incident to this edge after first testing that the edge 
+        can be flipped.
+
+        Returns:
+            bool: True if the edge could be flipped, False otherwise.
+
+        """
+        self.T.updated = <cbool>True
+        return self.T.flip(self.x)
+
+    def flip_flippable(self):
+        r"""Flip this edge to the other diagonal of the quadrilateral formed by 
+        the two cells incident to this edge. The edge is assumed flippable to 
+        save time.
+        """
+        self.T.updated = <cbool>True
+        self.T.flip_flippable(self.x)
 
 cdef class Delaunay2_edge_iter:
     r"""Wrapper class for a triangulation edge iterator.
@@ -746,6 +766,7 @@ cdef class Delaunay2_cell:
             v (Delauany2_vertex): Vertex to set ith vertex of this cell to.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_vertex(i, v.x)
 
     def set_vertices(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
@@ -758,10 +779,12 @@ cdef class Delaunay2_cell:
             v3 (Delaunay2_vertex): 3rd vertex of cell.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_vertices(v1.x, v2.x, v3.x)
 
     def reset_vertices(self):
         r"""Reset all of this cell's vertices."""
+        self.T.updated = <cbool>True
         self.x.set_vertices()
 
     def set_neighbor(self, int i, Delaunay2_cell n):
@@ -772,6 +795,7 @@ cdef class Delaunay2_cell:
             n (Delaunay2_cell): Cell to set ith neighbor of this cell to.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_neighbor(i, n.x)
 
     def set_neighbors(self, Delaunay2_cell c1, Delaunay2_cell c2, 
@@ -784,22 +808,27 @@ cdef class Delaunay2_cell:
             c3 (Delaunay2_cell): 3rd neighboring cell.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_neighbors(c1.x, c2.x, c3.x)
 
     def reset_neighbors(self):
         r"""Reset all of this cell's neighboring cells."""
+        self.T.updated = <cbool>True
         self.x.set_neighbors()
 
     def reorient(self):
         r"""Change the vertex order so that ccw and cw are switched."""
+        self.T.updated = <cbool>True
         self.x.reorient()
 
     def ccw_permute(self):
         r"""Bring the last vertex to the front of the vertex order."""
+        self.T.updated = <cbool>True
         self.x.ccw_permute()
         
     def cw_permute(self):
         r"""Put the 1st vertex at the end of the vertex order."""
+        self.T.updated = <cbool>True
         self.x.cw_permute()
 
     property circumcenter:
@@ -1031,23 +1060,29 @@ cdef class Delaunay2:
 
     """
 
-    _props_to_clear_on_update = {}
+    _cache_to_clear_on_update = {}
+
+    def _update_tess(self):
+        if self.T.updated:
+            self._cache_to_clear_on_update.clear()
+            self.T.updated = <cbool>False
+
+    @staticmethod
+    def _update_to_tess(func):
+        def wrapped_func(solf, *args, **kwargs):
+            solf._update_tess()
+            return func(solf, *args, **kwargs)
+        return wrapped_func
 
     @staticmethod
     def _dependent_property(fget):
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
-            if attr not in solf._props_to_clear_on_update:
-                solf._props_to_clear_on_update[attr] = fget(solf)
-            return solf._props_to_clear_on_update[attr]
+            solf._update_tess()
+            if attr not in solf._cache_to_clear_on_update:
+                solf._cache_to_clear_on_update[attr] = fget(solf)
+            return solf._cache_to_clear_on_update[attr]
         return property(wrapped_fget, None, None, fget.__doc__)
-
-    @staticmethod
-    def _update_to_tess(func):
-        def wrapped_func(solf, *args, **kwargs):
-            solf._props_to_clear_on_update.clear()
-            return func(solf, *args, **kwargs)
-        return wrapped_func
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

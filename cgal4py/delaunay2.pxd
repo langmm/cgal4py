@@ -12,6 +12,7 @@ cdef extern from "c_delaunay2.hpp":
     cdef cppclass Delaunay_with_info_2[Info]:
         Delaunay_with_info_2() except +
         Delaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
+        bool updated
         bool is_valid()
         uint32_t num_finite_verts()
         uint32_t num_finite_edges()
@@ -76,6 +77,8 @@ cdef extern from "c_delaunay2.hpp":
             Edge(All_edges_iter it)
             Edge(Vertex x1, Vertex x2)
             Edge(Cell x, int i)
+            Cell cell()
+            int ind()
             Vertex v1()
             Vertex v2()
             bool operator==(Edge other)
@@ -146,7 +149,9 @@ cdef extern from "c_delaunay2.hpp":
         double length(const Edge e)
 
         bool flip(Cell x, int i)
+        bool flip(Edge x)
         void flip_flippable(Cell x, int i)
+        void flip_flippable(Edge x)
 
         vector[Edge] get_boundary_of_conflicts(double* pos, Cell start)
         vector[Cell] get_conflicts(double* pos, Cell start)

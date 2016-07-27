@@ -77,6 +77,7 @@ cdef class Delaunay3_vertex:
             pos (:obj:`ndarray` of float64): new x,y,z coordinates for vertex.
 
         """
+        self.T.updated = <cbool>True
         assert(len(pos) == 3)
         self.x.set_point(&pos[0])
 
@@ -87,6 +88,7 @@ cdef class Delaunay3_vertex:
             c (Delaunay3_cell): Cell that should be set as the designated cell.
 
         """
+        self.T.updated = <cbool>True
         self.x.set_cell(c.x)
 
     property point:
@@ -521,6 +523,26 @@ cdef class Delaunay3_edge:
         out.assign(self.T, it)
         return out
 
+    def flip(self):
+        r"""Flip this edge to the other diagonal of the quadrilateral formed by
+        the two cells incident to this edge after first testing that the edge 
+        can be flipped.
+
+        Returns:
+            bool: True if the edge could be flipped, False otherwise. 
+
+        """
+        self.T.updated = <cbool>True
+        return self.T.flip(self.x)
+
+    def flip_flippable(self):
+        r"""Flip this edge to the other diagonal of the quadrilateral formed by
+        the two cells incident to this edge. The edge is assumed flippable to
+        save time.
+        """
+        self.T.updated = <cbool>True
+        self.T.flip_flippable(self.x)
+
 
 cdef class Delaunay3_edge_iter:
     r"""Wrapper class for a triangulation edge iterator.
@@ -859,6 +881,26 @@ cdef class Delaunay3_facet:
     #     """
     #     return self.T.side_of_circle(self.x, &pos[0])
 
+    def flip(self):
+        r"""Flip this facet to the other diagonal of the quadrilateral formed by
+        the two cells incident to this facet after first testing that the facet 
+        can be flipped.
+
+        Returns:
+            bool: True if the facet could be flipped, False otherwise. 
+
+        """
+        self.T.updated = <cbool>True
+        return self.T.flip(self.x)
+
+    def flip_flippable(self):
+        r"""Flip this facet to the other diagonal of the quadrilateral formed by
+        the two cells incident to this facet. The facet is assumed flippable to
+        save time.
+        """
+        self.T.updated = <cbool>True
+        self.T.flip_flippable(self.x)
+
 
 cdef class Delaunay3_facet_iter:
     r"""Wrapper class for a triangulation facet iterator.
@@ -1180,9 +1222,10 @@ cdef class Delaunay3_cell:
 
         Args: 
             i (int): Index of this cell's vertex that should be set. 
-            v (Delauany3_vertex): Vertex to set ith vertex of this cell to. 
+            v (Delaunay3_vertex): Vertex to set ith vertex of this cell to. 
 
         """
+        self.T.updated = <cbool>True
         self.x.set_vertex(i, v.x)
 
     def set_vertices(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
@@ -1196,10 +1239,12 @@ cdef class Delaunay3_cell:
             v4 (Delaunay2_vertex): 4th vertex of cell. 
 
         """
+        self.T.updated = <cbool>True
         self.x.set_vertices(v1.x, v2.x, v3.x, v4.x)
 
     def reset_vertices(self):
         r"""Reset all of this cell's vertices."""
+        self.T.updated = <cbool>True
         self.x.set_vertices()
 
     def set_neighbor(self, int i, Delaunay3_cell n):
@@ -1210,6 +1255,7 @@ cdef class Delaunay3_cell:
             n (Delaunay3_cell): Cell to set ith neighbor of this cell to. 
 
         """
+        self.T.updated = <cbool>True
         self.x.set_neighbor(i, n.x)
 
     def set_neighbors(self, Delaunay3_cell c1, Delaunay3_cell c2,
@@ -1223,10 +1269,12 @@ cdef class Delaunay3_cell:
             c4 (Delaunay3_cell): 4th neighboring cell. 
 
         """
+        self.T.updated = <cbool>True
         self.x.set_neighbors(c1.x, c2.x, c3.x, c4.x)
 
     def reset_neighbors(self):
         r"""Reset all of this cell's neighboring cells."""
+        self.T.updated = <cbool>True
         self.x.set_neighbors()
 
     property circumcenter:
@@ -1475,23 +1523,29 @@ cdef class Delaunay3:
 
     """
 
-    _props_to_clear_on_update = {}
+    _cache_to_clear_on_update = {}
+
+    def _update_tess(self):
+        if self.T.updated:
+            self._cache_to_clear_on_update.clear()
+            self.T.updated = <cbool>False
+
+    @staticmethod
+    def _update_to_tess(func):
+        def wrapped_func(solf, *args, **kwargs):
+            solf._update_tess()
+            return func(solf, *args, **kwargs)
+        return wrapped_func
 
     @staticmethod
     def _dependent_property(fget):
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
-            if attr not in solf._props_to_clear_on_update:
-                solf._props_to_clear_on_update[attr] = fget(solf)
-            return solf._props_to_clear_on_update[attr]
+            solf._update_tess()
+            if attr not in solf._cache_to_clear_on_update:
+                solf._cache_to_clear_on_update[attr] = fget(solf)
+            return solf._cache_to_clear_on_update[attr]
         return property(wrapped_fget, None, None, fget.__doc__)
-
-    @staticmethod
-    def _update_to_tess(func):
-        def wrapped_func(solf, *args, **kwargs):
-            solf._props_to_clear_on_update.clear()
-            return func(solf, *args, **kwargs)
-        return wrapped_func
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

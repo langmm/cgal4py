@@ -347,13 +347,21 @@ def test_flip():
         out = T.flip(c, 0)
         # assert(out == True)
     assert(T.num_edges == nedges)
+    for e in T.all_edges:
+        out = e.flip()
+        # assert(out == True)
 
-def test_flippable():
-    T = Delaunay3()
-    T.insert(pts)
-    for c in T.all_cells:
-        T.flip(c, 0)
-    assert(T.num_edges == nedges)
+# Far too slow
+# def test_flippable():
+#     T = Delaunay3()
+#     T.insert(pts)
+#     for c in T.all_cells:
+#         if T.flip(c, 0):
+#             T.flip_flippable(c, 0)
+#     assert(T.num_edges == nedges)
+#     for e in T.all_edges:
+#         if e.flip():
+#             e.flip_flippable()
 
 def test_io():
     fname = 'test_io2348_3.dat'

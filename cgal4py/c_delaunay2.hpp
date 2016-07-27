@@ -43,6 +43,7 @@ class Delaunay_with_info_2
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Face_handle,int>    Face_hash;
   Delaunay T;
+  bool updated = false;
   Delaunay_with_info_2() {};
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
   bool is_valid() const { return T.is_valid(); }
@@ -85,6 +86,7 @@ class Delaunay_with_info_2
 
   void insert(double *pts, Info *val, uint32_t n)
   {
+    updated = true;
     uint32_t i, j;
     std::vector< std::pair<Point,Info> > points;
     for (i = 0; i < n; i++) {
@@ -93,14 +95,16 @@ class Delaunay_with_info_2
     }
     T.insert( points.begin(),points.end() );
   }
-  void remove(Vertex v) { T.remove(v._x); }
-  void clear() { T.clear(); }
+  void remove(Vertex v) { updated = true; T.remove(v._x); }
+  void clear() { updated = true; T.clear(); }
 
   Vertex move(Vertex v, double *pos) {
+    updated = true;
     Point p = Point(pos[0], pos[1]);
     return Vertex(T.move(v._x, p));
   }
   Vertex move_if_no_collision(Vertex v, double *pos) {
+    updated = true;
     Point p = Point(pos[0], pos[1]);
     return Vertex(T.move_if_no_collision(v._x, p));
   }
@@ -208,6 +212,8 @@ class Delaunay_with_info_2
     Edge(Edge_circulator x) { _x = Edge_handle(x->first, x->second); }
     Edge(All_edges_iter x) { _x = Edge_handle(x._x->first, x._x->second); }
     Edge(Cell x, int i) { _x = Edge_handle(x._x, i); }
+    Cell cell() const { return Cell(_x.first); }
+    int ind() const { return _x.second; }
     Vertex_handle _v1() const { return _x.first->vertex((_x.second+2)%3); }
     Vertex_handle _v2() const { return _x.first->vertex((_x.second+1)%3); }
     Vertex v1() const { return Vertex(_v1()); }
@@ -451,11 +457,23 @@ class Delaunay_with_info_2
   }
 
   bool flip(Cell x, int i) { 
+    updated = true;
     T.flip(x._x, i); 
     return true;
   }
-  void flip_flippable(Cell x, int i) { // for completeness with 3D case
+  bool flip(Edge x) {
+    updated = true;
+    T.flip(x.cell()._x, x.ind());
+    return true;
+  }
+  // for completeness with 3D case
+  void flip_flippable(Cell x, int i) { 
+    updated = true;
     T.flip(x._x, i); 
+  }
+  void flip_flippable(Edge x) { 
+    updated = true;
+    T.flip(x.cell()._x, x.ind()); 
   }
 
   std::vector<Edge> get_boundary_of_conflicts(double* pos, Cell start) const {
@@ -571,7 +589,6 @@ class Delaunay_with_info_2
     std::ifstream is(filename, std::ios::binary);
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
-
 
       if (T.number_of_vertices() != 0) 
       	T.clear();
