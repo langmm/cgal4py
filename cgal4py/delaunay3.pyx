@@ -399,6 +399,18 @@ cdef class Delaunay3_edge:
         """
         return <pybool>self.T.is_Gabriel(self.x)
 
+    def is_equivalent(self, Delaunay3_edge solf):
+        r"""Determine if another edge has the same vertices as this edge.
+
+        Args:
+            solf (Delaunay3_edge): Edge for comparison.
+
+        Returns:
+            bool: True if the two edges share the same vertices, False otherwise.
+
+        """
+        return <pybool>self.T.are_equal(self.x, solf.x)
+
     def vertex(self, int i):
         r"""Get the ith vertex on this edge.
 
@@ -730,6 +742,19 @@ cdef class Delaunay3_facet:
 
         """
         return <pybool>self.T.is_Gabriel(self.x)
+
+    def is_equivalent(self, Delaunay3_facet solf):
+        r"""Determine if another facet has the same vertices as this facet.
+
+        Args:
+            solf (Delaunay3_facet): Facet for comparison.
+
+        Returns:
+            bool: True if the two facets share the same vertices, False 
+                otherwise.
+
+        """
+        return <pybool>self.T.are_equal(self.x, solf.x)
 
     def vertex(self, int i):
         r"""Get the ith vertex incident to this facet.

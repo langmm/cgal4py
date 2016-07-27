@@ -222,6 +222,7 @@ def test_edge():
         gab = e.is_Gabriel()
         print(e, v1.index, v2.index, elen, inf, gab)
         assert(e == e)
+        assert(e.is_equivalent(e))
         if eold is not None:
             assert(e != eold)
         if e.is_infinite():
@@ -245,6 +246,7 @@ def test_facet():
         gab = f.is_Gabriel()
         print(f, v1.index, v2.index, v3.index, i, inf, gab)
         assert(f == f)
+        assert(f.is_equivalent(f))
         if fold is not None:
             assert(f != fold)
 
