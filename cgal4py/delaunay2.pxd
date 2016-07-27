@@ -164,4 +164,3 @@ cdef class Delaunay2:
     cdef int n
     cdef Delaunay_with_info_2[uint32_t] *T
     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
-
