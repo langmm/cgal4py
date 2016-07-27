@@ -40,6 +40,7 @@ class Delaunay_with_info_2
   typedef typename Delaunay::Finite_vertices_iterator  Finite_vertices_iterator;
   typedef typename Delaunay::Finite_edges_iterator     Finite_edges_iterator;
   typedef typename Delaunay::Triangle                  Triangle;
+  typedef typename Delaunay::Locate_type               Locate_type;
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Face_handle,int>    Face_hash;
   Delaunay T;
@@ -116,6 +117,14 @@ class Delaunay_with_info_2
     	return Vertex(static_cast<Vertex_handle>(it));
     }
     return Vertex(T.infinite_vertex());
+  }
+
+  Cell locate(double* pos, int& lt, int& li) const {
+    Point p = Point(pos[0], pos[1]);
+    Locate_type lt_out;
+    Cell out = Cell(T.locate(p, lt_out, li));
+    lt = (int)lt_out;
+    return out;
   }
 
   template <typename Wrap, typename Wrap_handle>

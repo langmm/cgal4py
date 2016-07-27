@@ -38,6 +38,7 @@ cdef extern from "c_delaunay2.hpp":
         void read_from_file(const char* filename) except +
 
         Vertex get_vertex(Info index) except +
+        Cell locate(double* pos, int& lt, int& li)
 
         void info_ordered_vertices(double* pos)
         void vertex_info(Info* verts)

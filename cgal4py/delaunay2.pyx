@@ -348,6 +348,25 @@ cdef class Delaunay2_edge:
         self.T = T
         self.x = x
 
+    @staticmethod
+    def from_cell(Delaunay2_cell c, int i):
+        r"""Construct an edges from a cell and index of the vertex opposite the 
+        edge.
+
+        Args:
+            c (Delaunay2_cell): Cell
+            i (int): Index of vertex opposite the desired edge in c.
+
+        Returns:
+            Delaunay2_edge: Edge incident to c and opposite vertex i of c.
+
+        """
+        cdef Delaunay2_edge out = Delaunay2_edge()
+        cdef Delaunay_with_info_2[uint32_t].Edge e
+        e = Delaunay_with_info_2[uint32_t].Edge(c.x, i)
+        out.assign(c.T, e)
+        return out
+
     def __repr__(self):
         return "Delaunay2_edge[{},{}]".format(repr(self.vertex1), 
                                               repr(self.vertex2))
@@ -1321,6 +1340,40 @@ cdef class Delaunay2:
         cdef Delaunay2_vertex out = Delaunay2_vertex()
         out.assign(self.T, v)
         return out
+
+    def locate(self, np.ndarray[np.float64_t, ndim=1] pos):
+        r"""Get the cell/edge that a given point is a part of.
+
+        Args:
+            pos (:obj:`ndarray` of float64): x,y coordinates.
+
+        Returns:
+            :obj:`Delaunay2_cell` or :obj:`Delaunay2_edge`: Cell or edge that 
+                the given point is a part of.
+
+        """
+        assert(len(pos) == 2)
+        cdef int lt, li
+        lt = li = 999
+        cdef Delaunay2_cell c = Delaunay2_cell()
+        c.assign(self.T, self.T.locate(&pos[0], lt, li))
+        assert(lt != 999)
+        if lt < 2:
+            assert(li != 999)
+        if lt == 0:
+            return c.vertex(li)
+        elif lt == 1:
+            return Delaunay2_edge.from_cell(c, li)
+        elif lt == 2:
+            return c
+        elif lt == 3:
+            print("Point {} is outside the convex hull.".format(pos))
+            return c
+        elif lt == 4:
+            print("Point {} is outside the affine hull.".format(pos))
+            return 0
+        else:
+            raise RuntimeError("Value of {} not expected from CGAL locate.".format(lt))
 
     @property
     def all_verts_begin(self):
