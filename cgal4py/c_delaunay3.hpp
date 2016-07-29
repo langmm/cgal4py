@@ -1,21 +1,28 @@
 // TODO:
 // - Add support for argbitrary return objects so that dual can be added
 // - Line dual_support(Cell c, int i)
+#include <vector>
+#include <set>
+#include <array>
+#include <utility>
+#include <stdio.h>
+#include <math.h>
+#include <iostream>
+#include <fstream>
+#include <cmath>
+#include <algorithm>
+#include <limits>
+#include <stdint.h>
+#ifdef READTHEDOCS
+#include "dummy_CGAL.hpp"
+#else
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
 #include <CGAL/Triangulation_cell_base_with_circumcenter_3.h>
 #include <CGAL/squared_distance_3.h>
-#include <vector>
-#include <set>
-#include <array>
-#include <stdio.h>
-#include <math.h>
-#include <iostream>
-#include <fstream>
-#include <limits>
 #include <CGAL/Unique_hash_map.h>
-#include <stdint.h>
+#endif
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel         K;
 typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K>      Cb3;

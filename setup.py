@@ -8,12 +8,7 @@ import os
 
 
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
-RTDFLAG = True
-
-c_options = {'RTDFLAG': RTDFLAG}
-with open(os.path.join(os.path.dirname(__file__), 'cgal4py', 'config.pxi'), 'w') as fd:
-    for k, v in c_options.iteritems():
-        fd.write('DEF %s = %d\n' % (k.upper(), int(v)))
+# RTDFLAG = True
 
 try:
     from Cython.Distutils import build_ext
@@ -34,7 +29,6 @@ ext_options = dict(language="c++",
                        libraries=['gmp'],
                        extra_link_args=["-lgmp"],
                        extra_compile_args=["-std=c++11"],# "-std=gnu++11",
-                       cython_compile_time_env=c_options,
                        # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                        define_macros=[('CYTHON_TRACE', '1')])
 if RTDFLAG:
