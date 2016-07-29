@@ -8,7 +8,7 @@ import os
 
 
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
-# RTDFLAG = True
+RTDFLAG = True
 
 c_options = {'RTDFLAG': RTDFLAG}
 with open(os.path.join(os.path.dirname(__file__), 'cgal4py', 'config.pxi'), 'w') as fd:

@@ -49,23 +49,28 @@ enum  Sign
     };
   };
 
-  template < class H >
+  template < class H, bool Const >
   class Iterator;
 
   template < class T >
   class Container {
   public:
-    typedef Container<T> Self;
-    typedef T value_type;
-    typedef Iterator<Self> iterator;
+    typedef Container<T>         Self;
+    typedef T                    value_type;
+    typedef Iterator<Self,false> iterator;
+    typedef Iterator<Self,true>  const_iterator;
     
-    friend class Iterator<Self>;
+    friend class Iterator<Self,false>;
+    friend class Iterator<Self,true>;
 
     Container() {};
     Container & operator=(const Container &c) {};
     
     iterator begin() { return iterator(); }
     iterator end() { return iterator(); }
+
+    const_iterator begin() const { return const_iterator(); }
+    const_iterator end() const { return const_iterator(); }
     
   };
   
@@ -75,33 +80,36 @@ enum  Sign
   bool operator!=(const Container<T> &lhs, const Container<T> &rhs) { return false; }
   
   
-  template < class H >
+  template < class H, bool Const >
   class Iterator {
   public:
+    typedef Iterator<H, Const> Self;
     typedef typename H::iterator iterator;
-    typedef Iterator<H> Self;
     typedef typename H::value_type value_type;
-    typedef value_type* pointer;
-    typedef value_type* reference;
+    typedef typename std::conditional<Const, 
+				      const value_type*, 
+				      value_type*>::type pointer;
+    typedef typename std::conditional<Const, 
+				      const value_type&, 
+				      value_type&>::type reference;
   private:
     pointer p;
   public:    
     Iterator() { p = NULL; }
     // Iterator(const iterator &it) { p = &(*it); }
-    Iterator & operator= (const iterator &it) { return *this; }
+    Self & operator= (const iterator &it) { return *this; }
     Self & operator++() { return *this; }
     Self & operator--() { return *this; }
     Self operator++(int) { Self tmp(*this); ++(*this); return tmp; }
     Self operator--(int) { Self tmp(*this); --(*this); return tmp; }
     reference operator*() const { return *(p); }
     pointer   operator->() const { return p; }
-    
   };
   
-  template < class H >
-  bool operator==(const Iterator<H> &lhs, const Iterator<H> &rhs) { return false; }
-  template < class H >
-  bool operator!=(const Iterator<H> &lhs, const Iterator<H> &rhs) { return false; }
+  template < class H, bool Const >
+  bool operator==(const Iterator<H,Const> &lhs, const Iterator<H,Const> &rhs) { return false; }
+  template < class H, bool Const >
+  bool operator!=(const Iterator<H,Const> &lhs, const Iterator<H,Const> &rhs) { return false; }
 
   template < class I >
   class Filter_iterator {
@@ -137,6 +145,7 @@ enum  Sign
     reference operator*() const { return *c_;  }
     pointer operator->() const  { return &*c_; }
     Iterator base() const { return c_; }
+    operator Iterator() { return e_; }
   };
 
   template < class I >
@@ -438,7 +447,9 @@ enum  Sign
   public:
     Triangulation_data_structure_2() {};
     Face_range& faces() { return _faces; }
+    Face_range& faces() const { return const_cast<Tds*>(this)->_faces; }
     Vertex_range& vertices() { return _vertices; }
+    Vertex_range& vertices() const { return const_cast<Tds*>(this)->_vertices; }
 
     int dimension() const { return 0; }
     int number_of_vertices() const { return 0; }
@@ -464,8 +475,10 @@ enum  Sign
     Face_iterator faces_end() const { return faces().end(); }
     Vertex_iterator vertices_begin() const { return vertices_end(); }
     Vertex_iterator vertices_end() const { return vertices().end(); }
-    Face_iterator face_iterator_base_begin() const { faces().end(); }
-    Face_iterator face_iterator_base_end() const { faces().end(); }
+    Edge_iterator edges_begin() const { return Edge_iterator(); }
+    Edge_iterator edges_end() const { return Edge_iterator(); }
+    Face_iterator face_iterator_base_begin() const { return faces().end(); }
+    Face_iterator face_iterator_base_end() const { return faces().end(); }
 
     Face_circulator incident_faces(Vertex_handle v,
 				   Face_handle f =  Face_handle()) const { return Face_circulator(); }
@@ -739,8 +752,8 @@ enum  Sign
 
 
     // Delaunay stuff
-    void ccw(int i) {};
-    void cw(int i) {};
+    int ccw(int i) const { return i; }
+    int cw(int i) const { return i; }
     Point dual (Face_handle f) const { return Point(); }
     // Point circumcenter (Face_handle f) const { return Point(); }
     Vertex_handle nearest_vertex(Point p, Face_handle f = Face_handle()) const { return Vertex_handle(); }
@@ -773,9 +786,11 @@ enum  Sign
   public:
     typedef Key_                                     Key;
     typedef Data_                                    Data;
-    Unique_hash_map() {};
-    const Data& operator[]( const Key& key) const { return Data(); }
-    Data& operator[]( const Key& key) { return Data(); }
+    Unique_hash_map() 
+      : _data(0)
+    {};
+    const Data& operator[]( const Key& key) const { return _data; }
+    Data& operator[]( const Key& key) { return _data; }
   };
 
   template <class K>

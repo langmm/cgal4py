@@ -128,7 +128,7 @@ public:
 
   Cell locate(double* pos, int& lt, int& li) const {
     Point p = Point(pos[0], pos[1]);
-    Locate_type lt_out;
+    Locate_type lt_out = Locate_type(0);
     Cell out = Cell(T.locate(p, lt_out, li));
     lt = (int)lt_out;
     return out;
@@ -642,8 +642,6 @@ public:
   	is.read((char*)&y, sizeof(double));
 	V[i]->point() = Point(x,y);
 	V[i]->info() = info;
-  	// (*(V[i])).point() = Point(x,y);
-  	// (*(V[i])).info() = info;
       }
 
       // Creation of the faces
