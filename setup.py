@@ -4,6 +4,16 @@ from distutils.extension import Extension
 from Cython.Build import cythonize
 from Cython.Compiler.Options import directive_defaults
 import numpy
+import os
+
+
+RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
+# RTDFLAG = True
+
+c_options = {'RTDFLAG': RTDFLAG}
+with open(os.path.join(os.path.dirname(__file__), 'cgal4py', 'config.pxi'), 'w') as fd:
+    for k, v in c_options.iteritems():
+        fd.write('DEF %s = %d\n' % (k.upper(), int(v)))
 
 try:
     from Cython.Distutils import build_ext
@@ -19,25 +29,24 @@ directive_defaults['binding'] = True
 cmdclass = { }
 ext_modules = [ ]
 
+ext_options = dict(language="c++",
+                       include_dirs=[numpy.get_include()],
+                       libraries=['gmp'],
+                       extra_link_args=["-lgmp"],
+                       extra_compile_args=["-std=c++11"],# "-std=gnu++11",
+                       cython_compile_time_env=c_options,
+                       # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
+                       define_macros=[('CYTHON_TRACE', '1')])
+if RTDFLAG:
+    ext_options['extra_compile_args'].append('-DREADTHEDOCS')
+
 if use_cython:
     ext_modules += cythonize(Extension("cgal4py/delaunay2",
                                        sources=["cgal4py/delaunay2.pyx","cgal4py/c_delaunay2.cpp"],
-                                       language="c++",
-                                       include_dirs=[numpy.get_include()],
-                                       libraries=['gmp'],
-                                       extra_link_args=["-lgmp"],
-                                       extra_compile_args=["-std=c++11"],# "-std=gnu++11",
-                                       # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
-                                       define_macros=[('CYTHON_TRACE', '1')]))
+                                       **ext_options))
     ext_modules += cythonize(Extension("cgal4py/delaunay3",
                                        sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
-                                       language="c++",
-                                       include_dirs=[numpy.get_include()],
-                                       libraries=['gmp'],
-                                       extra_link_args=["-lgmp"],
-                                       extra_compile_args=["-std=c++11"],#"-std=gnu++11"]),
-                                       # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
-                                       define_macros=[('CYTHON_TRACE', '1')]))
+                                       **ext_options))
     # ext_modules += cythonize(Extension("cgal4py/kdtree",
     #                          sources=["cgal4py/kdtree.pyx","cgal4py/c_kdtree.cpp"],
     #                          language="c++",

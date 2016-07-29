@@ -1,19 +1,26 @@
 // TODO: 
 // - Add support for argbitrary return objects so that dual can be added
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Delaunay_triangulation_2.h>
-#include <CGAL/Triangulation_vertex_base_with_info_2.h>
-#include <CGAL/squared_distance_2.h>
 #include <vector>
 #include <set>
 #include <array>
+#include <utility>
 #include <stdio.h>
 #include <math.h>
 #include <iostream>
 #include <fstream>
+#include <cmath>
+#include <algorithm>
 #include <limits>
-#include <CGAL/Unique_hash_map.h>
 #include <stdint.h>
+#ifdef READTHEDOCS
+#include "dummy_CGAL.hpp"
+#else
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
+#include <CGAL/squared_distance_2.h>
+#include <CGAL/Unique_hash_map.h>
+#endif
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel         K;
 
@@ -21,7 +28,7 @@ template <typename Info_>
 class Delaunay_with_info_2
 // class Delaunay_with_info_2 : public CGAL::Delaunay_triangulation_2<K, CGAL::Triangulation_data_structure_2<CGAL::Triangulation_vertex_base_with_info_2<Info_, K>>>
 {
- public:
+public:
   typedef CGAL::Delaunay_triangulation_2<K, CGAL::Triangulation_data_structure_2<CGAL::Triangulation_vertex_base_with_info_2<Info_, K>>> Delaunay;
   typedef Info_ Info;
   typedef typename Delaunay::Point                     Point;
@@ -45,7 +52,7 @@ class Delaunay_with_info_2
   typedef typename CGAL::Unique_hash_map<Face_handle,int>    Face_hash;
   Delaunay T;
   bool updated = false;
-  Delaunay_with_info_2() {};
+  Delaunay_with_info_2() {}
   Delaunay_with_info_2(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
   bool is_valid() const { return T.is_valid(); }
   uint32_t num_finite_verts() const { return static_cast<uint32_t>(T.number_of_vertices()); }
@@ -371,11 +378,11 @@ class Delaunay_with_info_2
     out2 = incident_edges(x.v2());
     for (i = 0; i < out1.size(); i++) {
       if (out1[i] != x)
-	out.push_back(out1[i]);
+  	out.push_back(out1[i]);
     }
     for (i = 0; i < out2.size(); i++) {
       if (out2[i] != x)
-	out.push_back(out2[i]);
+  	out.push_back(out2[i]);
     }
     return out;
   }
@@ -387,7 +394,7 @@ class Delaunay_with_info_2
     out2 = incident_cells(v2);
     for (i = 0; i < out2.size(); i++) {
       if ((!out2[i].has_vertex(v1)) && (!out2[i].has_vertex(v2)))
-	out1.push_back(out2[i]);
+  	out1.push_back(out2[i]);
     }
     return out1;
   }
@@ -437,11 +444,11 @@ class Delaunay_with_info_2
     Face_circulator fstart = T.incident_faces(v._x);
     Face_circulator fcit = fstart;
     std::vector<Point> pts;
-    pts.push_back(T.circumcenter(fstart));
+    pts.push_back(T.circumcenter(static_cast<Face_handle>(fstart)));
     fcit++;
     for ( ; fcit != fstart; fcit++) {
       if (T.is_infinite(fcit))
-	return -1.0;
+  	return -1.0;
       Point dual = T.circumcenter(fcit);
       pts.push_back(dual);
     }
@@ -489,7 +496,7 @@ class Delaunay_with_info_2
     std::vector<Edge> out;
     Point p = Point(pos[0], pos[1]);
     T.get_boundary_of_conflicts(p, wrap_insert_iterator<Edge,Edge_handle>(out), 
-				start._x);
+  				start._x);
     return out;
   }
   std::vector<Cell> get_conflicts(double* pos, Cell start) const {
@@ -505,9 +512,9 @@ class Delaunay_with_info_2
     std::vector<Edge> eit;
     Point p = Point(pos[0], pos[1]);
     T.get_conflicts_and_boundary(p, 
-				 wrap_insert_iterator<Cell,Face_handle>(fit), 
-				 wrap_insert_iterator<Edge,Edge_handle>(eit), 
-				 start._x);
+  				 wrap_insert_iterator<Cell,Face_handle>(fit), 
+  				 wrap_insert_iterator<Edge,Edge_handle>(eit), 
+  				 start._x);
     out = std::make_pair(fit, eit);
     return out;
   }
@@ -536,8 +543,8 @@ class Delaunay_with_info_2
       os.write((char*)&m, sizeof(int));
       os.write((char*)&d, sizeof(int));
       if (n==0) {
-	os.close();
-	return;
+  	os.close();
+  	return;
       }
 
       Vertex_hash V;
@@ -549,20 +556,20 @@ class Delaunay_with_info_2
       int inum = 0;
       Vertex_handle v = T.infinite_vertex();
       if ( v != Vertex_handle()) {
-	V[v] = inum++;
+  	V[v] = inum++;
       }
       
       // other vertices
       for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
-	if ( v != vit ) {
-	  V[vit] = inum++;
-	  info = static_cast<Info>(vit->info());
-	  x = static_cast<double>(vit->point().x());
-	  y = static_cast<double>(vit->point().y());
-	  os.write((char*)&info, sizeof(Info));
-	  os.write((char*)&x, sizeof(double));
-	  os.write((char*)&y, sizeof(double));
-	}
+  	if ( v != vit ) {
+  	  V[vit] = inum++;
+  	  info = static_cast<Info>(vit->info());
+  	  x = static_cast<double>(vit->point().x());
+  	  y = static_cast<double>(vit->point().y());
+  	  os.write((char*)&info, sizeof(Info));
+  	  os.write((char*)&x, sizeof(double));
+  	  os.write((char*)&y, sizeof(double));
+  	}
       }
       
       // vertices of the faces
@@ -571,22 +578,22 @@ class Delaunay_with_info_2
       int index;
       int nvert = 0;
       for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
-	   ib != T.tds().face_iterator_base_end(); ++ib) {
-	F[ib] = inum++;
-	for (int j = 0; j < dim ; ++j) {
-	  index = V[ib->vertex(j)];
-	  os.write((char*)&index, sizeof(int));
-	  nvert++;
-	}
+  	   ib != T.tds().face_iterator_base_end(); ++ib) {
+  	F[ib] = inum++;
+  	for (int j = 0; j < dim ; ++j) {
+  	  index = V[ib->vertex(j)];
+  	  os.write((char*)&index, sizeof(int));
+  	  nvert++;
+  	}
       }
   
       // neighbor pointers of the faces
       for (All_faces_iterator it = T.tds().face_iterator_base_begin();
-	   it != T.tds().face_iterator_base_end(); ++it) {
-	for (int j = 0; j < d+1; ++j){
-	  index = F[it->neighbor(j)];
-	  os.write((char*)&index, sizeof(int));
-	}
+  	   it != T.tds().face_iterator_base_end(); ++it) {
+  	for (int j = 0; j < d+1; ++j){
+  	  index = F[it->neighbor(j)];
+  	  os.write((char*)&index, sizeof(int));
+  	}
       }
 
       os.close();
@@ -609,8 +616,8 @@ class Delaunay_with_info_2
       is.read((char*)&d, sizeof(int));
 
       if (n==0) {
-	T.set_infinite_vertex(Vertex_handle());
-	return;
+  	T.set_infinite_vertex(Vertex_handle());
+  	return;
       }
 
       T.tds().set_dimension(d);
@@ -629,40 +636,42 @@ class Delaunay_with_info_2
       Info info;
       double x, y;
       for( ; i < (n+1); ++i) {
-	V[i] = T.tds().create_vertex();
-	is.read((char*)&info, sizeof(Info));
-	is.read((char*)&x, sizeof(double));
-	is.read((char*)&y, sizeof(double));
-	(*(V[i])).point() = Point(x,y);
-	(*(V[i])).info() = info;
+  	V[i] = T.tds().create_vertex();
+  	is.read((char*)&info, sizeof(Info));
+  	is.read((char*)&x, sizeof(double));
+  	is.read((char*)&y, sizeof(double));
+	V[i]->point() = Point(x,y);
+	V[i]->info() = info;
+  	// (*(V[i])).point() = Point(x,y);
+  	// (*(V[i])).info() = info;
       }
 
       // Creation of the faces
       int index;
       int dim = (d == -1 ? 1 : d + 1);
       {
-	int nvert = 0;
-	for(i = 0; i < m; ++i) {
-	  F[i] = T.tds().create_face() ;
-	  for(int j = 0; j < dim ; ++j){
-	    is.read((char*)&index, sizeof(int));
-	    F[i]->set_vertex(j, V[index]);
-	    // The face pointer of vertices is set too often,
-	    // but otherwise we had to use a further map 
-	    V[index]->set_face(F[i]);
-	    nvert++;
-	  }
-	}
+  	int nvert = 0;
+  	for(i = 0; i < m; ++i) {
+  	  F[i] = T.tds().create_face() ;
+  	  for(int j = 0; j < dim ; ++j){
+  	    is.read((char*)&index, sizeof(int));
+  	    F[i]->set_vertex(j, V[index]);
+  	    // The face pointer of vertices is set too often,
+  	    // but otherwise we had to use a further map 
+  	    V[index]->set_face(F[i]);
+  	    nvert++;
+  	  }
+  	}
       }
 
       // Setting the neighbor pointers
       {
-	for(i = 0; i < m; ++i) {
-	  for(int j = 0; j < d+1; ++j){
-	    is.read((char*)&index, sizeof(int));
-	    F[i]->set_neighbor(j, F[index]);
-	  }
-	}
+  	for(i = 0; i < m; ++i) {
+  	  for(int j = 0; j < d+1; ++j){
+  	    is.read((char*)&index, sizeof(int));
+  	    F[i]->set_neighbor(j, F[index]);
+  	  }
+  	}
       }
 
       // Remove flat face
