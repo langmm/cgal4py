@@ -32,6 +32,10 @@ ext_options = dict(language="c++",
                        # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                        define_macros=[('CYTHON_TRACE', '1')])
 if RTDFLAG:
+    ext_options['language'] = "c"
+    ext_options['libraries'] = []
+    ext_options['extra_link_args'] = []
+    # ext_options['extra_compile_args'] = []
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
 
 if use_cython:
