@@ -26,7 +26,7 @@ ext_modules = [ ]
 
 ext_options = dict(language="c++",
                        include_dirs=[numpy.get_include()],
-                       libraries=['gmp'],
+                       libraries=['gmp','cgal'],
                        extra_link_args=["-lgmp"],
                        extra_compile_args=["-std=c++11"],# "-std=gnu++11",
                        # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
