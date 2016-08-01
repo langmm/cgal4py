@@ -409,6 +409,17 @@ class Delaunay_with_info_3
   }
   bool is_infinite(All_cells_iter x) const { return T.is_infinite(x._x); }
 
+  bool is_edge(Vertex x1, Vertex x2, Cell& c, int& i, int& j) const { 
+    return T.is_edge(x1._x, x2._x, c._x, i, j); 
+  }
+  bool is_facet(Vertex x1, Vertex x2, Vertex x3, Cell& c, int& i, int& j, int& k) const {
+    return T.is_facet(x1._x, x2._x, x3._x, c._x, i, j, k);
+  }
+  bool is_cell(Vertex x1, Vertex x2, Vertex x3, Vertex x4, 
+	       Cell& c, int& i1, int& i2, int& i3, int& i4) const { 
+    return T.is_cell(x1._x, x2._x, x3._x, x4._x, c._x, i1, i2, i3, i4);
+  }
+
   // Parts incident to a vertex
   std::vector<Vertex> incident_vertices(Vertex x) const {
     std::vector<Vertex> out;

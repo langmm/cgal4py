@@ -2022,6 +2022,79 @@ cdef class Delaunay3:
         return Delaunay3_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
 
+    def is_edge(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
+                Delaunay3_cell c = Delaunay3_cell(), int i1 = 0, int i2 = 0):
+        r"""Determine if two vertices form an edge in the triangulation.  
+
+        Args:
+            v1 (Delaunay3_vertex): First vertex. 
+            v2 (Delaunay3_vertex): Second vertex.
+            c (Delaunay3_cell, optional): If provided and the two vertices 
+                form an edge, the cell incident to the edge is stored here.
+            i1 (int, optional): If provided and the two vertices form an edge,
+                the index of v1 in cell c is stored here.
+            i2 (int, optional): If provided and the two vertices form an edge,
+                the index of v2 in cell c is stored here.
+
+        Returns:
+            bool: True if v1 and v2 form an edge, False otherwise. 
+
+        """
+        return <pybool>self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
+
+    def is_facet(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
+                 Delaunay3_vertex v3, Delaunay3_cell c = Delaunay3_cell(),
+                 int i1 = 0, int i2 = 0, int i3 = 0):
+        r"""Determine if two vertices form a facet in the triangulation.  
+
+        Args:
+            v1 (Delaunay3_vertex): First vertex. 
+            v2 (Delaunay3_vertex): Second vertex.
+            v3 (Delaunay3_vertex): Third vertex.
+            c (Delaunay3_cell, optional): If provided and the two vertices 
+                form a facet, the cell incident to the facet is stored here.
+            i1 (int, optional): If provided and the two vertices form a facet,
+                the index of v1 in cell c is stored here.
+            i2 (int, optional): If provided and the two vertices form a facet,
+                the index of v2 in cell c is stored here.
+            i3 (int, optional): If provided and the two vertices form a facet,
+                the index of v3 in cell c is stored here.
+
+        Returns:
+            bool: True if v1, v2, and v3 form a facet, False otherwise. 
+
+        """
+        return <pybool>self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
+
+    def is_cell(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
+                Delaunay3_vertex v3, Delaunay3_vertex v4, 
+                Delaunay3_cell c = Delaunay3_cell(),
+                int i1 = 0, int i2 = 0, int i3 = 0, int i4 = 0):
+        r"""Determine if two vertices form a cell in the triangulation.  
+
+        Args:
+            v1 (Delaunay3_vertex): First vertex. 
+            v2 (Delaunay3_vertex): Second vertex.
+            v3 (Delaunay3_vertex): Third vertex.
+            v4 (Delaunay3_vertex): Fourth vertex.
+            c (Delaunay3_cell, optional): If provided and the two vertices 
+                form a cell, the cell they form is stored here.
+            i1 (int, optional): If provided and the two vertices form a cell,
+                the index of v1 in cell c is stored here.
+            i2 (int, optional): If provided and the two vertices form a cell,
+                the index of v2 in cell c is stored here.
+            i3 (int, optional): If provided and the two vertices form a cell,
+                the index of v3 in cell c is stored here.
+            i3 (int, optional): If provided and the two vertices form a cell,
+                the index of v4 in cell c is stored here.
+
+        Returns:
+            bool: True if v1, v2, v3, and v4 form a cell, False otherwise. 
+
+        """
+        return <pybool>self.T.is_cell(v1.x, v2.x, v3.x, v4.x,
+                                          c.x, i1, i2, i3, i4)
+
     def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
         r"""Determine which vertex is closes to a given set of x,y coordinates.
 

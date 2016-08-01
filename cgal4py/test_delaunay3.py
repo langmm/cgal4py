@@ -218,7 +218,23 @@ def test_clear():
     assert(T.num_finite_verts == 0)
     assert(T.num_cells == 0)
 
-# def test_is_edge():
+def test_is_edge():
+    T = Delaunay3()
+    T.insert(pts)
+    assert(T.is_edge(T.get_vertex(0), T.get_vertex(1)))
+    assert(not T.is_edge(T.get_vertex(1), T.get_vertex(nverts_fin-1)))
+
+def test_is_facet():
+    T = Delaunay3()
+    T.insert(pts)
+    assert(T.is_facet(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3)))
+    assert(not T.is_facet(T.get_vertex(0), T.get_vertex(1), T.get_vertex(nverts_fin-1)))
+
+def test_is_cell():
+    T = Delaunay3()
+    T.insert(pts)
+    assert(T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3), T.get_vertex(5)))
+    assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3), T.get_vertex(nverts_fin-1)))
 
 def test_vert():
     T = Delaunay3()

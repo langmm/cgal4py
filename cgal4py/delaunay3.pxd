@@ -159,6 +159,11 @@ cdef extern from "c_delaunay3.hpp":
         bool is_infinite(All_facets_iter x)
         bool is_infinite(All_cells_iter x)
 
+        bool is_edge(Vertex x1, Vertex x2, Cell& c, int& i, int& j) const
+        bool is_facet(Vertex x1, Vertex x2, Vertex x3, Cell& c, int& i, int& j, int& k) const
+        bool is_cell(Vertex x1, Vertex x2, Vertex x3, Vertex x4,
+                     Cell& c, int& i1, int& i2, int& i3, int& i4) const
+
         vector[Vertex] incident_vertices(Vertex x)
         vector[Edge] incident_edges(Vertex x)
         vector[Facet] incident_facets(Vertex x)

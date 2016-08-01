@@ -1527,7 +1527,29 @@ cdef class Delaunay2:
 
         """
         return <pybool>self.T.is_cell(v1.x, v2.x, v3.x, c.x)
-                
+
+    def includes_edge(self, Delaunay2_vertex va, Delaunay2_vertex vb,
+                      Delaunay2_vertex vbr = Delaunay2_vertex(),
+                      Delaunay2_cell c = Delaunay2_cell(), int i = 0):
+        r"""Determine if there is a valid edge along the line between two 
+        vertices that is incident to the first vertex.
+
+        Args:
+            va (Delaunay2_vertex): Starting vertex.
+            vb (Delaunay2_vertex): Ending vertex.
+            vbr (Delaunay2_vertex, optional): If provided and if there is an 
+                edge, the other vertex incident to the edge is stored here.
+            c (Delaunay2_cell, optional): If provided and if there is an edge, 
+                the cell incident to that edge is stored here.
+            i (int, optional): If provided and if there is an edge, the index of 
+                the vertex opposite the edge on the cell is stored here.
+
+        Returns:
+            bool: True if there is an edge starting at va along the line between 
+                va and vb.
+
+        """
+        return <pybool>self.T.includes_edge(va.x, vb.x, vbr.x, c.x, i)
 
     def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
         r"""Determine which vertex is closes to a given set of x,y coordinates

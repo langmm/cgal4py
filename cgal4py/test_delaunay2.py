@@ -1,5 +1,6 @@
 # TODO:
 # - value test circumcenter
+# - test includes_edge
 
 from nose import with_setup
 import numpy as np
