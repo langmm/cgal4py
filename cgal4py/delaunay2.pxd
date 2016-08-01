@@ -149,6 +149,11 @@ cdef extern from "c_delaunay2.hpp":
         vector[Cell] incident_cells(Cell x)
 
         Vertex nearest_vertex(double* pos)
+
+        Edge mirror_edge(Edge x) const
+        int mirror_index(Cell x, int i) const 
+        Vertex mirror_vertex(Cell x, int i) const 
+
         void circumcenter(Cell x, double* out)
         double dual_area(const Vertex v)
         double length(const Edge e)

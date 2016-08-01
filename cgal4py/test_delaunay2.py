@@ -494,6 +494,19 @@ def test_nearest_vertex():
     v = T.nearest_vertex(pts[idx_test,:]-0.1)
     assert(v.index == idx_test)
 
+def test_mirror():
+    T = Delaunay2()
+    T.insert(pts)
+    for e in T.all_edges:
+        e2 = T.mirror_edge(e)
+        break
+    for c in T.all_cells:
+        idx = 0
+        i2 = T.mirror_index(c, idx)
+        assert(c == c.neighbor(idx).neighbor(i2))
+        v2 = T.mirror_vertex(c, idx)
+        assert(v2 == c.neighbor(idx).vertex(i2))
+
 def test_get_boundary_of_conflicts():
     T = Delaunay2()
     T.insert(pts)

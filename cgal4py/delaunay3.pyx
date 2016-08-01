@@ -2111,6 +2111,57 @@ cdef class Delaunay3:
         v.assign(self.T, vc)
         return v
 
+    def mirror_facet(self, Delaunay3_facet x):
+        r"""Get the same facet as referenced from its other incident cell. 
+
+        Args:
+            x (Delaunay3_facet): Facet to mirror.
+
+        Returns:
+            Delaunay3_facet: The same facet as x, but referenced from the 
+                other cell incident to x.
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Facet ec
+        ec = self.T.mirror_facet(x.x)
+        cdef Delaunay3_facet out = Delaunay3_facet()
+        out.assign(self.T, ec)
+        return out
+
+    def mirror_index(self, Delaunay3_cell x, int i):
+        r"""Get the index of a cell with respect to its ith neighbor. 
+
+        Args: 
+            x (Delaunay3_cell): Cell to get mirrored index for. 
+            i (int): Index of neighbor that should be used to determine the 
+                mirrored index. 
+
+        Returns: 
+            int: Index of cell x with respect to its ith neighbor. 
+
+        """
+        cdef int out = self.T.mirror_index(x.x, i)
+        return out
+
+    def mirror_vertex(self, Delaunay3_cell x, int i):
+        r"""Get the vertex of a cell's ith neighbor opposite to the cell. 
+
+        Args: 
+            x (Delaunay3_cell): Cell. 
+            i (int): Index of neighbor that should be used to determine the 
+                mirrored vertex. 
+
+        Returns:
+            Delaunay3_vertex: Vertex in the ith neighboring cell of cell x, 
+                that is opposite to cell x. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex vc
+        vc = self.T.mirror_vertex(x.x, i)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, vc)
+        return out
+
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                                   Delaunay3_cell start):
         r"""Get the facets bounding the zone in conflict with a given point. 

@@ -443,6 +443,10 @@ public:
     return out;
   }
 
+  Edge mirror_edge(Edge x) const { return Edge(T.mirror_edge(x._x)); }
+  int mirror_index(Cell x, int i) const { return T.mirror_index(x._x, i); }
+  Vertex mirror_vertex(Cell x, int i) const { return Vertex(T.mirror_vertex(x._x, i)); }
+
   void circumcenter(Cell x, double* out) const {
     if (T.is_infinite(x._x)) {
       out[0] = std::numeric_limits<double>::infinity();
