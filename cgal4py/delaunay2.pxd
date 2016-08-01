@@ -130,6 +130,12 @@ cdef extern from "c_delaunay2.hpp":
         bool is_infinite(All_edges_iter x)
         bool is_infinite(All_cells_iter x)
 
+        bool is_edge(Vertex x1, Vertex x2)
+        bool is_edge(Vertex x1, Vertex x2, Cell& c, int& i)
+        bool is_cell(Vertex x1, Vertex x2, Vertex x3)
+        bool is_cell(Vertex x1, Vertex x2, Vertex x3, Cell& c)
+        bool includes_edge(Vertex va, Vertex vb, Vertex& vbr, Cell& c, int& i)
+
         vector[Vertex] incident_vertices(Vertex x)
         vector[Edge] incident_edges(Vertex x)
         vector[Cell] incident_cells(Vertex x)

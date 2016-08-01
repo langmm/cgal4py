@@ -338,6 +338,13 @@ public:
   bool is_infinite(All_edges_iter x) const { return T.is_infinite(x._x); }
   bool is_infinite(All_cells_iter x) const { return T.is_infinite(x._x); }
 
+  bool is_edge(Vertex x1, Vertex x2) const { return T.is_edge(x1._x, x2._x); }
+  bool is_edge(Vertex x1, Vertex x2, Cell& c, int& i) const { return T.is_edge(x1._x, x2._x, c._x, i); }
+  bool is_cell(Vertex x1, Vertex x2, Vertex x3) const { return T.is_face(x1._x, x2._x, x3._x); }
+  bool is_cell(Vertex x1, Vertex x2, Vertex x3, Cell& c) const { return T.is_face(x1._x, x2._x, x3._x, c._x); }
+  bool includes_edge(Vertex va, Vertex vb, Vertex& vbr, Cell& c, int& i) {
+    return T.includes_edge(va._x, vb._x, vbr._x, c._x, i);
+  }
 
   // Constructs incident to a vertex
   std::vector<Vertex> incident_vertices(Vertex x) const {

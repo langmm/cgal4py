@@ -218,6 +218,8 @@ def test_clear():
     assert(T.num_finite_verts == 0)
     assert(T.num_cells == 0)
 
+# def test_is_edge():
+
 def test_vert():
     T = Delaunay3()
     T.insert(pts)

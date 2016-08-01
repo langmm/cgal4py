@@ -1493,6 +1493,42 @@ cdef class Delaunay2:
         return Delaunay2_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
 
+    def is_edge(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
+                Delaunay2_cell c = Delaunay2_cell(), int i = 0):
+        r"""Determine if two vertices form an edge in the triangulation.
+
+        Args:
+            v1 (Delaunay2_vertex): First vertex.
+            v2 (Delaunay2_vertex): Second vertex.
+            c (Delaunay2_cell, optional): If provided and the two vertices 
+                form an edge, the cell incident to the edge is stored here.
+            i (int, optional): If provided and the two vertices form an edge, 
+                the index of the vertex opposite the edge in cell c is stored 
+                here.
+        Returns:
+            bool: True if v1 and v2 form an edge, False otherwise.
+
+        """
+        return <pybool>self.T.is_edge(v1.x, v2.x, c.x, i)
+
+    def is_cell(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
+                Delaunay2_vertex v3, Delaunay2_cell c = Delaunay2_cell()):
+        r"""Determine if three vertices form a cell in the triangulation.
+
+        Args:
+            v1 (Delaunay2_vertex): First vertex.
+            v2 (Delaunay2_vertex): Second vertex.
+            v3 (Delaunay2_vertex): Third vertex.
+            c (Delaunay2_cell, optional): If provided and the three vertices 
+                form a cell, the cell they form is stored here.
+
+        Returns:
+            bool: True if v1, v2, and v3 form a cell, False otherwise.
+
+        """
+        return <pybool>self.T.is_cell(v1.x, v2.x, v3.x, c.x)
+                
+
     def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
         r"""Determine which vertex is closes to a given set of x,y coordinates
 

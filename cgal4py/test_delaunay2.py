@@ -30,55 +30,59 @@ def test_create():
     T = Delaunay2()
 
 def test_insert():
+    # without duplicates
     T = Delaunay2()
     T.insert(pts)
     assert(T.is_valid())
-
-def test_insert_dup():
+    # with duplicates
     T = Delaunay2()
     T.insert(pts_dup)
     assert(T.is_valid())
 
 def test_num_verts():
+    # without duplicates
     T = Delaunay2()
     T.insert(pts)
+    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
     assert(T.num_finite_verts == nverts_fin)
     assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
-
-def test_num_verts_dup():
+    # with duplicates
     T = Delaunay2()
     T.insert(pts_dup)
+    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
     assert(T.num_finite_verts == nverts_fin)
     assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
 
 def test_num_edges():
+    # without duplicates
     T = Delaunay2()
     T.insert(pts)
-    print(T.num_finite_edges, T.num_infinite_edges)
+    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
     assert(T.num_finite_edges == nedges_fin)
     assert(T.num_infinite_edges == nedges_inf)
     assert(T.num_edges == nedges)
-
-def test_num_edges_dup():
+    # with duplicates
     T = Delaunay2()
     T.insert(pts_dup)
-    print(T.num_finite_edges, T.num_infinite_edges)
+    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
     assert(T.num_finite_edges == nedges_fin)
     assert(T.num_infinite_edges == nedges_inf)
     assert(T.num_edges == nedges)
 
 def test_num_cells():
+    # without duplicates
     T = Delaunay2()
     T.insert(pts)
+    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
     assert(T.num_finite_cells == ncells_fin)
     assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
-    
-def test_num_cells_dup():
+    # with duplicates
     T = Delaunay2()
     T.insert(pts_dup)
+    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
     assert(T.num_finite_cells == ncells_fin)
     assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
@@ -201,6 +205,18 @@ def test_remove():
     v = T.get_vertex(0)
     T.remove(v)
     assert(T.num_verts == (nverts-1))
+
+def test_is_edge():
+    T = Delaunay2()
+    T.insert(pts)
+    assert(T.is_edge(T.get_vertex(0), T.get_vertex(1)))
+    assert(not T.is_edge(T.get_vertex(0), T.get_vertex(nverts_fin-1)))
+
+def test_is_cell():
+    T = Delaunay2()
+    T.insert(pts)
+    assert(T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3)))
+    assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(nverts_fin-1)))
 
 def test_vert():
     T = Delaunay2()
