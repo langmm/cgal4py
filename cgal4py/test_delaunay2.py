@@ -521,6 +521,15 @@ def test_get_conflicts_and_boundary():
     cells, edges = T.get_conflicts_and_boundary(p, c)
     print(len(cells), len(edges))
 
+def test_line_walk():
+    T = Delaunay2()
+    T.insert(pts)
+    p1 = np.array([-1, -1], 'float64')
+    p2 = np.array([+1, +1], 'float64')
+    x = T.line_walk(p1, p2)
+    print(len(x))
+    assert(len(x) == 6)
+
 def test_vertices():
     T = Delaunay2()
     T.insert(pts)

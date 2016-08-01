@@ -8,6 +8,7 @@ import os
 
 
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
+# RTDFLAG = True
 
 try:
     from Cython.Distutils import build_ext

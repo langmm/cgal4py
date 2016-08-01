@@ -405,6 +405,56 @@ enum  Sign
   bool operator!=(typename Tds_::Face_handle fh,
 		  Triangulation_ds_face_circulator_2<Tds_> fc) { return (fc!=fh); }
 
+  template < class Tds>
+  class Triangulation_line_face_circulator_2 
+  {
+  public:
+    typedef Triangulation_line_face_circulator_2<Tds> Face_circulator;
+    typedef typename Tds::Face                      Face;
+    typedef typename Tds::Vertex                    Vertex;
+    typedef typename Tds::Face_handle               Face_handle;
+    typedef typename Tds::Vertex_handle             Vertex_handle;
+  private:
+    Vertex_handle _v;
+    Face_handle    pos;
+  public:
+    Triangulation_line_face_circulator_2() 
+      : _v(), pos() 
+    {}
+    Triangulation_line_face_circulator_2(Vertex_handle v,
+					 Face_handle f = Face_handle()) {
+      _v = v;
+      pos = f;
+    }
+    Face_circulator& operator=(const Face_circulator& other) { return *this; }
+    Face_circulator& operator++() { return *this; }
+    Face_circulator operator++(int) {
+      Face_circulator tmp(*this);
+      --(*this);
+      return tmp;
+    }
+    Face_circulator& operator--() { return *this; }
+    Face_circulator operator--(int) {
+      Face_circulator tmp(*this);
+      --(*this);
+      return tmp;
+    }
+    operator Face_handle() const { return pos; }
+    bool operator==(const Face_circulator &fc) const { return false; }
+    bool operator!=(const Face_circulator &fc) const { return false; }
+    bool operator==(const int i) const { return false; }
+    bool operator==(const Face_handle &fh) const { return pos == fh; }
+    bool operator!=(const Face_handle &fh) const { return pos != fh; }
+    Face& operator*() const { return *pos; }
+    Face* operator->() const { return &*pos; }
+  };
+  template < class Tds_ >
+  bool operator==(typename Tds_::Face_handle fh,
+		  Triangulation_line_face_circulator_2<Tds_> fc) { return (fc==fh); }
+  template < class Tds_ >
+  bool operator!=(typename Tds_::Face_handle fh,
+		  Triangulation_line_face_circulator_2<Tds_> fc) { return (fc!=fh); }
+
   template < class Tds >
   class Triangulation_ds_vertex_circulator_2 {
   public:
@@ -529,10 +579,14 @@ enum  Sign
     friend class Triangulation_ds_edge_circulator_2<Tds>;
     friend class Triangulation_ds_vertex_circulator_2<Tds>;
 
+    friend class Triangulation_line_face_circulator_2<Tds>;
+
     typedef Triangulation_ds_edge_iterator_2<Tds>      Edge_iterator;
     typedef Triangulation_ds_face_circulator_2<Tds>    Face_circulator;
     typedef Triangulation_ds_vertex_circulator_2<Tds>  Vertex_circulator;
     typedef Triangulation_ds_edge_circulator_2<Tds>    Edge_circulator;
+
+    typedef Triangulation_line_face_circulator_2<Tds>  Line_face_circulator;
     
     typedef Container<Vertex>                          Vertex_range;
     typedef Container<Face>                            Face_range;
@@ -668,6 +722,8 @@ enum  Sign
     typedef typename Tds::Face_circulator        Face_circulator;
     typedef typename Tds::Vertex_circulator      Vertex_circulator;
     typedef typename Tds::Edge_circulator        Edge_circulator;
+
+    typedef typename Tds::Line_face_circulator   Line_face_circulator;
 
     typedef typename Tds::Face_iterator          All_faces_iterator;
     typedef typename Tds::Edge_iterator          All_edges_iterator;
@@ -878,6 +934,11 @@ enum  Sign
 			      OutputItBoundaryEdges eit,
 			      Face_handle start= Face_handle(),
 			      bool strict = true) const { return eit; }
+
+    Line_face_circulator  line_walk(const Point& p,
+				    const Point& q,
+				    Face_handle f = Face_handle()) const { return Line_face_circulator(); }
+      
   };
 
   // Things specific to 3D case

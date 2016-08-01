@@ -38,6 +38,7 @@ public:
   typedef typename Delaunay::Vertex_circulator         Vertex_circulator;
   typedef typename Delaunay::Edge_circulator           Edge_circulator;
   typedef typename Delaunay::Face_circulator           Face_circulator;
+  typedef typename Delaunay::Line_face_circulator      Line_face_circulator;
   typedef typename Delaunay::Vertex_iterator           Vertex_iterator;
   typedef typename Delaunay::Face_iterator             Face_iterator;
   typedef typename Delaunay::Edge_iterator             Edge_iterator;
@@ -530,6 +531,19 @@ public:
   				 wrap_insert_iterator<Edge,Edge_handle>(eit), 
   				 start._x);
     out = std::make_pair(fit, eit);
+    return out;
+  }
+
+  std::vector<Cell> line_walk(double* pos1, double* pos2) const {
+    Point p1 = Point(pos1[0], pos1[1]);
+    Point p2 = Point(pos2[0], pos2[1]);
+    std::vector<Cell> out;
+    Line_face_circulator fc = T.line_walk(p1, p2), done(fc);
+    if (fc == 0)
+      return out;
+    do {
+      out.push_back(Cell(static_cast<Face_handle>(fc)));
+    } while (++fc != done);
     return out;
   }
 

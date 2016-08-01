@@ -1646,3 +1646,27 @@ cdef class Delaunay2:
             e.assign(self.T, cv.second[i])
             out_edges.append(e)
         return out_cells, out_edges
+
+    def line_walk(self, np.ndarray[np.float64_t, ndim=1] pos1,
+                  np.ndarray[np.float64_t, ndim=1] pos2):
+        r"""Get the cells intersected by a line.
+
+        Args:
+            pos1 (np.ndarray of float64): x,y coordinates of starting point.
+            pos2 (np.ndarray of float64): x,y coordinates of stopping point.
+
+        Returns:
+            list of Delaunay2_cell: Cells intersected by a line from pos1 to 
+                pos2.
+
+        """
+        cdef object out = []
+        cdef np.uint32_t i
+        cdef vector[Delaunay_with_info_2[uint32_t].Cell] cv
+        cdef Delaunay2_cell c
+        cv = self.T.line_walk(&pos1[0], &pos2[0])
+        for i in range(cv.size()):
+            c = Delaunay2_cell()
+            c.assign(self.T, cv[i])
+            out.append(c)
+        return out
