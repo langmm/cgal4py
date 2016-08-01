@@ -28,59 +28,83 @@ nedges = nedges_fin + nedges_inf
 ncells_fin = 12
 ncells_inf = 12
 ncells = ncells_fin + ncells_inf
-# vert_incident_cells = [12, 
+nfacets_fin = 30
+nfacets_inf = 18
+nfacets = nfacets_fin + nfacets_inf
 
 def test_create():
     T = Delaunay3()
 
 def test_insert():
+    # without duplicates
     T = Delaunay3()
     T.insert(pts)
     assert(T.is_valid())
-
-def test_insert_dup():
+    # with duplicates
     T = Delaunay3()
     T.insert(pts_dup)
     assert(T.is_valid())
 
 def test_num_verts():
+    # without duplicates
     T = Delaunay3()
     T.insert(pts)
+    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
     assert(T.num_finite_verts == nverts_fin)
     assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
-
-def test_num_verts_dup():
+    # with duplicates
     T = Delaunay3()
     T.insert(pts_dup)
+    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
     assert(T.num_finite_verts == nverts_fin)
     assert(T.num_infinite_verts == nverts_inf)
     assert(T.num_verts == nverts)
 
 def test_num_edges():
+    # without duplicates
     T = Delaunay3()
     T.insert(pts)
+    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
     assert(T.num_finite_edges == nedges_fin)
     assert(T.num_infinite_edges == nedges_inf)
     assert(T.num_edges == nedges)
-
-def test_num_edges_dup():
+    # with duplicates
     T = Delaunay3()
     T.insert(pts_dup)
+    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
     assert(T.num_finite_edges == nedges_fin)
     assert(T.num_infinite_edges == nedges_inf)
     assert(T.num_edges == nedges)
 
-def test_num_cells():
+def test_num_facets():
+    # without duplicates
     T = Delaunay3()
     T.insert(pts)
+    print(T.num_finite_facets, T.num_infinite_facets, T.num_facets)
+    assert(T.num_finite_facets == nfacets_fin)
+    assert(T.num_infinite_facets == nfacets_inf)
+    assert(T.num_facets == nfacets)
+    # with duplicates
+    T = Delaunay3()
+    T.insert(pts_dup)
+    print(T.num_finite_facets, T.num_infinite_facets, T.num_facets)
+    assert(T.num_finite_facets == nfacets_fin)
+    assert(T.num_infinite_facets == nfacets_inf)
+    assert(T.num_facets == nfacets)
+
+def test_num_cells():
+    # without duplicates
+    T = Delaunay3()
+    T.insert(pts)
+    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
     assert(T.num_finite_cells == ncells_fin)
     assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
-    
-def test_num_cells_dup():
+    # with duplicates
     T = Delaunay3()
     T.insert(pts_dup)
+    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
     assert(T.num_finite_cells == ncells_fin)
     assert(T.num_infinite_cells == ncells_inf)
     assert(T.num_cells == ncells)
@@ -163,6 +187,22 @@ def test_get_vertex():
         v = T.get_vertex(i)
         assert(np.allclose(v.point, pts[i,:]))
 
+def test_locate():
+    T = Delaunay3()
+    T.insert(pts)
+    for c in T.finite_cells:
+        p = c.center
+        print(c,p,T.locate(p))
+        assert(c == T.locate(p))
+        assert(c == T.locate(p, c))
+        assert(c.vertex(0) == T.locate(c.vertex(0).point))
+        assert(c.vertex(0) == T.locate(c.vertex(0).point, c))
+        assert(c.facet(0) == T.locate(c.facet(0).center))
+        assert(c.facet(0) == T.locate(c.facet(0).center, c))
+        # assert(c.facet(0).edge(0) == T.locate(c.facet(0).edge(0).center))
+        # assert(c.facet(0).edge(0) == T.locate(c.facet(0).edge(0).center, c))
+        break
+
 def test_remove():
     T = Delaunay3()
     T.insert(pts)
@@ -240,11 +280,14 @@ def test_facet():
         v1 = f.vertex(0)
         v2 = f.vertex(1)
         v3 = f.vertex(2)
+        e1 = f.edge(0)
+        e2 = f.edge(1)
+        e3 = f.edge(2)
         c = f.cell
         i = f.ind
         inf = f.is_infinite()
         gab = f.is_Gabriel()
-        print(f, v1.index, v2.index, v3.index, i, inf, gab)
+        print(f, v1.index, v2.index, v3.index, i, inf, gab, f.center)
         assert(f == f)
         assert(f.is_equivalent(f))
         if fold is not None:
@@ -271,10 +314,16 @@ def test_cell():
     T.insert(pts)
     cold = None
     for c in T.all_cells:
-        print(c, c.circumcenter)
+        print(c, c.circumcenter, c.center)
         assert(c == c)
         if cold is not None:
             assert(c != cold)
+            
+        f1 = c.facet(0)
+        f2 = c.facet(1)
+        f3 = c.facet(2)
+        f4 = c.facet(3)
+
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
@@ -385,8 +434,8 @@ def test_vert_incident_verts():
             count += 1
         x = v.incident_vertices()[0]
         print(v.index, c0, x)
-    print(count)
-    assert(count == 68)
+    print(count, 2*T.num_edges)
+    assert(count == 2*T.num_edges) # 68
     
 def test_vert_incident_edges():
     T = Delaunay3()
@@ -399,8 +448,8 @@ def test_vert_incident_edges():
             count += 1
         x = v.incident_edges()[0]
         print(v.index, c0, x)
-    print(count)
-    assert(count == 68)
+    print(count, 2*T.num_edges)
+    assert(count == 2*T.num_edges) # 68
 
 def test_vert_incident_facets():
     T = Delaunay3()
@@ -413,8 +462,8 @@ def test_vert_incident_facets():
             count += 1
         x = v.incident_facets()[0]
         print(v.index, c0, x)
-    print(count)
-    assert(count == 144)
+    print(count, 3*T.num_facets)
+    assert(count == 3*T.num_facets) # 144
 
 def test_vert_incident_cells():
     T = Delaunay3()
@@ -426,8 +475,8 @@ def test_vert_incident_cells():
             c0 += 1
             count += 1
         print(v.index, c0)
-    print(count)
-    assert(count == 96)
+    print(count, 4*T.num_cells)
+    assert(count == 4*T.num_cells) # 96
 
 def test_edge_incident_verts():
     T = Delaunay3()
@@ -439,8 +488,8 @@ def test_edge_incident_verts():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 68)
+    print(count, 2*T.num_edges)
+    assert(count == 2*T.num_edges) # 68
 
 def test_edge_incident_edges():
     T = Delaunay3()
@@ -465,8 +514,8 @@ def test_edge_incident_facets():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 144)
+    print(count, 3*T.num_facets)
+    assert(count == 3*T.num_facets) # 144
 
 def test_edge_incident_cells():
     T = Delaunay3()
@@ -478,8 +527,8 @@ def test_edge_incident_cells():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 144)
+    print(count, 3*T.num_facets)
+    assert(count == 3*T.num_facets) # 144
 
 def test_facet_incident_verts():
     T = Delaunay3()
@@ -491,8 +540,8 @@ def test_facet_incident_verts():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 144)
+    print(count, 3*T.num_facets)
+    assert(count == 3*T.num_facets) # 144
 
 def test_facet_incident_edges():
     T = Delaunay3()
@@ -504,8 +553,8 @@ def test_facet_incident_edges():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 144)
+    print(count, 3*T.num_facets)
+    assert(count == 3*T.num_facets) # 144
 
 def test_facet_incident_facets():
     T = Delaunay3()
@@ -518,7 +567,7 @@ def test_facet_incident_facets():
             count += 1
         print(c0)
     print(count)
-    assert(count == 466)
+    assert(count == 480)
 
 def test_facet_incident_cells():
     T = Delaunay3()
@@ -530,8 +579,8 @@ def test_facet_incident_cells():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 96)
+    print(count, 2*T.num_facets)
+    assert(count == 2*T.num_facets) # 96
 
 def test_cell_incident_verts():
     T = Delaunay3()
@@ -543,8 +592,8 @@ def test_cell_incident_verts():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 96)
+    print(count, 4*T.num_cells)
+    assert(count == 4*T.num_cells) # 96
 
 def test_cell_incident_edges():
     T = Delaunay3()
@@ -556,8 +605,8 @@ def test_cell_incident_edges():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 144)
+    print(count, 6*T.num_cells)
+    assert(count == 6*T.num_cells) # 144
 
 def test_cell_incident_facets():
     T = Delaunay3()
@@ -569,8 +618,8 @@ def test_cell_incident_facets():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 96)
+    print(count, 4*T.num_cells)
+    assert(count == 4*T.num_cells) # 96
 
 def test_cell_incident_cells():
     T = Delaunay3()
@@ -582,8 +631,8 @@ def test_cell_incident_cells():
             c0 += 1
             count += 1
         print(c0)
-    print(count)
-    assert(count == 72)
+    print(count, 4*T.num_cells)
+    assert(count == 4*T.num_cells) # 72
 
 def test_nearest_vertex():
     idx_test = 8

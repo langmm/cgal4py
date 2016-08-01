@@ -8,7 +8,6 @@ import os
 
 
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
-# RTDFLAG = True
 
 try:
     from Cython.Distutils import build_ext
@@ -26,13 +25,12 @@ ext_modules = [ ]
 
 ext_options = dict(language="c++",
                        include_dirs=[numpy.get_include()],
-                       libraries=['gmp','cgal'],
+                       libraries=['gmp','CGAL'],
                        extra_link_args=["-lgmp"],
                        extra_compile_args=["-std=c++11"],# "-std=gnu++11",
                        # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                        define_macros=[('CYTHON_TRACE', '1')])
 if RTDFLAG:
-    # ext_options['language'] = "c"
     ext_options['libraries'] = []
     ext_options['extra_link_args'] = []
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')

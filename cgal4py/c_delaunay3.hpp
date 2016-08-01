@@ -54,6 +54,7 @@ class Delaunay_with_info_3
   typedef typename Delaunay::Facet_circulator          Facet_circulator;
   typedef typename Delaunay::Cell_circulator           Cell_circulator;
   typedef typename Delaunay::Tetrahedron               Tetrahedron;
+  typedef typename Delaunay::Locate_type               Locate_type;
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Cell_handle,int>    Cell_hash;
   typedef Info_ Info;
@@ -112,6 +113,21 @@ class Delaunay_with_info_3
         return Vertex(static_cast<Vertex_handle>(it));
     }
     return Vertex(T.infinite_vertex());
+  }
+
+  Cell locate(double* pos, int& lt, int& li, int& lj) const {
+    Point p = Point(pos[0], pos[1], pos[2]);
+    Locate_type lt_out = Locate_type(0);
+    Cell out = Cell(T.locate(p, lt_out, li, lj));
+    lt = (int)lt_out;
+    return out;
+  }
+  Cell locate(double* pos, int& lt, int& li, int& lj, Cell c) const {
+    Point p = Point(pos[0], pos[1], pos[2]);
+    Locate_type lt_out = Locate_type(0);
+    Cell out = Cell(T.locate(p, lt_out, li, lj, c._x));
+    lt = (int)lt_out;
+    return out;
   }
 
   template <typename Wrap, typename Wrap_handle>
@@ -212,7 +228,7 @@ class Delaunay_with_info_3
     Edge(All_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
     Edge(Finite_edges_iterator x) { _x = static_cast<Edge_handle>(*x); }
     Edge(All_edges_iter x) { _x = static_cast<Edge_handle>(*(x._x)); }
-    Edge(Cell x, int i1, int i2) { _x = Edge_handle(x._x, i1, i2); }
+    Edge(Cell x, int i1, int i2) { _x = Edge_handle(x._x, i1%4, i2%4); }
     Cell cell() const { return Cell(_x.first); }
     int ind1() const { return _x.second; }
     int ind2() const { return _x.third; }
@@ -228,32 +244,6 @@ class Delaunay_with_info_3
     Vertex v2() const { return Vertex(_v2()); }
     bool operator==(Edge other) const { return (_x == other._x); }
     bool operator!=(Edge other) const { return (_x != other._x); }
-    // bool operator==(Edge other) const {
-    //   Vertex_handle x1 = _v1(), x2 = _v2();
-    //   Vertex_handle o1 = other._v1(), o2 = other._v2();
-    //   if ((x1 == o1) && (x2 == o2))
-    //     return true;
-    //   else if ((x1 == o2) && (x2 == o1))
-    //     return true;
-    //   else
-    //     return false;
-    // }
-    // bool operator!=(Edge other) const {
-    //   Vertex_handle x1 = _v1(), x2 = _v2();
-    //   Vertex_handle o1 = other._v1(), o2 = other._v2();
-    //   if (x1 == o1) {
-    //     if (x2 != o2)
-    //       return true;
-    //     else
-    //       return false;
-    //   } else if (x1 == o2) {
-    //     if (x2 != o1)
-    //       return true;
-    //     else
-    //       return false;
-    //   } else
-    //     return true;
-    // }
   };
 
 
@@ -291,7 +281,12 @@ class Delaunay_with_info_3
     Cell cell() const { return Cell(_x.first); }
     int ind() const { return _x.second; }
     Vertex vertex(int i) const { 
-      return Vertex(cell().vertex((ind() + 1 + (i%3))%3)); 
+      return Vertex(cell().vertex(ind() + 1 + (i%3))); 
+    }
+    Edge edge(int i) const {
+      int i1 = ind() + 1 + ((i+1)%3);
+      int i2 = ind() + 1 + ((i+2)%3);
+      return Edge(cell(), i1, i2);
     }
     bool operator==(Facet other) const { return (_x == other._x); }
     bool operator!=(Facet other) const { return (_x != other._x); }
@@ -335,24 +330,26 @@ class Delaunay_with_info_3
       _x = Cell_handle(v1._x, v2._x, v3._x, v4._x,
 		       n1._x, n2._x, n3._x, n4._x);
     }
-    bool operator==(Cell other) { return (_x == other._x); }
-    bool operator!=(Cell other) { return (_x != other._x); }
+    bool operator==(Cell other) const { return (_x == other._x); }
+    bool operator!=(Cell other) const { return (_x != other._x); }
 
-    Vertex vertex(int i) { return Vertex(_x->vertex(i)); }
-    bool has_vertex(Vertex v) { return _x->has_vertex(v._x); }
-    bool has_vertex(Vertex v, int *i) { return _x->has_vertex(v._x, *i); }
-    int ind(Vertex v) { return _x->index(v._x); }
+    Facet facet(int i) const { return Facet(*this, i); }
 
-    Cell neighbor(int i) { return Cell(_x->neighbor(i)); }
+    Vertex vertex(int i) const { return Vertex(_x->vertex(i%4)); }
+    bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
+    bool has_vertex(Vertex v, int *i) const { return _x->has_vertex(v._x, *i); }
+    int ind(Vertex v) const { return _x->index(v._x); }
+
+    Cell neighbor(int i) const { return Cell(_x->neighbor(i%4)); }
     bool has_neighbor(Cell c) const { return _x->has_neighbor(c._x); }
     bool has_neighbor(Cell c, int *i) const { return _x->has_neighbor(c._x, *i); }
     int ind(Cell c) const { return _x->index(c._x); }
 
-    void set_vertex(int i, Vertex v) { _x->set_vertex(i, v._x); }
+    void set_vertex(int i, Vertex v) { _x->set_vertex(i%4, v._x); }
     void set_vertices() { _x->set_vertices(); }
     void set_vertices(Vertex v1, Vertex v2, Vertex v3, Vertex v4) {
       _x->set_vertices(v1._x, v2._x, v3._x, v4._x); }
-    void set_neighbor(int i, Cell c) { _x->set_neighbor(i, c._x); }
+    void set_neighbor(int i, Cell c) { _x->set_neighbor(i%4, c._x); }
     void set_neighbors() { _x->set_neighbors(); }
     void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4) {
       _x->set_neighbors(c1._x, c2._x, c3._x, c4._x); 
@@ -360,32 +357,32 @@ class Delaunay_with_info_3
   };
 
   bool are_equal(const Facet f1, const Facet f2) const {
-    // return T.are_equal(f1._x, f2._x);
-    Vertex x1 = f1.vertex(0), x2 = f1.vertex(1), x3 = f1.vertex(2);
-    Vertex o1 = f2.vertex(0), o2 = f2.vertex(1), o3 = f2.vertex(2);
-    if (x1 == o1) {
-      if ((x2 == o2) && (x3 == o3))
-	return true;
-      else if ((x2 == o3) && (x3 == o2))
-	return true;
-      else
-	return false;
-    } else if (x1 == o2) {
-      if ((x2 == o1) && (x3 == o3))
-	return true;
-      else if ((x2 == o3) && (x3 == o1))
-	return true;
-      else
-	return false;
-    } else if (x1 == o3) {
-      if ((x2 == o2) && (x3 == o1))
-	return true;
-      else if ((x2 == o1) && (x3 == o2))
-	return true;
-      else
-	return false;
-    } else
-      return false;
+    return T.are_equal(f1._x, f2._x);
+    // Vertex x1 = f1.vertex(0), x2 = f1.vertex(1), x3 = f1.vertex(2);
+    // Vertex o1 = f2.vertex(0), o2 = f2.vertex(1), o3 = f2.vertex(2);
+    // if (x1 == o1) {
+    //   if ((x2 == o2) && (x3 == o3))
+    // 	return true;
+    //   else if ((x2 == o3) && (x3 == o2))
+    // 	return true;
+    //   else
+    // 	return false;
+    // } else if (x1 == o2) {
+    //   if ((x2 == o1) && (x3 == o3))
+    // 	return true;
+    //   else if ((x2 == o3) && (x3 == o1))
+    // 	return true;
+    //   else
+    // 	return false;
+    // } else if (x1 == o3) {
+    //   if ((x2 == o2) && (x3 == o1))
+    // 	return true;
+    //   else if ((x2 == o1) && (x3 == o2))
+    // 	return true;
+    //   else
+    // 	return false;
+    // } else
+    //   return false;
   }
   bool are_equal(const Edge e1, const Edge e2) const {
     if ((e1.v1() == e2.v1()) && (e1.v2() == e2.v2()))
@@ -487,15 +484,9 @@ class Delaunay_with_info_3
   }
   std::vector<Edge> incident_edges(Facet x) const {
     std::vector<Edge> out;
-    int i1, i2;
-    for (int i = 1; i < 3; i++) {
-      i1 = (x.ind() + i + 0) % 4;
-      i2 = (x.ind() + i + 1) % 4;
-      out.push_back(Edge(x.cell(), i1, i2));
+    for (int i = 0; i < 3; i++) {
+      out.push_back(x.edge(i));
     }
-    i1 = (x.ind() + 3) % 4;
-    i2 = (x.ind() + 1) % 4;
-    out.push_back(Edge(x.cell(), i1, i2));
     return out;
   }
   std::vector<Facet> incident_facets(Facet x) const {
@@ -544,7 +535,7 @@ class Delaunay_with_info_3
   }
   std::vector<Cell> incident_cells(Cell x) const {
     std::vector<Cell> out;
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
       out.push_back(x.neighbor(i));
     return out;
   }

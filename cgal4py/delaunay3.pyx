@@ -369,6 +369,26 @@ cdef class Delaunay3_edge:
         self.T = T
         self.x = x
 
+    @staticmethod
+    def from_cell(Delaunay3_cell c, int i, int j):
+        r"""Construct an edges from a cell and indices of the two vertices 
+        in the cell that are incident to the edge.
+
+        Args:
+            c (Delaunay3_cell): Cell 
+            i (int): Index of one vertex in c, incident to the edge.
+            j (int): Index of second vertex in c, incident to the edge.
+
+        Returns:
+            Delaunay3_edge: Edge incident to c and vertices i & j of cell c.
+
+        """
+        cdef Delaunay3_edge out = Delaunay3_edge()
+        cdef Delaunay_with_info_3[uint32_t].Edge e
+        e = Delaunay_with_info_3[uint32_t].Edge(c.x, i, j)
+        out.assign(c.T, e)
+        return out
+
     def __repr__(self):
         return "Delaunay3_edge[{},{}]".format(repr(self.vertex1),
                                               repr(self.vertex2))
@@ -463,6 +483,16 @@ cdef class Delaunay3_edge:
         r"""int: The index of the 2nd vertex of this edge in its cell."""
         def __get__(self):
             return self.x.ind2()
+
+    property center:
+        r""":obj:`ndarray` of float64: x,y,z coordinates of edge center."""
+        def __get__(self):
+            return (self.vertex1.point + self.vertex2.point)/2.0
+
+    property midpoint:
+        r""":obj:`ndarray` of float64: x,y,z coordinates of edge midpoint."""
+        def __get__(self):
+            return self.center
 
     property length:
         r"""float64: The length of the edge. If infinite, -1 is returned"""
@@ -732,6 +762,25 @@ cdef class Delaunay3_facet:
         self.T = T
         self.x = x
 
+    @staticmethod
+    def from_cell(Delaunay3_cell c, int i):
+        r"""Construct a facet from a cell and index of the vertex in the cell 
+        opposite the desired facet.
+
+        Args:
+            c (Delaunay3_cell): Cell 
+            i (int): Index of vertex in c that is opposite the facet.
+
+        Returns:
+            Delaunay3_facet: Facet incident to c and opposite vertex i in c.
+
+        """
+        cdef Delaunay3_facet out = Delaunay3_facet()
+        cdef Delaunay_with_info_3[uint32_t].Facet e
+        e = Delaunay_with_info_3[uint32_t].Facet(c.x, i)
+        out.assign(c.T, e)
+        return out
+
     def __repr__(self):
         return "Delaunay3_facet[{},{},{}]".format(repr(self.vertex(0)),
                                                   repr(self.vertex(1)),
@@ -794,10 +843,34 @@ cdef class Delaunay3_facet:
         out.assign(self.T, v)
         return out
 
+    def edge(self, int i):
+        r"""Get the edge opposite the ith vertex incident to this facet.
+
+        Args:
+            i (int): Index of the edge that should be returned.
+        
+        Returns:
+            Delaunay3_edge: Edge opposite the ith vertex of this facet.
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Edge e
+        e = self.x.edge(i)
+        cdef Delaunay3_edge out = Delaunay3_edge()
+        out.assign(self.T, e)
+        return out
+
+    property center:
+        r""":obj:`ndarray` of float64: x,y,z coordinates of cell center."""
+        def __get__(self):
+            return (self.vertex(0).point + \
+                    self.vertex(1).point + \
+                    self.vertex(2).point)/3.0
+
     property area:
         r"""float64: The area of the facet. If infinite, -1 is returned"""
         def __get__(self):
-            return -1
+            raise NotImplementedError
+            # return -1
 
     property cell:
         r"""Delaunay3_cell: The cell this facet is assigned to."""
@@ -1114,6 +1187,23 @@ cdef class Delaunay3_cell:
         """
         return self.T.is_infinite(self.x)
 
+    def facet(self, int i):
+        r"""Find the facet opposite the ith vertex incident to this cell.
+
+        Args:
+            i (int): Index of vertex opposite the desired facet.
+
+        Returns:
+            Delaunay3_facet: The facet opposite the ith vertex incident to this 
+                cell.
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Facet f
+        f = self.x.facet(i)
+        cdef Delaunay3_facet out = Delaunay3_facet()
+        out.assign(self.T, f)
+        return out
+
     def vertex(self, int i):
         r"""Find the ith vertex that is incident to this cell. 
 
@@ -1276,6 +1366,14 @@ cdef class Delaunay3_cell:
         r"""Reset all of this cell's neighboring cells."""
         self.T.updated = <cbool>True
         self.x.set_neighbors()
+
+    property center:
+        """:obj:`ndarray` of float64: x,y,z coordinates of cell center."""
+        def __get__(self):
+            return (self.vertex(0).point + \
+                    self.vertex(1).point + \
+                    self.vertex(2).point + \
+                    self.vertex(3).point)/4.0
 
     property circumcenter:
         """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""
@@ -1777,6 +1875,46 @@ cdef class Delaunay3:
                 cell that should be flipped.
         """
         self.T.flip_flippable(x.x, i)
+
+    def locate(self, np.ndarray[np.float64_t, ndim=1] pos,
+               Delaunay3_cell start = None):
+        r"""Get the vertex/cell/facet/edge that a given point is a part of.
+
+        Args:
+            pos (:obj:`ndarray` of float64): x,y coordinates.   
+            start (Delaunay3_cell, optional): Cell to start the search at. 
+
+        Returns:
+
+        """
+        assert(len(pos) == 3)
+        cdef int lt, li, lj
+        lt = li = lj = 999
+        cdef Delaunay3_cell c = Delaunay3_cell()
+        if start is not None:
+            c.assign(self.T, self.T.locate(&pos[0], lt, li, lj, start.x))
+        else:
+            c.assign(self.T, self.T.locate(&pos[0], lt, li, lj))
+        print(lt)
+        assert(lt != 999)
+        if lt < 2:
+            assert(li != 999)
+        if lt == 0: # vertex
+            return c.vertex(li)
+        elif lt == 1: # edge
+            return Delaunay3_edge.from_cell(c, li, lj)
+        elif lt == 2: # facet
+            return Delaunay3_facet.from_cell(c, li)
+        elif lt == 3: # cell
+            return c
+        elif lt == 4:
+            print("Point {} is outside the convex hull.".format(pos))
+            return c
+        elif lt == 5:
+            print("Point {} is outside the affine hull.".format(pos))
+            return 0
+        else:
+            raise RuntimeError("Value of {} not expected from CGAL locate.".format(lt))
 
     def get_vertex(self, np.uint64_t index):
         r"""Get the vertex object corresponding to the given index. 

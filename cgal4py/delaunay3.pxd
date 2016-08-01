@@ -39,6 +39,8 @@ cdef extern from "c_delaunay3.hpp":
         void read_from_file(const char* filename) except +
 
         Vertex get_vertex(Info index) except +
+        Cell locate(double* pos, int& lt, int& li, int& lj)
+        Cell locate(double* pos, int& lt, int& li, int& lj, Cell c)
 
         void info_ordered_vertices(double* pos)
         void vertex_info(Info* verts)
@@ -106,6 +108,7 @@ cdef extern from "c_delaunay3.hpp":
             Cell cell()
             int ind()
             Vertex vertex(int i)
+            Edge edge(int i)
 
         cppclass All_cells_iter:
             All_cells_iter()
@@ -124,6 +127,8 @@ cdef extern from "c_delaunay3.hpp":
                  Cell n1, Cell n2, Cell n3, Cell n4)
             bool operator==(Cell other)
             bool operator!=(Cell other)
+
+            Facet facet(int i)
 
             Vertex vertex(int i)
             bool has_vertex(Vertex v)

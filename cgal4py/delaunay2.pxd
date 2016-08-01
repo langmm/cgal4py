@@ -36,6 +36,7 @@ cdef extern from "c_delaunay2.hpp":
 
         Vertex get_vertex(Info index) except +
         Cell locate(double* pos, int& lt, int& li)
+        Cell locate(double* pos, int& lt, int& li, Cell c)
 
         void info_ordered_vertices(double* pos)
         void vertex_info(Info* verts)

@@ -174,6 +174,20 @@ def test_io():
     assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
 
+def test_locate():
+    T = Delaunay2()
+    T.insert(pts)
+    for c in T.finite_cells:
+        p = c.center
+        print('{}\n{}\n{}'.format(c,p,T.locate(p)))
+        assert(c == T.locate(p,c))
+        assert(c == T.locate(p))
+        assert(c.vertex(0) == T.locate(c.vertex(0).point))
+        assert(c.vertex(0) == T.locate(c.vertex(0).point, c))
+        # assert(c.edge(0) == T.locate(c.edge(0).midpoint))
+        # assert(c.edge(0) == T.locate(c.edge(0).midpoint, c))
+        break
+
 def test_get_vertex():
     T = Delaunay2()
     T.insert(pts)
@@ -220,8 +234,10 @@ def test_edge():
     for e in T.all_edges:
         v1 = e.vertex1
         v2 = e.vertex2
+        assert(e.vertex(0) == v1)
+        assert(e.vertex(1) == v2)
         elen = e.length
-        print(e, v1.index, v2.index, elen)
+        print(e, v1.index, v2.index, elen, e.midpoint, e.center)
         assert(e == e)
         if eold is not None:
             assert(e != eold)
@@ -237,13 +253,16 @@ def test_cell():
     T.insert(pts)
     cold = None
     for c in T.all_cells:
-        print(c, c.dimension, c.circumcenter)
+        print(c, c.dimension, c.circumcenter, c.center)
         assert(c == c)
         if cold is not None:
             assert(c != cold)
         v1 = c.vertex(0)
         v2 = c.vertex(1)
         v3 = c.vertex(2)
+        e1 = c.edge(0)
+        e2 = c.edge(1)
+        e3 = c.edge(2)
         assert(c.has_vertex(v1))
         assert(c.has_vertex(v1, return_index = True) == 0)
         assert(c.ind_vertex(v1) == 0)

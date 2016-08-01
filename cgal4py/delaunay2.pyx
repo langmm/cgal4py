@@ -389,6 +389,21 @@ cdef class Delaunay2_edge:
         """
         return self.T.is_infinite(self.x)
 
+    def vertex(self, int i):
+        r"""Return a vertex incident to this edge.
+
+        Args:
+            i (int): Index of vertex incident to this edge.
+
+        Returns:
+            Delaunay2_vertex: Vertex i of this edge.
+
+        """
+        if (i % 2) == 0:
+            return self.vertex1
+        else:
+            return self.vertex2
+
     property vertex1:
         r"""Delaunay2_vertex: The first vertex in the edge."""
         def __get__(self):
@@ -404,6 +419,16 @@ cdef class Delaunay2_edge:
             cdef Delaunay2_vertex out = Delaunay2_vertex()
             out.assign(self.T, x)
             return out
+
+    property center:
+        r""":obj:`ndarray` of float64: x,y coordinates of edge center."""
+        def __get__(self):
+            return (self.vertex1.point + self.vertex2.point)/2.0
+
+    property midpoint:
+        r""":obj:`ndarray` of float64: x,y coordinates of edge midpoint."""
+        def __get__(self):
+            return self.center
 
     property length:
         r"""float64: The length of the edge. If infinite, -1 is returned"""
@@ -689,6 +714,19 @@ cdef class Delaunay2_cell:
         out.assign(self.T, v)
         return out
 
+    def edge(self, int i):
+        r"""Find the edge incident to this cell that is opposite the ith vertex.
+
+        Args:
+            i (int): The index of the vertex opposite the edge that should be 
+                returned.
+
+        Returns:
+            Delaunay2_edge: Edge incident to this cell and opposite vertex i.
+
+        """
+        return Delaunay2_edge.from_cell(self, i)
+
     def has_vertex(self, Delaunay2_vertex v, pybool return_index = False):
         r"""Determine if a vertex belongs to this cell.
 
@@ -849,6 +887,13 @@ cdef class Delaunay2_cell:
         r"""Put the 1st vertex at the end of the vertex order."""
         self.T.updated = <cbool>True
         self.x.cw_permute()
+
+    property center:
+        r""":obj:`ndarray` of float64: x,y coordinates of cell center."""
+        def __get__(self):
+            return (self.vertex(0).point + \
+                    self.vertex(1).point + \
+                    self.vertex(2).point)/3.0
 
     property circumcenter:
         r""":obj:`ndarray` of float64: x,y coordinates of cell circumcenter."""
@@ -1341,22 +1386,28 @@ cdef class Delaunay2:
         out.assign(self.T, v)
         return out
 
-    def locate(self, np.ndarray[np.float64_t, ndim=1] pos):
-        r"""Get the cell/edge that a given point is a part of.
-
+    def locate(self, np.ndarray[np.float64_t, ndim=1] pos,
+               Delaunay2_cell start = None):
+        r"""Get the vertex/cell/edge that a given point is a part of.
+        
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
+            start (Delaunay2_cell, optional): Cell to start the search at.
 
         Returns:
-            :obj:`Delaunay2_cell` or :obj:`Delaunay2_edge`: Cell or edge that 
-                the given point is a part of.
+            :obj:`Delaunay2_vertex`, :obj:`Delaunay2_cell` or 
+                :obj:`Delaunay2_edge`: Vertex, cell or edge that the given point 
+                is a part of.
 
         """
         assert(len(pos) == 2)
         cdef int lt, li
         lt = li = 999
         cdef Delaunay2_cell c = Delaunay2_cell()
-        c.assign(self.T, self.T.locate(&pos[0], lt, li))
+        if start is not None:
+            c.assign(self.T, self.T.locate(&pos[0], lt, li, start.x))
+        else:
+            c.assign(self.T, self.T.locate(&pos[0], lt, li))
         assert(lt != 999)
         if lt < 2:
             assert(li != 999)
