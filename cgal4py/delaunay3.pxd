@@ -205,6 +205,9 @@ cdef extern from "c_delaunay3.hpp":
 
         pair[vector[Cell],vector[Facet]] find_conflicts(double* pos, Cell start)
 
+        int side_of_cell(const double* pos, Cell c, int& lt, int& li, int& lj) const
+        int side_of_edge(const double* pos, const Edge e, int& lt, int& li) const
+        int side_of_facet(const double* pos, const Facet f, int& lt, int& li, int& lj) const 
         # int side_of_circle(const Facet f, const double* pos)
         int side_of_sphere(const Cell c, const double* pos)
         bool is_Gabriel(const Edge e)

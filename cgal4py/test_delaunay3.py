@@ -283,11 +283,22 @@ def test_edge():
         assert(e.is_equivalent(e))
         if eold is not None:
             assert(e != eold)
+        p1 = e.center; p2 = v1.point
+        print(e.side(p1), p1)
+        print(e.side(p2), p2)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
+            assert(np.isinf(e.center).all())
+            assert(e.side(p1) == -1)
+            assert(e.side(p2) == -1)
         else:
+            p3 = e.center + 10*elen
+            print(e.side(p3), p3)
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
+            # assert(e.side(p1) == -1) # virtually impossible
+            # assert(e.side(p2) == 0)
+            # assert(e.side(p3) == 1)
         eold = e
 
 def test_facet():
@@ -310,6 +321,20 @@ def test_facet():
         assert(f.is_equivalent(f))
         if fold is not None:
             assert(f != fold)
+
+        p1 = f.center; p2 = v1.point
+        print(f.side(p1), p1)
+        print(f.side(p2), p2)
+        if f.is_infinite():
+            assert(np.isinf(f.center).all())
+            assert(f.side(p1) == -1)
+            assert(f.side(p2) == -1)
+        # else:
+        #     p3 = 2*v1.point - f.center + np.arange(3)
+        #     print(f.side(p3), p3)
+        #     assert(f.side(p1) == -1)
+        #     assert(f.side(p2) == 0)
+        #     assert(f.side(p3) == 1)
 
         # # This segfaults inside CGAL function call
         # print(f.side_of_circle((v1.point+v2.point+v3.point)/3), (v1.point+v2.point+v3.point)/3)
@@ -366,15 +391,25 @@ def test_cell():
         c.set_neighbor(0, n1)
         c.set_neighbors(n4, n3, n2, n1)
 
+        p1 = c.center; p2 = v1.point
+        print(c.side(p1), p1)
+        print(c.side(p2), p2)
         print(c.side_of_sphere(c.circumcenter), c.circumcenter)
         print(c.side_of_sphere(v1.point), v1.point)
         if c.is_infinite():
+            assert(np.isinf(c.center).all())
+            assert(c.side(p1) == -1)
+            assert(c.side(p2) == -1)
             assert(np.isinf(c.circumcenter).all())
             assert(c.side_of_sphere(c.circumcenter) == -1)
             assert(c.side_of_sphere(v1.point) == -1)
-            # assert(c.side_of_sphere(2*v1.point - c.circumcenter) == -1)
         else:
+            p3 = 2*v1.point - c.center
+            print(c.side(p3), p3)
             print(c.side_of_sphere(2*v1.point - c.circumcenter), 2*v1.point - c.circumcenter)
+            assert(c.side(p1) == -1)
+            assert(c.side(p2) == 0)
+            assert(c.side(p3) == 1)
             assert(c.side_of_sphere(c.circumcenter) == -1)
             assert(c.side_of_sphere(v1.point) == 0)
             assert(c.side_of_sphere(2*v1.point - c.circumcenter) == 1)

@@ -633,6 +633,46 @@ class Delaunay_with_info_3
     return out;
   }
 
+  int side_of_cell(const double* pos, Cell c, int& lt, int& li, int& lj) const {
+    if (T.is_infinite(c._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1]) || std::isinf(pos[2])) 
+      return 1;
+    else {
+      Point p = Point(pos[0], pos[1], pos[2]);
+      Locate_type lt_out = Locate_type(0);    
+      int out = -(int)T.side_of_cell(p, c._x, lt_out, li, lj);
+      lt = (int)lt_out;
+      return out;
+    }
+  }
+  int side_of_edge(const double* pos, const Edge e, int& lt, int& li) const {
+    if (T.is_infinite(e._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1]) || std::isinf(pos[2])) 
+      return 1;
+    else {
+      Point p = Point(pos[0], pos[1], pos[2]);
+      Locate_type lt_out = Locate_type(0);
+      int out = -(int)T.side_of_edge(p, e._x, lt_out, li);
+      lt = (int)lt_out;
+      return out;
+    }
+  }
+  int side_of_facet(const double* pos, const Facet f, int& lt, int& li, int& lj) const {
+    if (T.is_infinite(f._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1]) || std::isinf(pos[2])) 
+      return 1;
+    else {
+      Point p = Point(pos[0], pos[1], pos[2]);
+      Locate_type lt_out = Locate_type(0);
+      int out = -(int)T.side_of_facet(p, f._x, lt_out, li, lj);
+      lt = (int)lt_out;
+      return out;
+    }
+  }
+
   // Currently segfaults inside CGAL function call
   // int side_of_circle(const Facet f, const double* pos) const {
   //   if (T.is_infinite(f._x))
@@ -652,7 +692,7 @@ class Delaunay_with_info_3
       return 1;
     else {
       Point p = Point(pos[0], pos[1], pos[2]);
-      return (int)(-T.side_of_sphere(c._x, p));
+      return -(int)T.side_of_sphere(c._x, p);
     }
   }
 

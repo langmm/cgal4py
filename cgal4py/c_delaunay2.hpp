@@ -551,6 +551,17 @@ public:
     return out;
   }
 
+  int oriented_side(Cell f, const double* pos) const {
+    if (T.is_infinite(f._x))
+      return -1;
+    else if (std::isinf(pos[0]) || std::isinf(pos[1])) {
+      return 1;
+    } else {
+      Point p = Point(pos[0], pos[1]);
+      return (int)T.oriented_side(f._x, p);
+    }
+  }
+
   int side_of_oriented_circle(Cell f, const double* pos) const {
     if (T.is_infinite(f._x))
       return -1;

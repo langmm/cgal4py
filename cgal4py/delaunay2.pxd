@@ -169,6 +169,7 @@ cdef extern from "c_delaunay2.hpp":
 
         vector[Cell] line_walk(double* pos1, double* pos2) const
 
+        int oriented_side(Cell f, const double* pos) const
         int side_of_oriented_circle(Cell f, const double* pos) const
 
 cdef class Delaunay2:

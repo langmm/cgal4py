@@ -487,7 +487,10 @@ cdef class Delaunay3_edge:
     property center:
         r""":obj:`ndarray` of float64: x,y,z coordinates of edge center."""
         def __get__(self):
-            return (self.vertex1.point + self.vertex2.point)/2.0
+            if self.is_infinite():
+                return np.float('inf')*np.ones(3, 'float64')
+            else:
+                return (self.vertex1.point + self.vertex2.point)/2.0
 
     property midpoint:
         r""":obj:`ndarray` of float64: x,y,z coordinates of edge midpoint."""
@@ -552,6 +555,21 @@ cdef class Delaunay3_edge:
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
         return out
+
+    def side(self, np.ndarray[np.float64_t, ndim=1] p):
+        r"""Determine if a point is inside, outside or on this edge.
+
+        Args:
+            p (np.ndarray of float64): x,y,z coordinates.
+
+        Returns:
+            int: -1 if p is inside this edge, 0 if p is one of this edge's 
+                vertices, and 1 if p is outside this edge.
+
+        """
+        cdef int lt, li
+        lt = li = 999
+        return self.T.side_of_edge(&p[0], self.x, lt, li)
 
     def flip(self):
         r"""Flip this edge to the other diagonal of the quadrilateral formed by
@@ -862,10 +880,13 @@ cdef class Delaunay3_facet:
     property center:
         r""":obj:`ndarray` of float64: x,y,z coordinates of cell center."""
         def __get__(self):
-            return (self.vertex(0).point + \
-                    self.vertex(1).point + \
-                    self.vertex(2).point)/3.0
-
+            if self.is_infinite():
+                return np.float('inf')*np.ones(3, 'float64')
+            else:
+                return (self.vertex(0).point + \
+                        self.vertex(1).point + \
+                        self.vertex(2).point)/3.0
+                        
     property area:
         r"""float64: The area of the facet. If infinite, -1 is returned"""
         def __get__(self):
@@ -885,7 +906,17 @@ cdef class Delaunay3_facet:
         r"""int: The index of the vertex this facet is opposite on its cell."""
         def __get__(self):
             return self.x.ind()
-        
+
+    property mirror:
+        r"""Delaunay3_facet: The same facet as this one, but referenced from its 
+        other incident cell"""
+        def __get__(self):
+            cdef Delaunay_with_info_3[uint32_t].Facet ec
+            ec = self.T.mirror_facet(self.x)
+            cdef Delaunay3_facet out = Delaunay3_facet()
+            out.assign(self.T, ec)
+            return out
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this facet.
 
@@ -938,6 +969,21 @@ cdef class Delaunay3_facet:
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
         return out
+
+    def side(self, np.ndarray[np.float64_t, ndim=1] p):
+        r"""Determine if a point is inside, outside or on this facet.
+
+        Args:
+            p (np.ndarray of float64): x,y,z coordinates.
+
+        Returns:
+            int: -1 if p is inside this facet, 0 if p is on one of this facet's 
+                vertices or edges, and 1 if p is outside this facet.
+
+        """
+        cdef int lt, li, lj
+        lt = li = lj = 999
+        return self.T.side_of_facet(&p[0], self.x, lt, li, lj)
 
     # Currently segfaults inside CGAL function
     # def side_of_circle(self, np.ndarray[np.float64_t, ndim=1] pos):
@@ -1187,6 +1233,39 @@ cdef class Delaunay3_cell:
         """
         return self.T.is_infinite(self.x)
 
+    def mirror_index(self, int i):
+        r"""Get the index of this cell with respect to its ith neighbor. 
+
+        Args: 
+            i (int): Index of neighbor that should be used to determine the 
+                mirrored index. 
+
+        Returns: 
+            int: Index of this cell with respect to its ith neighbor. 
+
+        """
+        cdef int out = self.T.mirror_index(self.x, i)
+        return out
+
+    def mirror_vertex(self, int i):
+        r"""Get the vertex of this cell's ith neighbor that is opposite to this 
+        cell.
+
+        Args: 
+            i (int): Index of neighbor that should be used to determine the 
+                mirrored vertex. 
+
+        Returns:
+            Delaunay3_vertex: Vertex in the ith neighboring cell of this cell, 
+                that is opposite to this cell. 
+
+        """
+        cdef Delaunay_with_info_3[uint32_t].Vertex vc
+        vc = self.T.mirror_vertex(self.x, i)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, vc)
+        return out
+
     def facet(self, int i):
         r"""Find the facet opposite the ith vertex incident to this cell.
 
@@ -1370,10 +1449,13 @@ cdef class Delaunay3_cell:
     property center:
         """:obj:`ndarray` of float64: x,y,z coordinates of cell center."""
         def __get__(self):
-            return (self.vertex(0).point + \
-                    self.vertex(1).point + \
-                    self.vertex(2).point + \
-                    self.vertex(3).point)/4.0
+            if self.is_infinite():
+                return np.float('inf')*np.ones(3, 'float64')
+            else:
+                return (self.vertex(0).point + \
+                        self.vertex(1).point + \
+                        self.vertex(2).point + \
+                        self.vertex(3).point)/4.0
 
     property circumcenter:
         """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""
@@ -1434,6 +1516,21 @@ cdef class Delaunay3_cell:
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
         return out
+
+    def side(self, np.ndarray[np.float64_t, ndim=1] p):
+        r"""Determine if a point is inside, outside or on this cell.
+
+        Args:
+            p (np.ndarray of float64): x,y,z coordinates.
+
+        Returns:
+            int: -1 if p is inside this cell, 0 if p is on one of this cell's 
+                vertices, edges, or facets, and 1 if p is outside this cell.
+
+        """
+        cdef int lt, li, lj
+        lt = li = lj = 999
+        return self.T.side_of_cell(&p[0], self.x, lt, li, lj)
 
     def side_of_sphere(self, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Determine where a point is with repect to this cell's 
@@ -2122,11 +2219,7 @@ cdef class Delaunay3:
                 other cell incident to x.
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Facet ec
-        ec = self.T.mirror_facet(x.x)
-        cdef Delaunay3_facet out = Delaunay3_facet()
-        out.assign(self.T, ec)
-        return out
+        return x.mirror
 
     def mirror_index(self, Delaunay3_cell x, int i):
         r"""Get the index of a cell with respect to its ith neighbor. 
@@ -2140,8 +2233,7 @@ cdef class Delaunay3:
             int: Index of cell x with respect to its ith neighbor. 
 
         """
-        cdef int out = self.T.mirror_index(x.x, i)
-        return out
+        return x.mirror_index(i)
 
     def mirror_vertex(self, Delaunay3_cell x, int i):
         r"""Get the vertex of a cell's ith neighbor opposite to the cell. 
@@ -2156,11 +2248,7 @@ cdef class Delaunay3:
                 that is opposite to cell x. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex vc
-        vc = self.T.mirror_vertex(x.x, i)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
-        out.assign(self.T, vc)
-        return out
+        return x.mirror_vertex(i)
 
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                                   Delaunay3_cell start):

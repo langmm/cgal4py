@@ -260,6 +260,7 @@ def test_edge():
             assert(e != eold)
         if e.is_infinite():
             assert(np.isclose(elen, -1.0))
+            assert(np.isinf(e.center).all())
         else:
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
@@ -299,15 +300,25 @@ def test_cell():
         c.set_neighbor(0, n1)
         c.set_neighbors(n3, n2, n1)
 
+        print(c.side(c.center))
+        print(c.side(v1.point))
+        print(c.side(2*v1.point-c.center))
         print(c.side_of_circle(c.circumcenter))
         print(c.side_of_circle(v1.point))
         print(c.side_of_circle(2*v1.point-c.circumcenter), 2*v1.point-c.circumcenter)
         if c.is_infinite():
+            assert(np.isinf(c.center).all())
+            assert(c.side(c.center) == -1)
+            assert(c.side(v1.point) == -1)
+            assert(c.side(2*v1.point-c.center) == -1)
             assert(np.isinf(c.circumcenter).all())
             assert(c.side_of_circle(c.circumcenter) == -1)
             assert(c.side_of_circle(v1.point) == -1)
             assert(c.side_of_circle(2*v1.point-c.circumcenter) == -1)
         else:
+            assert(c.side(c.center) == -1)
+            assert(c.side(v1.point) == 0)
+            assert(c.side(2*v1.point-c.center) == 1)
             assert(c.side_of_circle(c.circumcenter) == -1)
             assert(c.side_of_circle(v1.point) == 0)
             assert(c.side_of_circle(2*v1.point-c.circumcenter) == 1)

@@ -423,7 +423,10 @@ cdef class Delaunay2_edge:
     property center:
         r""":obj:`ndarray` of float64: x,y coordinates of edge center."""
         def __get__(self):
-            return (self.vertex1.point + self.vertex2.point)/2.0
+            if self.is_infinite():
+                return np.float('inf')*np.ones(2, 'float64')
+            else:
+                return (self.vertex1.point + self.vertex2.point)/2.0
 
     property midpoint:
         r""":obj:`ndarray` of float64: x,y coordinates of edge midpoint."""
@@ -434,6 +437,16 @@ cdef class Delaunay2_edge:
         r"""float64: The length of the edge. If infinite, -1 is returned"""
         def __get__(self):
             cdef np.float64_t out = self.T.length(self.x)
+            return out
+
+    property mirror:
+        r"""Delaunay2_edge: The same edge, but represented using the other 
+        incident cell."""
+        def __get__(self):
+            cdef Delaunay_with_info_2[uint32_t].Edge ec
+            ec = self.T.mirror_edge(self.x)
+            cdef Delaunay2_edge out = Delaunay2_edge()
+            out.assign(self.T, ec)
             return out
 
     def incident_vertices(self):
@@ -698,6 +711,52 @@ cdef class Delaunay2_cell:
         """
         return self.T.is_infinite(self.x)
 
+    def mirror_index(self, int i):
+        r"""Get the index of this cell with respect to its ith neighbor.
+
+        Args:
+            i (int): Index of neighbor that should be used to determine the 
+                mirrored index.
+
+        Returns:
+            int: Index of this cell with respect to its ith neighbor.
+
+        """
+        cdef int out = self.T.mirror_index(self.x, i)
+        return out
+
+    def mirror_vertex(self, int i):
+        r"""Get the vertex of this cell's ith neighbor that is opposite to this 
+        cell.
+
+        Args:
+            i (int): Index of neighbor that should be used to determine the
+                mirrored vertex.
+
+        Returns:
+            Delaunay2_vertex: Vertex in the ith neighboring cell of this cell 
+                that is opposite to this cell.
+
+        """
+        cdef Delaunay_with_info_2[uint32_t].Vertex vc
+        vc = self.T.mirror_vertex(self.x, i)
+        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        out.assign(self.T, vc)
+        return out
+
+    def edge(self, int i):
+        r"""Find the edge incident to this cell that is opposite the ith vertex.
+
+        Args:
+            i (int): The index of the vertex opposite the edge that should be 
+                returned.
+
+        Returns:
+            Delaunay2_edge: Edge incident to this cell and opposite vertex i.
+
+        """
+        return Delaunay2_edge.from_cell(self, i)
+
     def vertex(self, int i):
         r"""Find the ith vertex that is incident to this cell.
 
@@ -713,19 +772,6 @@ cdef class Delaunay2_cell:
         cdef Delaunay2_vertex out = Delaunay2_vertex()
         out.assign(self.T, v)
         return out
-
-    def edge(self, int i):
-        r"""Find the edge incident to this cell that is opposite the ith vertex.
-
-        Args:
-            i (int): The index of the vertex opposite the edge that should be 
-                returned.
-
-        Returns:
-            Delaunay2_edge: Edge incident to this cell and opposite vertex i.
-
-        """
-        return Delaunay2_edge.from_cell(self, i)
 
     def has_vertex(self, Delaunay2_vertex v, pybool return_index = False):
         r"""Determine if a vertex belongs to this cell.
@@ -891,9 +937,12 @@ cdef class Delaunay2_cell:
     property center:
         r""":obj:`ndarray` of float64: x,y coordinates of cell center."""
         def __get__(self):
-            return (self.vertex(0).point + \
-                    self.vertex(1).point + \
-                    self.vertex(2).point)/3.0
+            if self.is_infinite():
+                return np.float('inf')*np.ones(2, 'float64')
+            else:
+                return (self.vertex(0).point + \
+                        self.vertex(1).point + \
+                        self.vertex(2).point)/3.0
 
     property circumcenter:
         r""":obj:`ndarray` of float64: x,y coordinates of cell circumcenter."""
@@ -946,6 +995,19 @@ cdef class Delaunay2_cell:
         cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
         out.assign(self.T, it)
         return out
+
+    def side(self, np.ndarray[np.float64_t, ndim=1] p):
+        r"""Determine if a point is inside, outside or on this cell's edge.
+
+        Args:
+            p (np.ndarray of np.float64): x,y coordinates.
+        
+        Returns:
+            int: -1 if p is inside this cell, 0 if p is on one of this cell's 
+                vertices or edges, and 1 if p is outside this cell.
+
+        """
+        return self.T.oriented_side(self.x, &p[0])
 
     def side_of_circle(self, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Determine where a point is with repect to this cell's 
@@ -1578,11 +1640,7 @@ cdef class Delaunay2:
                 incident to the edge.
 
         """
-        cdef Delaunay_with_info_2[uint32_t].Edge ec
-        ec = self.T.mirror_edge(x.x)
-        cdef Delaunay2_edge out = Delaunay2_edge()
-        out.assign(self.T, ec)
-        return out
+        return x.mirror
 
     def mirror_index(self, Delaunay2_cell x, int i):
         r"""Get the index of a cell with respect to its ith neighbor.
@@ -1596,8 +1654,7 @@ cdef class Delaunay2:
             int: Index of cell x with respect to its ith neighbor.
 
         """
-        cdef int out = self.T.mirror_index(x.x, i)
-        return out
+        return x.mirror_index(i)
 
     def mirror_vertex(self, Delaunay2_cell x, int i):
         r"""Get the vertex of a cell's ith neighbor opposite to the cell.
@@ -1612,11 +1669,7 @@ cdef class Delaunay2:
                 that is opposite to cell x.
 
         """
-        cdef Delaunay_with_info_2[uint32_t].Vertex vc
-        vc = self.T.mirror_vertex(x.x, i)
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
-        out.assign(self.T, vc)
-        return out
+        return x.mirror_vertex(i)
 
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                                   Delaunay2_cell start):
