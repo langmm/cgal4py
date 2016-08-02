@@ -292,10 +292,10 @@ def test_edge():
             assert(e.side(p1) == -1)
             assert(e.side(p2) == -1)
         else:
-            p3 = e.center + 10*elen
-            print(e.side(p3), p3)
             l = np.sqrt(np.sum((pts[v1.index,:]-pts[v2.index,:])**2.0))
             assert(np.isclose(elen, l))
+            # p3 = e.center + 10*elen
+            # print(e.side(p3), p3)
             # assert(e.side(p1) == -1) # virtually impossible
             # assert(e.side(p2) == 0)
             # assert(e.side(p3) == 1)
