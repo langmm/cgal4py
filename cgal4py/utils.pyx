@@ -68,6 +68,25 @@ def py_quickSort(np.ndarray[np.float64_t, ndim=2] pos, np.uint32_t d):
     quickSort(&pos[0,0], &idx[0], ndim, d, l, r)
     return idx
 
+def py_insertSort(np.ndarray[np.float64_t, ndim=2] pos, np.uint32_t d):
+    r"""Get the indices required to sort coordinates along one dimension.
+
+    Args:
+        pos (np.ndarray of float64): (n,m) array of n m-D coordinates. 
+        d (np.uint32_t): Dimension that pos should be sorted along.
+
+    Returns:
+        np.ndarray of uint64: Indices that sort pos along dimension d.
+
+    """
+    cdef uint32_t ndim = pos.shape[1]
+    cdef int64_t l = 0
+    cdef int64_t r = pos.shape[0]-1
+    cdef np.ndarray[np.uint64_t, ndim=1] idx
+    idx = np.arange(pos.shape[0]).astype('uint64')
+    insertSort(&pos[0,0], &idx[0], ndim, d, l, r)
+    return idx
+
 def py_partition(np.ndarray[np.float64_t, ndim=2] pos, np.uint32_t d,
                  np.int64_t p):
     r"""Get the indices required to partition coordinates along one dimension.

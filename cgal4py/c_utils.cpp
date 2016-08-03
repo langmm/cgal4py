@@ -95,7 +95,6 @@ int64_t select(double *pts, uint64_t *idx,
   }
 }
 
-
 int64_t pivot(double *pts, uint64_t *idx,
               uint32_t ndim, uint32_t d,
               int64_t l, int64_t r)
