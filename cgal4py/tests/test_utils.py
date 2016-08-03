@@ -32,4 +32,55 @@ def test_quickSort():
     idx = utils.py_quickSort(pts, d)
     assert(np.allclose(idx, np.argsort(pts[:,d])))
 
+def test_partition():
+    d = 1; p = 0
+    np.random.seed(10)
+    # Even number
+    N = 10
+    pts = np.random.rand(N,2).astype('float64')
+    q, idx = utils.py_partition(pts, d, p)
+    assert((pts[idx[:q],d] <= pts[p,d]).all())
+    assert((pts[idx[q:],d] > pts[p,d]).all())
+    pts = np.random.rand(N,3).astype('float64')
+    q, idx = utils.py_partition(pts, d, p)
+    assert((pts[idx[:q],d] <= pts[p,d]).all())
+    assert((pts[idx[q:],d] > pts[p,d]).all())
+    # Odd number
+    N = 11
+    pts = np.random.rand(N,2).astype('float64')
+    q, idx = utils.py_partition(pts, d, p)
+    assert((pts[idx[:q],d] <= pts[p,d]).all())
+    assert((pts[idx[q:],d] > pts[p,d]).all())
+    pts = np.random.rand(N,3).astype('float64')
+    q, idx = utils.py_partition(pts, d, p)
+    assert((pts[idx[:q],d] <= pts[p,d]).all())
+    assert((pts[idx[q:],d] > pts[p,d]).all())
+
+def test_select():
+    d = 1
+    np.random.seed(10)
+    # Even number
+    N = 10
+    p = q = N/2
+    p -= 1
+    pts = np.random.rand(N,2).astype('float64')
+    idx = utils.py_select(pts, d, p)
+    assert((pts[idx[:q],d] <= np.median(pts[:,d])).all())
+    assert((pts[idx[q:],d] > np.median(pts[:,d])).all())
+    pts = np.random.rand(N,3).astype('float64')
+    idx = utils.py_select(pts, d, p)
+    assert((pts[idx[:q],d] <= np.median(pts[:,d])).all())
+    assert((pts[idx[q:],d] > np.median(pts[:,d])).all())
+    # Odd number
+    N = 11
+    p = q = N/2
+    q += 1
+    pts = np.random.rand(N,2).astype('float64')
+    idx = utils.py_select(pts, d, p)
+    assert((pts[idx[:q],d] <= np.median(pts[:,d])).all())
+    assert((pts[idx[q:],d] > np.median(pts[:,d])).all())
+    pts = np.random.rand(N,3).astype('float64')
+    idx = utils.py_select(pts, d, p)
+    assert((pts[idx[:q],d] <= np.median(pts[:,d])).all())
+    assert((pts[idx[q:],d] > np.median(pts[:,d])).all())
 
