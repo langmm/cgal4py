@@ -6,7 +6,7 @@
 from nose import with_setup
 import numpy as np
 import os
-from delaunay3 import Delaunay3
+from ..delaunay3 import Delaunay3
 
 
 pts = np.array([[ 0,  0,  0],
@@ -749,10 +749,3 @@ def test_edges():
     assert(e.shape[0] == T.num_finite_edges)
     assert(e.shape[1] == 2)
 
-def test_plot():
-    fname_test = "test_plot3D.png"
-    T = Delaunay3()
-    T.insert(pts)
-    axs = T.plot(plotfile=fname_test, title='Test')
-    os.remove(fname_test)
-    # T.plot(axs=axs)
