@@ -30,26 +30,6 @@ cdef extern from "c_kdtree.hpp":
         # KDTree()
         KDTree(double *pts, uint64_t *idx, uint64_t n, uint32_t m, uint32_t leafsize0,
                double *left_edge, double *right_edge)
-    int64_t partition(double *pts, uint64_t *idx,
-                      uint32_t ndim, uint32_t d,
-                      int64_t l, int64_t r, int64_t p)
-    int64_t select(double *pts, uint64_t *idx,
-                   uint32_t ndim, uint32_t d,
-                   int64_t l, int64_t r, int64_t n)
-    int64_t pivot(double *pts, uint64_t *idx,
-                  uint32_t ndim, uint32_t d,
-                  int64_t l, int64_t r)
-
-# cdef class Leaf:
-#     cdef object idx
-#     cdef uint32_t id
-#     cdef uint64_t children
-#     cdef uint32_t ndim
-#     cdef object periodic_left
-#     cdef object periodic_right
-#     cdef object neighbors
-#     cdef object wrapped
-#     cdef object T
 
 cdef class PyKDTree:
     cdef uint64_t npts

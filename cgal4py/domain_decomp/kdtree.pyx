@@ -290,23 +290,6 @@ from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 #             self._wrapped_index = idx
 #         return self._wrapped_edge_arr, self._wrapped_points, self._wrapped_old_idx, self._wrapped_index
 
-# def test_partition(int N, int ndim, int d):
-#     np.random.seed(10)
-#     cdef np.ndarray[np.float64_t, ndim=2] x = np.random.rand(N,ndim).astype('float64')
-#     cdef np.ndarray[np.uint64_t, ndim=1] idx = np.arange(N).astype('uint64')
-#     cdef np.int64_t l = 0
-#     cdef np.int64_t r = N-1
-#     cdef np.int64_t p = pivot(&x[0,0], &idx[0], ndim, d, l, r)
-#     cdef np.ndarray[np.float64_t, ndim=1] piv = x[idx[p],:]
-#     print 'before: {}'.format(x[idx,:])
-#     print 'pivot before: (x[{},{}] = {})'.format(p,d,piv[d])
-#     p = partition(&x[0,0], &idx[0], ndim, d, l, r, p)
-#     print 'pivot after: (x[{},{}] = {})'.format(p,d,x[idx[p],d])
-#     print 'after: {}'.format(x[idx,:])
-#     assert((x[idx[:(p+1)],d] <= piv[d]).all())
-#     assert((x[idx[(p+1):],d] > piv[d]).all())
-#     assert((x[idx[p],:] == piv).all())
-
 # def test_pivot(int N, int ndim, int d):
 #     np.random.seed(10)
 #     cdef np.ndarray[np.float64_t, ndim=2] x = np.random.rand(N,ndim).astype('float64')
@@ -338,29 +321,6 @@ from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 #     else:
 #         med = pos[idx[p],d]
 #     return med
-
-# def test_select(int N, int ndim, int d):
-#     np.random.seed(10)
-#     cdef np.ndarray[np.float64_t, ndim=2] x = np.random.rand(N,ndim).astype('float64')
-#     print 'before: {}'.format(x)
-#     cdef np.ndarray[np.uint64_t, ndim=1] idx = np.arange(N).astype('uint64')
-#     cdef np.float64_t med = np.median(x[:,d])
-#     cdef np.int64_t l = 0
-#     cdef np.int64_t r = N-1
-#     cdef np.int64_t p = (N-1)/2
-#     cdef np.ndarray[np.float64_t, ndim=1] pivot = x[p,:]
-#     print 'x[{},{}], Median = {}'.format(p,d,med)
-#     p = select(&x[0,0], &idx[0], ndim, d, l, r, p)
-#     print 'after: {}'.format(x[idx,:])
-#     print 'x[{},{}] = {}'.format(p,d,x[idx[p],d])
-#     assert((x[idx[:(p+1)],d] <= med).all())
-#     assert((x[idx[(p+1):],d] > med).all())
-#     cdef np.float64_t med_out
-#     if (N%2) == 0:
-#         med_out = (x[idx[p],d] + x[idx[p+1],d])/2.0
-#     else:
-#         med_out = x[idx[p],d]
-#     assert(med_out == med)
 
 # cdef class PyKDTree:
 #     def __cinit__(self, np.ndarray[double, ndim=2] pts, 

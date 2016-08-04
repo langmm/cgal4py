@@ -52,6 +52,26 @@ def test_insertSort():
     idx = utils.py_insertSort(pts, d)
     assert(np.allclose(idx, np.argsort(pts[:,d])))
 
+def test_pivot():
+    d = 1
+    np.random.seed(10)
+    # Even number
+    N = 10
+    pts = np.random.rand(N,2).astype('float64')
+    q, idx = utils.py_pivot(pts, d)
+    assert((pts[idx[:q],d] <= pts[idx[q],d]).all())
+    pts = np.random.rand(N,3).astype('float64')
+    q, idx = utils.py_pivot(pts, d)
+    assert((pts[idx[:q],d] <= pts[idx[q],d]).all())
+    # Odd number
+    N = 11
+    pts = np.random.rand(N,2).astype('float64')
+    q, idx = utils.py_pivot(pts, d)
+    assert((pts[idx[:q],d] <= pts[idx[q],d]).all())
+    pts = np.random.rand(N,3).astype('float64')
+    q, idx = utils.py_pivot(pts, d)
+    assert((pts[idx[:q],d] <= pts[idx[q],d]).all())
+
 def test_partition():
     d = 1; p = 0
     np.random.seed(10)

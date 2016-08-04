@@ -50,6 +50,50 @@ void quickSort(double *pts, uint64_t *idx,
     }
 }
 
+void insertSort(double *pts, uint64_t *idx,
+                uint32_t ndim, uint32_t d,
+                int64_t l, int64_t r)
+{
+  int64_t i, j;
+  uint64_t t;
+
+  if (l == r) return;
+  for (i = l+1; i <= r; i++) {
+    t = idx[i];
+    j = i - 1;
+    while ((j >= l) && (pts[ndim*idx[j]+d] > pts[ndim*t+d])) {
+      idx[j+1] = idx[j];
+      j--;
+    }
+    idx[j+1] = t;
+  }
+}
+
+int64_t pivot(double *pts, uint64_t *idx,
+              uint32_t ndim, uint32_t d,
+              int64_t l, int64_t r)
+{ 
+  if ((r - l) < 5) {
+    insertSort(pts, idx, ndim, d, l, r);
+    return (l+r)/2;
+  }
+
+  int64_t i, subr, m5;
+  uint64_t t;
+  int64_t nsub = 0;
+  for (i = l; i <= r; i+=5) {
+    subr = i + 4;
+    if (subr > r) subr = r;
+
+    insertSort(pts, idx, ndim, d, i, subr);
+    m5 = (i+subr)/2;
+    t = idx[m5]; idx[m5] = idx[l + nsub]; idx[l + nsub] = t;
+
+    nsub++;
+  }
+  return select(pts, idx, ndim, d, l, l+nsub-1, l+(nsub-1)/2);
+}
+
 int64_t partition(double *pts, uint64_t *idx,
                   uint32_t ndim, uint32_t d,
                   int64_t l, int64_t r, int64_t p)
@@ -95,49 +139,7 @@ int64_t select(double *pts, uint64_t *idx,
   }
 }
 
-int64_t pivot(double *pts, uint64_t *idx,
-              uint32_t ndim, uint32_t d,
-              int64_t l, int64_t r)
-{ 
-  if ((r - l) < 5) {
-    insertSort(pts, idx, ndim, d, l, r);
-    return (l+r)/2;
-  }
 
-  int64_t i, subr, m5;
-  uint64_t t;
-  int64_t nsub = 0;
-  for (i = l; i <= r; i+=5) {
-    subr = i + 4;
-    if (subr > r) subr = r;
-
-    insertSort(pts, idx, ndim, d, i, subr);
-    m5 = (i+subr)/2;
-    t = idx[m5]; idx[m5] = idx[l + nsub]; idx[l + nsub] = t;
-
-    nsub++;
-  }
-  return select(pts, idx, ndim, d, l, l+nsub-1, l+(nsub-1)/2);
-}
-
-void insertSort(double *pts, uint64_t *idx,
-                uint32_t ndim, uint32_t d,
-                int64_t l, int64_t r)
-{
-  int64_t i, j;
-  uint64_t t;
-
-  if (l == r) return;
-  for (i = l+1; i <= r; i++) {
-    t = idx[i];
-    j = i - 1;
-    while ((j >= l) && (pts[ndim*idx[j]+d] > pts[ndim*t+d])) {
-      idx[j+1] = idx[j];
-      j--;
-    }
-    idx[j+1] = t;
-  }
-}
 
 
 
