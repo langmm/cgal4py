@@ -15,7 +15,7 @@ except:
 
 class Triangulate(object):
     def __init__(self, pts, left_edge=None, right_edge=None, periodic=False,
-                 nproc=0):
+                 nproc=0, domain_decomp='kdtree'):
         r"""Triangulation of points.
 
         Args:
