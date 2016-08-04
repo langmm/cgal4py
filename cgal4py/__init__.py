@@ -15,7 +15,7 @@ except:
 
 class Triangulate(object):
     def __init__(self, pts, left_edge=None, right_edge=None, periodic=False,
-                 nproc=0, domain_decomp='kdtree'):
+                 nproc=0, dd_method='kdtree', dd_kwargs={}):
         r"""Triangulation of points.
 
         Args:
@@ -30,6 +30,11 @@ class Triangulate(object):
                 periodic at its left and right edges. Defaults to False.
             nproc (int, optional): The number of MPI processes that should be 
                 spawned. If <2, no processes are spawned. Defaults to 0.
+            dd_method (str, optional): String specifier for a domain 
+                decomposition method. See :meth:`cgal4py.domain_decomp.leaves` 
+                for available values. Defaults to 'kdtree'.
+            dd_kwargs (dict, optional): Dictionary of keyword arguments for the 
+                selected domain decomposition method. Defaults to empty dict.
 
         Raises:
             ValueError: If `pts` is not a 2D array.
@@ -57,6 +62,7 @@ class Triangulate(object):
                 raise ValueError("right_edge must be a 1D array with {} elements.".format(ndim))
         # Parallel
         if nproc > 1 and FLAG_MPI4PY:
+            leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, **dd_kwargs)
             raise NotImplementedError
         # Serial
         else:

@@ -27,7 +27,7 @@ class Leaf(object):
 
 from kdtree import kdtree
 
-def leaves(method, *args, **kwargs):
+def leaves(method, pts, left_edge, right_edge, *args, **kwargs):
     r"""Get list of leaves for a given domain decomposition.
 
     Args:
@@ -35,7 +35,11 @@ def leaves(method, *args, **kwargs):
             'kdtree': KDTree based on median position along the dimension 
                 with the greatest domain width. See 
                 :meth:`cgal4py.domain_decomp.kdtree` for details on 
-                accepted input arguments.
+                accepted keyword arguments.
+        pts (np.ndarray of float64): (n,m) array of n coordinates in a 
+            m-dimensional domain. 
+        left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
+        right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
         *args: Variable argument list. Passed to the selected domain 
             decomposition method.
         **kwargs: Variable keyword argument list. Passed to the selected domain 
@@ -51,7 +55,7 @@ def leaves(method, *args, **kwargs):
 
     """
     if method.lower() == 'kdtree':
-        return kdtree(*args, **kwargs)
+        return kdtree(pts, left_edge, right_edge, *args, **kwargs)
     else:
         raise ValueError("'{}' is not a supported domain decomposition.".format(method))
 

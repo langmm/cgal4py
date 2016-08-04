@@ -1,4 +1,6 @@
 import numpy as np
+from nose.tools import assert_equal
+from nose.tools import assert_raises
 
 from cgal4py import domain_decomp
 
@@ -19,5 +21,6 @@ def test_kdtree():
     leaves3 = domain_decomp.kdtree(pts3, left_edge3, right_edge3, leafsize)
 
 def test_leaves():
-    leaves2 = domain_decomp.leaves('kdtree',pts2, left_edge2, right_edge2, leafsize)
-    leaves3 = domain_decomp.leaves('kdtree',pts3, left_edge3, right_edge3, leafsize)
+    leaves2 = domain_decomp.leaves('kdtree', pts2, left_edge2, right_edge2, leafsize)
+    leaves3 = domain_decomp.leaves('kdtree', pts3, left_edge3, right_edge3, leafsize)
+    assert_raises(ValueError, domain_decomp.leaves, 'invalid', pts2, left_edge2, right_edge2)
