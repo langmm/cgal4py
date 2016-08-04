@@ -44,7 +44,7 @@ if use_cython:
                                        sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
                                        **ext_options))
     ext_modules += cythonize(Extension("cgal4py/domain_decomp/kdtree",
-                                       sources=["cgal4py/domain_decomp/kdtree.pyx","cgal4py/domain_decomp/c_kdtree.cpp"],
+                                       sources=["cgal4py/domain_decomp/kdtree.pyx","cgal4py/domain_decomp/c_kdtree.cpp","cgal4py/c_utils.cpp"],
                                        language="c++",
                                        include_dirs=[numpy.get_include()],
                                        extra_compile_args=["-std=gnu++11"]))
