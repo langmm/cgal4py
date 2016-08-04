@@ -37,11 +37,11 @@ if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
 
 if use_cython:
-    ext_modules += cythonize(Extension("cgal4py/delaunay2",
-                                       sources=["cgal4py/delaunay2.pyx","cgal4py/c_delaunay2.cpp"],
+    ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay2",
+                                       sources=["cgal4py/delaunay/delaunay2.pyx","cgal4py/delaunay/c_delaunay2.cpp"],
                                        **ext_options))
-    ext_modules += cythonize(Extension("cgal4py/delaunay3",
-                                       sources=["cgal4py/delaunay3.pyx","cgal4py/c_delaunay3.cpp"],
+    ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay3",
+                                       sources=["cgal4py/delaunay/delaunay3.pyx","cgal4py/delaunay/c_delaunay3.cpp"],
                                        **ext_options))
     ext_modules += cythonize(Extension("cgal4py/domain_decomp/kdtree",
                                        sources=["cgal4py/domain_decomp/kdtree.pyx","cgal4py/domain_decomp/c_kdtree.cpp","cgal4py/c_utils.cpp"],
@@ -56,9 +56,9 @@ if use_cython:
     cmdclass.update({ 'build_ext': build_ext })
 else:
     ext_modules += [
-        Extension("cgal4py.delaunay2", ["cgal4py/c_delaunay2.cpp"],
+        Extension("cgal4py.delaunay.delaunay2", ["cgal4py/delaunay/c_delaunay2.cpp"],
                   include_dirs=[numpy.get_include()]),
-        Extension("cgal4py.delaunay3", ["cgal4py/c_delaunay3.cpp"],
+        Extension("cgal4py.delaunay.delaunay3", ["cgal4py/delaunay/c_delaunay3.cpp"],
                   include_dirs=[numpy.get_include()]),
         Extension("cgal4py.domain_decomp.kdtree", ["cgal4py/domain_decomp/c_kdtree.cpp"],
                   include_dirs=[numpy.get_include()]),

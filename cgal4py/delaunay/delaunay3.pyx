@@ -9,7 +9,7 @@ import cython
 import numpy as np
 cimport numpy as np
 
-from . import plot
+from cgal4py import plot
 
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector

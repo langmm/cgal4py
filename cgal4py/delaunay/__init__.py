@@ -18,22 +18,22 @@ class Delaunay(object):
                 'kdtree'. Options include:
                     'kdtree': A KD-tree is used to split the triangulation 
                         between processors.
-
-        Returns:
-            Delaunay: Triangulation object.
+                        
+        Attributes:
+            ndim (int): The number of dimensions that the points occupy.
 
         """
         if parallel:
             raise NotImplementedError
         else:
-            ndim = pts.shape[-1]
-            if ndim == 2:
-                self.T = Delaunay2()
-                self.T.insert(pts)
-            elif ndim == 3:
-                self.T = Delaunay3()
-                self.T.insert(pts)
+            self.ndim = pts.shape[-1]
+            if self.ndim == 2:
+                self._T = Delaunay2()
+                self._T.insert(pts)
+            elif self.ndim == 3:
+                self._T = Delaunay3()
+                self._T.insert(pts)
             else:
                 raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
         
-        
+__all__ = ["Delaunay", "Delaunay2", "Delaunay3"]        

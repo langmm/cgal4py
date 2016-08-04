@@ -9,7 +9,7 @@ import cython
 import numpy as np
 cimport numpy as np
 
-from . import plot
+from cgal4py import plot
 
 from functools import wraps
 

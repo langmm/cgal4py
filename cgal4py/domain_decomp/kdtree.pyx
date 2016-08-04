@@ -1,19 +1,9 @@
-import cython
+from cgal4py.domain_decomp import Leaf
 
-import os, pickle, copy
+import cython
 import numpy as np
 cimport numpy as np
-
-from libc.stdlib cimport malloc, free
-from libcpp.vector cimport vector
-from libcpp.pair cimport pair
-from libcpp cimport bool as cbool
-from cpython cimport bool as pybool
-from cython.operator cimport dereference
-from cython.operator cimport preincrement
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
-
-from cgal4py.domain_decomp import Leaf
 
 def kdtree(np.ndarray[double, ndim=2] pts,
            np.ndarray[double, ndim=1] left_edge, 

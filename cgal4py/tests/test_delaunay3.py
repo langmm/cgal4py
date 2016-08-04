@@ -6,7 +6,7 @@
 from nose import with_setup
 import numpy as np
 import os
-from ..delaunay3 import Delaunay3
+from cgal4py.delaunay import Delaunay3
 
 
 pts = np.array([[ 0,  0,  0],
