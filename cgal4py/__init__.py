@@ -4,6 +4,7 @@ import domain_decomp
 from delaunay import Delaunay
 
 import numpy as np
+import sys
 import warnings
 
 FLAG_MPI4PY = False
@@ -15,7 +16,7 @@ except:
 
 class Triangulate(object):
     def __init__(self, pts, left_edge=None, right_edge=None, periodic=False,
-                 nproc=0, dd_method='kdtree', dd_kwargs={}):
+                 dd_method='kdtree', dd_kwargs={}, nproc=0, limit_mem=False):
         r"""Triangulation of points.
 
         Args:
@@ -28,13 +29,16 @@ class Triangulate(object):
                 Defaults to None.
             periodic (bool optional): If True, the domain is assumed to be 
                 periodic at its left and right edges. Defaults to False.
-            nproc (int, optional): The number of MPI processes that should be 
-                spawned. If <2, no processes are spawned. Defaults to 0.
             dd_method (str, optional): String specifier for a domain 
                 decomposition method. See :meth:`cgal4py.domain_decomp.leaves` 
                 for available values. Defaults to 'kdtree'.
             dd_kwargs (dict, optional): Dictionary of keyword arguments for the 
                 selected domain decomposition method. Defaults to empty dict.
+            nproc (int, optional): The number of MPI processes that should be 
+                spawned. If <2, no processes are spawned. Defaults to 0.
+            limit_mem (bool, optional): If True, memory usage is limited by 
+                writing things to file at a cost to performance. Defaults to 
+                False.
 
         Raises:
             ValueError: If `pts` is not a 2D array.
@@ -63,6 +67,28 @@ class Triangulate(object):
         # Parallel
         if nproc > 1 and FLAG_MPI4PY:
             leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, **dd_kwargs)
+            # Spawn tasks and send appropriate info
+            comm = MPI.COMM_SELF.Spawn(sys.executable, args=['worker_leaf.py'],
+                                       maxprocs=nprocs)
+            leaf2task = {}
+            task2leaf = {i:[] for i in range(nprocs)}
+            task2leaves = [[] for i in range(nprocs)]
+            for leaf in leaves:
+                task = leaf.id % nprocs
+                task2leaf[task].append(leaf.id)
+                leaf2task[leaf.id] = task
+                if limit_mem:
+                    task2leaves[task].append(leaf.id)
+                    leaf.to_file()
+                else:
+                    task2leaves[task].append(leaf)
+            leaves = comm.scatter(task2leaves, root==MPI.ROOT)
+            leaf2task = comm.bcast(leaf2task, root=MPI.ROOT)
+            task2leaf = comm.bcast(task2leaf, root=MPI.ROOT)
+            print(len(leaves))
+            assert(len(leaves) == 0)
+
+            
             raise NotImplementedError
         # Serial
         else:
