@@ -74,6 +74,7 @@ class DelaunayLeaf(object):
     def __init__(self, leaf, pts):
         self.leaf = leaf
         self.T = Delaunay(pts[leaf.idx,:])
+        self.wrapped = np.zeros(len(leaf.idx), 'bool')
     @property
     def id(self):
         r"""int: Unique index of this leaf."""
@@ -112,6 +113,44 @@ class DelaunayLeaf(object):
     def num_leaves(self):
         r"""int: Number of leaves in the domain decomposition."""
         return self.leaf.num_leaves
+
+    def incoming_points(self, leafid, idx, pos):
+        r"""Add incoming points from other leaves.
+
+        Args:
+            leafid (int): ID for the leaf that points came from.
+            idx (np.ndarray of int): Indices of points being recieved.
+            pos (np.ndarray of float): Positions of points being recieved.
+
+        """
+        if len(idx) == 0: return
+        # Wrap points
+        wrapped = np.zeros(len(idx), 'bool')
+        if self.id == leafid:
+            for i in range(self.m):
+                if self.periodic_left[i] and self.periodic_right[i]:
+                    idx_left = (pos[:,i] - self.left_edge[i]) < (self.right_edge[i] - pos[:,i])
+                    idx_right = (self.right_edge[i] - pos[:,i]) < (pos[:,i] - self.left_edge[i])
+                    pos[idx_left,i] += self.domain_width[i]
+                    pos[idx_right,i] -= self.domain_width[i]
+                    wrapped[idx_left] = True
+                    wrapped[idx_right] = True
+        else:
+            for i in range(self.m):
+                if leafid in self.neighbors[i]['right_periodic']:
+                    idx_left = (pos[:,i] + self.domain_width[i] - self.right_edge[i]) < (self.left_edge[i] - pos[:,i]) 
+                    pos[idx_left,i] += self.domain_width[i]
+                    wrapped[idx_left] = True
+                if leafid in self.neighbors[i]['left_periodic']:
+                    idx_right = (self.left_edge[i] - pos[:,i] + self.domain_width[i]) < (pos[:,i] - self.right_edge[i])
+                    pos[idx_right,i] -= self.domain_width[i]
+                    wrapped[idx_right] = True
+        # Concatenate arrays
+        self.idx = np.concatenate([self.idx, idx])
+        # self.pos = np.concatenate([self.pos, pos])
+        self.wrapped = np.concatenate([self.wrapped, wrapped])
+        # Insert points
+        self.T.insert(pos)
 
     def outgoing_points(self):
         r"""Get indices of points that should be sent to each neighbor."""
