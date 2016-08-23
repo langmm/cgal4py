@@ -643,6 +643,8 @@ public:
     }
   }
 
+  
+
   void read_from_file(const char* filename)
   {
     std::ifstream is(filename, std::ios::binary);
@@ -723,6 +725,58 @@ public:
     }
   }
 
+  // void serialize_block(Info max, Info* faces, int* neighbors) const 
+  // {
+  //   Vertex_handle v = T.infinite_vertex();
+  //   int n = 0, m = 0;
+  //   int d = static_cast<int>(T.dimension());
+
+  //   // Count faces and vertices entirely in this block
+  //   for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
+  //     if (( v != vit ) && ( vit->info() < max )) {
+  // 	n++;
+  //     }
+  //   }
+  //   int nvert = 0;
+  //   for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+  // 	 ib != T.tds().face_iterator_base_end(); ++ib) {
+  //     nvert = 0;
+  //     for (int j = 0; j < dim ; ++j) {
+  // 	if 
+  // 	index = V[ib->vertex(j)];
+  // 	os.write((char*)&index, sizeof(int));
+  // 	nvert++;
+  //     }
+
+    
+  //     // vertices of the faces
+  //     inum = 0;
+  //     int dim = (d == -1 ? 1 :  d + 1);
+  //     int index;
+  //     int nvert = 0;
+  //     for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+  // 	   ib != T.tds().face_iterator_base_end(); ++ib) {
+  // 	F[ib] = inum++;
+  // 	for (int j = 0; j < dim ; ++j) {
+  // 	  index = V[ib->vertex(j)];
+  // 	  os.write((char*)&index, sizeof(int));
+  // 	  nvert++;
+  // 	}
+  //     }
+  
+  //     // neighbor pointers of the faces
+  //     for (All_faces_iterator it = T.tds().face_iterator_base_begin();
+  // 	   it != T.tds().face_iterator_base_end(); ++it) {
+  // 	for (int j = 0; j < d+1; ++j){
+  // 	  index = F[it->neighbor(j)];
+  // 	  os.write((char*)&index, sizeof(int));
+  // 	}
+  //     }
+
+  //     os.close();
+  //   }
+  // }
+
   void info_ordered_vertices(double* pos) const {
     Info i;
     Point p;
@@ -754,7 +808,7 @@ public:
     }
   }
 
-  void outgoing_points(double *left_edge, double *right_edge, bool periodic,
+  void boundary_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly,
                        std::vector<Info>& rx, std::vector<Info>& ry,
                        std::vector<Info>& alln) const

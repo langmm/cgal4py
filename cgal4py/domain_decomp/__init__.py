@@ -1,6 +1,9 @@
+import numpy as np
 
 class Leaf(object):
-    def __init__(self, leafid, idx, left_edge, right_edge):
+    def __init__(self, leafid, idx, left_edge, right_edge,
+                 periodic_left=None, periodic_right=None,
+                 neighbors=None, num_leaves=None):
         r"""A container for leaf info.
 
         Args:
@@ -10,24 +13,49 @@ class Leaf(object):
                 dimension.
             right_edge (np.ndarray of float64): Domain maximum along each 
                 dimension.
+            periodic_left (np.ndarray of bool, optional): Truth of left edge 
+                being periodic in each dimension. Defaults to None. Is set by
+                :meth:`cgal4py.domain_decomp.leaves`.
+            periodic_right (np.ndarray of bool, optional): Truth of right edge 
+                being periodic in each dimension. Defaults to None. Is set by 
+                :meth:`cgal4py.domain_decomp.leaves`.
+            neighbors (list of dict, optional): Indices of neighboring leaves in 
+                each dimension. Defaults to None. Is set by 
+                :meth:`cgal4py.domain_decomp.leaves`.
+            num_leaves (int, optional): Number of leaves in the domain 
+                decomposition. Defaults to None. Is set by 
+                :meth:`cgal4py.domain_decomp.leaves`.  
 
         Attributes:
             id (int): Unique index of this leaf.
             idx (np.ndarray of uint64): Indices of points in this leaf.
+            ndim (int): Number of dimensions in the domain.
             left_edge (np.ndarray of float64): Domain minimum along each 
                 dimension.
             right_edge (np.ndarray of float64): Domain maximum along each 
                 dimension.
+            periodic_left (np.ndarray of bool): Truth of left edge being 
+                periodic in each dimension. 
+            periodic_right (np.ndarray of bool): Truth of right edge being 
+                periodic in each dimension. 
+            neighbors (list of dict): Indices of neighboring leaves in each 
+                dimension. 
+            num_leaves (int): Number of leaves in the domain decomposition. 
 
         """
         self.id = leafid
         self.idx = idx
+        self.ndim = len(left_edge)
         self.left_edge = left_edge
         self.right_edge = right_edge
+        self.periodic_left = periodic_left
+        self.periodic_right = periodic_right
+        self.neighbors = neighbors
+        self.num_leaves = num_leaves
 
 from kdtree import kdtree
 
-def leaves(method, pts, left_edge, right_edge, *args, **kwargs):
+def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     r"""Get list of leaves for a given domain decomposition.
 
     Args:
@@ -40,6 +68,7 @@ def leaves(method, pts, left_edge, right_edge, *args, **kwargs):
             m-dimensional domain. 
         left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
         right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
+        periodic (bool): True if domain is periodic, False otherwise.
         *args: Variable argument list. Passed to the selected domain 
             decomposition method.
         **kwargs: Variable keyword argument list. Passed to the selected domain 
@@ -54,10 +83,62 @@ def leaves(method, pts, left_edge, right_edge, *args, **kwargs):
             methods listed above.
 
     """
+    m = pts.shape[1]
+    # Get leaves
     if method.lower() == 'kdtree':
-        return kdtree(pts, left_edge, right_edge, *args, **kwargs)
+        leaves = kdtree(pts, left_edge, right_edge, *args, **kwargs)
     else:
         raise ValueError("'{}' is not a supported domain decomposition.".format(method))
+    # Set total number of leaves
+    if leaves[0].num_leaves is None:
+        num_leaves = len(leaves)
+        for leaf in leaves:
+            leaf.num_leaves = num_leaves
+    # Determine if leaves are on periodic boundaries
+    if leaves[0].periodic_left is None:
+        if periodic:
+            for leaf in leaves:
+                leaf.periodic_left = np.isclose(leaf.left_edge, left_edge)
+                leaf.periodic_right = np.isclose(leaf.right_edge, right_edge)
+        else:
+            for leaf in leaves:
+                leaf.periodic_left = np.zeros(leaf.ndim, 'bool')
+                leaf.periodic_right = np.zeros(leaf.ndim, 'bool')
+    # Add neighbors
+    if leaves[0].neighbors is None:
+        for leaf in leaves:
+            leaf.neighbors = [
+                {'left':[],'left_periodic':[],
+                 'right':[],'right_periodic':[]} for i in range(leaf.ndim)]
+            for prev in leaves[:(leaf.id+1)]:
+                matches = [None for _ in range(m)]
+                match = True
+                for i in range(m):
+                    if leaf.left_edge[i] > prev.right_edge[i]:
+                        if not (leaf.periodic_right[i] and prev.periodic_left[i]):
+                            match = False
+                            break
+                    if leaf.right_edge[i] < prev.left_edge[i]:
+                        if not (prev.periodic_right[i] and leaf.periodic_left[i]):
+                            match = False
+                            break
+                if match:
+                    for i in range(m):
+                        if np.isclose(leaf.left_edge[i], prev.right_edge[i]):
+                            leaf.neighbors[i]['left'].append(prev.id)
+                            prev.neighbors[i]['right'].append(leaf.id)
+                        elif np.isclose(leaf.right_edge[i], prev.left_edge[i]):
+                            leaf.neighbors[i]['right'].append(prev.id)
+                            prev.neighbors[i]['left'].append(leaf.id)
+                        if periodic:
+                            if leaf.periodic_right[i] and prev.periodic_left[i]:
+                                leaf.neighbors[i]['right_periodic'].append(prev.id)
+                                prev.neighbors[i]['left_periodic'].append(leaf.id)
+                            if prev.periodic_right[i] and leaf.periodic_left[i]:
+                                leaf.neighbors[i]['left_periodic'].append(prev.id)
+                                prev.neighbors[i]['right_periodic'].append(leaf.id)
+    # Return leaves
+    return leaves
 
 __all__ = ["Leaf", "kdtree"]
 

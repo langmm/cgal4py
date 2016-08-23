@@ -3,7 +3,7 @@ from libcpp.vector cimport vector
 from libcpp.set cimport set as cset
 from libcpp.pair cimport pair
 from libcpp cimport bool
-from libc.stdint cimport uint32_t, uint64_t
+from libc.stdint cimport uint32_t
 
 cdef extern from "c_delaunay2.hpp":
     cdef cppclass Delaunay_with_info_2[Info]:
@@ -172,7 +172,13 @@ cdef extern from "c_delaunay2.hpp":
         int oriented_side(Cell f, const double* pos) const
         int side_of_oriented_circle(Cell f, const double* pos) const
 
-cdef class Delaunay2:
-    cdef int n
-    cdef Delaunay_with_info_2[uint32_t] *T
-    cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
+        void boundary_points(double *left_edge, double *right_edge, bool periodic,
+                             vector[Info]& lx, vector[Info]& ly,
+                             vector[Info]& rx, vector[Info]& ry,
+                             vector[Info]& alln) const
+
+# cdef class Delaunay2:
+#     cdef int n
+#     cdef void *_T
+#     # cdef Delaunay_with_info_2[info_t] *T
+#     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)

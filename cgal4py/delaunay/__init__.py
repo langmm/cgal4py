@@ -28,8 +28,112 @@ def Delaunay(pts):
     else:
         raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
     T.insert(pts)
-    return T    
+    return T
 
+class DelaunayLeaf(object):
+    r"""Wraps triangulation of a single leaf in a domain decomposition.
+
+    Args:
+        leaf (:class:`cgal4py.domain_decomp.Leaf`): Leaf in domain decomposition.
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates 
+            that will be selected from by `leaf.idx`.
+
+    Attributes:
+        leaf (:class:`cgal4py.domain_decomp.Leaf`): Leaf in domain decomposition.
+        T (:class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:):
+            2D or 3D triangulation class. 
+
+    """
+    def __init__(self, leaf, pts):
+        self.leaf = leaf
+        self.T = Delaunay(pts[leaf.idx,:])
+    @property
+    def id(self):
+        r"""int: Unique index of this leaf."""
+        return self.leaf.id
+    @property
+    def idx(self):
+        r"""np.ndarray of uint64: Indices of points in this leaf."""
+        return self.leaf.idx
+    @property
+    def ndim(self):
+        r"""ndim: Number of dimensions in the domain."""
+        return self.leaf.ndim
+    @property
+    def left_edge(self):
+        r"""np.ndarray of float64: Domain minimum along each dimension."""
+        return self.leaf.left_edge
+    @property
+    def right_edge(self):
+        r"""np.ndarray of float64: Domain maximum along each dimension."""
+        return self.leaf.right_edge
+    @property
+    def periodic_left(self):
+        r"""np.ndarray of bool: Truth of left edge being periodic in each 
+        dimension."""
+        return self.leaf.periodic_left
+    @property
+    def periodic_right(self):
+        r"""np.ndarray of bool: Truth of right edge being periodic in each 
+        dimension."""
+        return self.leaf.periodic_right
+    @property
+    def neighbors(self):
+        r"""list of dict: Indices of neighboring leaves in each dimension."""
+        return self.leaf.neighbors
+    @property
+    def num_leaves(self):
+        r"""int: Number of leaves in the domain decomposition."""
+        return self.leaf.num_leaves
+
+    def outgoing_points(self):
+        r"""Get indices of points that should be sent to each neighbor."""
+        # TODO: Check that iind does not matter. iind contains points in tets 
+        # that are infinite. For non-periodic boundary conditions, these points 
+        # may need to be sent to distant leaves for an accurate convex hull. 
+        # Currently points on an edge without a bordering leaf are sent to all 
+        # leaves, but it is possible this could miss a few points...
+        lind, rind, iind = self.T.boundary_points(self.left_edge,
+                                                  self.right_edge,
+                                                  True)
+        # Count for preallocation
+        Nind = np.zeros(self.num_leaves, 'uint32')
+        for i in range(self.ndim):
+            l_neighbors = self.neighbors[i]['left'] + \
+              self.neighbors[i]['left_periodic']
+            r_neighbors = self.neighbors[i]['right'] + \
+              self.neighbors[i]['right_periodic']
+            if len(l_neighbors) == 0:
+                l_neighbors = range(self.num_leaves)
+            if len(r_neighbors) == 0:
+                r_neighbors = range(self.num_leaves)
+            Nind[l_neighbors] += len(lind[i])
+            Nind[r_neighbors] += len(rind[i])
+        # Add points
+        hvall = [np.zeros(Nind[k], iind.dtype) for k in xrange(self.num_leaves)]
+        Cind = np.zeros(self.num_leaves, 'uint32')
+        for i in range(self.ndim):
+            l_neighbors = self.neighbors[i]['left'] + \
+              self.neighbors[i]['left_periodic']
+            r_neighbors = self.neighbors[i]['right'] + \
+              self.neighbors[i]['right_periodic']
+            if len(l_neighbors) == 0:
+                l_neighbors = range(self.num_leaves)
+            if len(r_neighbors) == 0:
+                r_neighbors = range(self.num_leaves)
+            ilN = len(lind[i])
+            irN = len(rind[i])
+            for k in l_neighbors:
+                hvall[k][Cind[k]:(Cind[k]+ilN)] = lind[i]
+                Cind[k] += ilN
+            for k in r_neighbors:
+                hvall[k][Cind[k]:(Cind[k]+irN)] = rind[i]
+                Cind[k] += irN
+        # Ensure unique values (overlap can happen if a point is at a corner)
+        for k in xrange(num_leaves):
+            hvall[k] = np.unique(hvall[k])
+        return hvall
+            
 
 # class Delaunay(object):#Delaunay2,Delaunay3):
 

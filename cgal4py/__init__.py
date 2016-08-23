@@ -4,15 +4,15 @@ import domain_decomp
 from delaunay import Delaunay
 
 import numpy as np
-import sys
+import sys, os
 import warnings
 
-FLAG_MPI4PY = False
+FLAG_MULTIPROC = False
 try:
-    import mpi4py
-    FLAG_MPI4PY = True
+    import parallel
+    FLAG_MULTIPROC = True
 except:
-    warnings.warn("mpi4py could not be imported. Parallel features will be disabled.")
+    warnings.warn("multiprocessing could not be imported. Parallel features will be disabled.")
 
 class Triangulate(object):
     def __init__(self, pts, left_edge=None, right_edge=None, periodic=False,
@@ -53,6 +53,7 @@ class Triangulate(object):
         # Check input
         if (pts.ndim != 2):
             raise ValueError("pts must be a 2D array of coordinates")
+        npts = pts.shape[0]
         ndim = pts.shape[1]
         if left_edge is None:
             left_edge = np.min(pts, axis=0)
@@ -64,32 +65,18 @@ class Triangulate(object):
         else:
             if (right_edge.ndim != 1) or (len(right_edge) != ndim):
                 raise ValueError("right_edge must be a 1D array with {} elements.".format(ndim))
-        # Parallel
-        if nproc > 1 and FLAG_MPI4PY:
-            leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, **dd_kwargs)
-            # Spawn tasks and send appropriate info
-            comm = MPI.COMM_SELF.Spawn(sys.executable, args=['worker_leaf.py'],
-                                       maxprocs=nprocs)
-            leaf2task = {}
-            task2leaf = {i:[] for i in range(nprocs)}
-            task2leaves = [[] for i in range(nprocs)]
-            for leaf in leaves:
-                task = leaf.id % nprocs
-                task2leaf[task].append(leaf.id)
-                leaf2task[leaf.id] = task
-                if limit_mem:
-                    task2leaves[task].append(leaf.id)
-                    leaf.to_file()
-                else:
-                    task2leaves[task].append(leaf)
-            leaves = comm.scatter(task2leaves, root==MPI.ROOT)
-            leaf2task = comm.bcast(leaf2task, root=MPI.ROOT)
-            task2leaf = comm.bcast(task2leaf, root=MPI.ROOT)
-            print(len(leaves))
-            assert(len(leaves) == 0)
-
-            
-            raise NotImplementedError
+        # Assign attributes
+        self.pts = pts
+        self.npts = npts
+        self.ndim = ndim
+        self.left_edge = left_edge
+        self.right_edge = right_edge
+        self.periodic = periodic
+        # Parallel 
+        if nproc > 1 and FLAG_MULTIPROC:
+            leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, 
+                                          periodic, **dd_kwargs)
+            self.T = parallel.ParallelDelaunay(leaves, pts, nproc)
         # Serial
         else:
             if periodic:

@@ -22,7 +22,14 @@ def kdtree(np.ndarray[double, ndim=2] pts,
     Returns:
         list of :class:`domain_decomp.Leaf`s: Leaves in the KDTree.
 
+    Raises:
+        ValueError: If `leafsize < 2`. This currectly segfaults.
+
     """
+    if (leafsize < 2):
+        # This is here to prevent segfault. The cpp code needs modified to 
+        # support leafsize = 1
+        raise ValueError("'leafsize' cannot be smaller than 2.")
     cdef uint32_t k,i
     cdef uint64_t npts = <uint64_t>pts.shape[0]
     cdef uint32_t ndim = <uint32_t>pts.shape[1]
