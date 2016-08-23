@@ -21,28 +21,31 @@ from cython.operator cimport dereference
 from cython.operator cimport preincrement, predecrement
 from libc.stdint cimport uint32_t, uint64_t
 
+ctypedef uint32_t info_t
+cdef object np_info = np.uint32
+ctypedef np.uint32_t np_info_t
 
 cdef class Delaunay3_vertex:
     r"""Wrapper class for a triangulation vertex.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this vertex belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].Vertex`): C++ vertex object 
+        x (:obj:`Delaunay_with_info_3[info_t].Vertex`): C++ vertex object 
             Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].Vertex x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].Vertex x
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     Delaunay_with_info_3[uint32_t].Vertex x):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     Delaunay_with_info_3[info_t].Vertex x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
                 that this vertex belongs to. 
-            x (:obj:`Delaunay_with_info_3[uint32_t].Vertex`): C++ vertex object 
+            x (:obj:`Delaunay_with_info_3[info_t].Vertex`): C++ vertex object 
                 Direct interaction with this object is not recommended. 
 
         """
@@ -103,11 +106,11 @@ cdef class Delaunay3_vertex:
             return out
 
     property index:
-        r"""uint32: The index of the vertex point in the input array."""
+        r"""info_t: The index of the vertex point in the input array."""
         def __get__(self):
-            cdef np.uint32_t out
+            cdef info_t out
             if self.is_infinite():
-                out = np.iinfo(np.uint32).max
+                out = <info_t>np.iinfo(np_info).max
             else:
                 out = self.x.info()
             return out
@@ -122,7 +125,7 @@ cdef class Delaunay3_vertex:
     property cell:
         r"""Delaunay3_cell: Designated cell for this vertex."""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Cell c
+            cdef Delaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
             cdef Delaunay3_cell out = Delaunay3_cell()
             out.assign(self.T, c)
@@ -136,7 +139,7 @@ cdef class Delaunay3_vertex:
                 vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
         cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
@@ -149,7 +152,7 @@ cdef class Delaunay3_vertex:
             Delaunay3_edge_vector: Iterator over edges incident to this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        cdef vector[Delaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
         cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
         out.assign(self.T, it)
@@ -162,7 +165,7 @@ cdef class Delaunay3_vertex:
             Delaunay3_facet_vector: Iterator over facets incident to this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        cdef vector[Delaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
         cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
         out.assign(self.T, it)
@@ -175,7 +178,7 @@ cdef class Delaunay3_vertex:
             Delaunay3_cell_vector: Iterator over cells incident to this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        cdef vector[Delaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
@@ -193,14 +196,14 @@ cdef class Delaunay3_vertex_iter:
                 'all_end': The last vertex in an iteration over all vertices. 
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this vertex belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].All_verts_iter`): C++ vertex 
+        x (:obj:`Delaunay_with_info_3[info_t].All_verts_iter`): C++ vertex 
             object. Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].All_verts_iter x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].All_verts_iter x
 
     def __cinit__(self, Delaunay3 T, str vert = None):
         self.T = T.T
@@ -239,7 +242,7 @@ cdef class Delaunay3_vertex_iter:
         r"""Delaunay3_vertex: Corresponding vertex object."""
         def __get__(self):
             cdef Delaunay3_vertex out = Delaunay3_vertex()
-            out.assign(self.T, Delaunay_with_info_3[uint32_t].Vertex(self.x)) 
+            out.assign(self.T, Delaunay_with_info_3[info_t].Vertex(self.x)) 
             return out
 
 
@@ -289,27 +292,27 @@ cdef class Delaunay3_vertex_vector:
     r"""Wrapper class for a vector of vertices.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
             Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Vertex]`): Vector of C++ 
+        v (:obj:`vector[Delaunay_with_info_3[info_t].Vertex]`): Vector of C++ 
             vertices.
         n (int): The number of vertices in the vector.
         i (int): The index of the currect vertex.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef vector[Delaunay_with_info_3[uint32_t].Vertex] v
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef vector[Delaunay_with_info_3[info_t].Vertex] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     vector[Delaunay_with_info_3[uint32_t].Vertex] v):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     vector[Delaunay_with_info_3[info_t].Vertex] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
                 Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Vertex]`): Vector of 
+            v (:obj:`vector[Delaunay_with_info_3[info_t].Vertex]`): Vector of 
                 C++ vertices.
 
         """
@@ -346,23 +349,23 @@ cdef class Delaunay3_edge:
     r"""Wrapper class for a triangulation edge.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this edge belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].Edge`): C++ edge object 
+        x (:obj:`Delaunay_with_info_3[info_t].Edge`): C++ edge object 
             Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].Edge x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].Edge x
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     Delaunay_with_info_3[uint32_t].Edge x):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     Delaunay_with_info_3[info_t].Edge x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
                 that this edge belongs to. 
-            x (:obj:`Delaunay_with_info_3[uint32_t].Edge`): C++ edge object 
+            x (:obj:`Delaunay_with_info_3[info_t].Edge`): C++ edge object 
                 Direct interaction with this object is not recommended. 
 
         """
@@ -384,8 +387,8 @@ cdef class Delaunay3_edge:
 
         """
         cdef Delaunay3_edge out = Delaunay3_edge()
-        cdef Delaunay_with_info_3[uint32_t].Edge e
-        e = Delaunay_with_info_3[uint32_t].Edge(c.x, i, j)
+        cdef Delaunay_with_info_3[info_t].Edge e
+        e = Delaunay_with_info_3[info_t].Edge(c.x, i, j)
         out.assign(c.T, e)
         return out
 
@@ -443,7 +446,7 @@ cdef class Delaunay3_edge:
             Delaunay3_vertex: ith vertex on this edge.
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex x
+        cdef Delaunay_with_info_3[info_t].Vertex x
         x = self.x.vertex(i)
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, x)
@@ -452,7 +455,7 @@ cdef class Delaunay3_edge:
     property vertex1:
         r"""Delaunay3_vertex: The first vertex in the edge."""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Vertex x = self.x.v1()
+            cdef Delaunay_with_info_3[info_t].Vertex x = self.x.v1()
             cdef Delaunay3_vertex out = Delaunay3_vertex()
             out.assign(self.T, x)
             return out
@@ -460,7 +463,7 @@ cdef class Delaunay3_edge:
     property vertex2:
         r"""Delaunay3_vertex: The second vertex in the edge."""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Vertex x = self.x.v2()
+            cdef Delaunay_with_info_3[info_t].Vertex x = self.x.v2()
             cdef Delaunay3_vertex out = Delaunay3_vertex()
             out.assign(self.T, x)
             return out
@@ -468,7 +471,7 @@ cdef class Delaunay3_edge:
     property cell:
         r"""Delaunay3_cell: The cell this edge is assigned to."""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Cell c
+            cdef Delaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
             cdef Delaunay3_cell out = Delaunay3_cell()
             out.assign(self.T, c)
@@ -511,7 +514,7 @@ cdef class Delaunay3_edge:
                 edge.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
         cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
@@ -524,7 +527,7 @@ cdef class Delaunay3_edge:
             Delaunay3_edge_vector: Iterator over edges incident to this edge. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        cdef vector[Delaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
         cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
         out.assign(self.T, it)
@@ -537,7 +540,7 @@ cdef class Delaunay3_edge:
             Delaunay3_facet_vector: Iterator over facets incident to this edge. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        cdef vector[Delaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
         cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
         out.assign(self.T, it)
@@ -550,7 +553,7 @@ cdef class Delaunay3_edge:
             Delaunay3_cell_vector: Iterator over cells incident to this edge.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        cdef vector[Delaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
@@ -603,14 +606,14 @@ cdef class Delaunay3_edge_iter:
                 'all_end': The last edge in an iteration over all edges.
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this edge belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].All_edges_iter`): C++ edge  
+        x (:obj:`Delaunay_with_info_3[info_t].All_edges_iter`): C++ edge  
             object. Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].All_edges_iter x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].All_edges_iter x
 
     def __cinit__(self, Delaunay3 T, str edge = None):
         self.T = T.T
@@ -650,7 +653,7 @@ cdef class Delaunay3_edge_iter:
         r"""Delaunay3_edge: Corresponding edge object."""
         def __get__(self):
             cdef Delaunay3_edge out = Delaunay3_edge()
-            out.assign(self.T, Delaunay_with_info_3[uint32_t].Edge(self.x))
+            out.assign(self.T, Delaunay_with_info_3[info_t].Edge(self.x))
             return out
 
 
@@ -700,27 +703,27 @@ cdef class Delaunay3_edge_vector:
     r"""Wrapper class for a vector of edges.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
             Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Edge]`): Vector of C++ 
+        v (:obj:`vector[Delaunay_with_info_3[info_t].Edge]`): Vector of C++ 
             edges.
         n (int): The number of edges in the vector.
         i (int): The index of the currect edge.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef vector[Delaunay_with_info_3[uint32_t].Edge] v
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef vector[Delaunay_with_info_3[info_t].Edge] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     vector[Delaunay_with_info_3[uint32_t].Edge] v):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     vector[Delaunay_with_info_3[info_t].Edge] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
                 Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Edge]`): Vector of 
+            v (:obj:`vector[Delaunay_with_info_3[info_t].Edge]`): Vector of 
                 C++ edges.
 
         """
@@ -757,23 +760,23 @@ cdef class Delaunay3_facet:
     r"""Wrapper class for a triangulation facet.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this facet belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].Facet`): C++ facet object 
+        x (:obj:`Delaunay_with_info_3[info_t].Facet`): C++ facet object 
             Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].Facet x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].Facet x
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     Delaunay_with_info_3[uint32_t].Facet x):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     Delaunay_with_info_3[info_t].Facet x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
                 that this facet belongs to. 
-            x (:obj:`Delaunay_with_info_3[uint32_t].Facet`): C++ facet object 
+            x (:obj:`Delaunay_with_info_3[info_t].Facet`): C++ facet object 
                 Direct interaction with this object is not recommended. 
 
         """
@@ -794,8 +797,8 @@ cdef class Delaunay3_facet:
 
         """
         cdef Delaunay3_facet out = Delaunay3_facet()
-        cdef Delaunay_with_info_3[uint32_t].Facet e
-        e = Delaunay_with_info_3[uint32_t].Facet(c.x, i)
+        cdef Delaunay_with_info_3[info_t].Facet e
+        e = Delaunay_with_info_3[info_t].Facet(c.x, i)
         out.assign(c.T, e)
         return out
 
@@ -855,7 +858,7 @@ cdef class Delaunay3_facet:
             Delaunay_vertex: ith vertex of this facet.
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        cdef Delaunay_with_info_3[info_t].Vertex v
         v = self.x.vertex(i)
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
@@ -871,7 +874,7 @@ cdef class Delaunay3_facet:
             Delaunay3_edge: Edge opposite the ith vertex of this facet.
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Edge e
+        cdef Delaunay_with_info_3[info_t].Edge e
         e = self.x.edge(i)
         cdef Delaunay3_edge out = Delaunay3_edge()
         out.assign(self.T, e)
@@ -896,7 +899,7 @@ cdef class Delaunay3_facet:
     property cell:
         r"""Delaunay3_cell: The cell this facet is assigned to."""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Cell c
+            cdef Delaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
             cdef Delaunay3_cell out = Delaunay3_cell()
             out.assign(self.T, c)
@@ -911,7 +914,7 @@ cdef class Delaunay3_facet:
         r"""Delaunay3_facet: The same facet as this one, but referenced from its 
         other incident cell"""
         def __get__(self):
-            cdef Delaunay_with_info_3[uint32_t].Facet ec
+            cdef Delaunay_with_info_3[info_t].Facet ec
             ec = self.T.mirror_facet(self.x)
             cdef Delaunay3_facet out = Delaunay3_facet()
             out.assign(self.T, ec)
@@ -925,7 +928,7 @@ cdef class Delaunay3_facet:
                 facet.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
         cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
@@ -938,7 +941,7 @@ cdef class Delaunay3_facet:
             Delaunay3_edge_vector: Iterator over edges incident to this facet. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        cdef vector[Delaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
         cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
         out.assign(self.T, it)
@@ -951,7 +954,7 @@ cdef class Delaunay3_facet:
             Delaunay3_facet_vector: Iterator over facets incident to this facet. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        cdef vector[Delaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
         cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
         out.assign(self.T, it)
@@ -964,7 +967,7 @@ cdef class Delaunay3_facet:
             Delaunay3_cell_vector: Iterator over cells incident to this facet.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        cdef vector[Delaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
@@ -1032,14 +1035,14 @@ cdef class Delaunay3_facet_iter:
                 'all_end': The last facet in an iteration over all facets.
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this facet belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].All_facets_iter`): C++ facet  
+        x (:obj:`Delaunay_with_info_3[info_t].All_facets_iter`): C++ facet  
             object. Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].All_facets_iter x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].All_facets_iter x
 
     def __cinit__(self, Delaunay3 T, str facet = None):
         self.T = T.T
@@ -1079,7 +1082,7 @@ cdef class Delaunay3_facet_iter:
         r"""Delaunay3_facet: Corresponding facet object."""
         def __get__(self):
             cdef Delaunay3_facet out = Delaunay3_facet()
-            out.assign(self.T, Delaunay_with_info_3[uint32_t].Facet(self.x))
+            out.assign(self.T, Delaunay_with_info_3[info_t].Facet(self.x))
             return out
 
 
@@ -1129,27 +1132,27 @@ cdef class Delaunay3_facet_vector:
     r"""Wrapper class for a vector of facets.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
             Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Facet]`): Vector of C++ 
+        v (:obj:`vector[Delaunay_with_info_3[info_t].Facet]`): Vector of C++ 
             facets.
         n (int): The number of facets in the vector.
         i (int): The index of the currect facet.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef vector[Delaunay_with_info_3[uint32_t].Facet] v
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef vector[Delaunay_with_info_3[info_t].Facet] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     vector[Delaunay_with_info_3[uint32_t].Facet] v):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     vector[Delaunay_with_info_3[info_t].Facet] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
                 Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Facet]`): Vector of 
+            v (:obj:`vector[Delaunay_with_info_3[info_t].Facet]`): Vector of 
                 C++ facets.
 
         """
@@ -1186,23 +1189,23 @@ cdef class Delaunay3_cell:
     r"""Wrapper class for a triangulation cell.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this cell belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].Cell`): C++ cell object. 
+        x (:obj:`Delaunay_with_info_3[info_t].Cell`): C++ cell object. 
             Direct interaction with this object is not recommended.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].Cell x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].Cell x
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     Delaunay_with_info_3[uint32_t].Cell x):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     Delaunay_with_info_3[info_t].Cell x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
                 that this cell belongs to. 
-            x (:obj:`Delaunay_with_info_3[uint32_t].Cell`): C++ cell object 
+            x (:obj:`Delaunay_with_info_3[info_t].Cell`): C++ cell object 
                 Direct interaction with this object is not recommended. 
 
         """
@@ -1260,7 +1263,7 @@ cdef class Delaunay3_cell:
                 that is opposite to this cell. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex vc
+        cdef Delaunay_with_info_3[info_t].Vertex vc
         vc = self.T.mirror_vertex(self.x, i)
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, vc)
@@ -1277,7 +1280,7 @@ cdef class Delaunay3_cell:
                 cell.
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Facet f
+        cdef Delaunay_with_info_3[info_t].Facet f
         f = self.x.facet(i)
         cdef Delaunay3_facet out = Delaunay3_facet()
         out.assign(self.T, f)
@@ -1293,7 +1296,7 @@ cdef class Delaunay3_cell:
             Delaunay3_vertex: The ith vertex incident to this cell. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        cdef Delaunay_with_info_3[info_t].Vertex v
         v = self.x.vertex(i)
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
@@ -1345,7 +1348,7 @@ cdef class Delaunay3_cell:
             Delaunay2_cell: The neighboring cell opposite the ith vertex. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Cell v
+        cdef Delaunay_with_info_3[info_t].Cell v
         v = self.x.neighbor(i)
         cdef Delaunay3_cell out = Delaunay3_cell()
         out.assign(self.T, v)
@@ -1472,7 +1475,7 @@ cdef class Delaunay3_cell:
                 cell.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Vertex] it
+        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
         cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
         out.assign(self.T, it)
@@ -1485,7 +1488,7 @@ cdef class Delaunay3_cell:
             Delaunay3_edge_vector: Iterator over edges incident to this cell. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Edge] it
+        cdef vector[Delaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
         cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
         out.assign(self.T, it)
@@ -1498,7 +1501,7 @@ cdef class Delaunay3_cell:
             Delaunay3_facet_vector: Iterator over facets incident to this cell. 
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Facet] it
+        cdef vector[Delaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
         cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
         out.assign(self.T, it)
@@ -1511,7 +1514,7 @@ cdef class Delaunay3_cell:
             Delaunay3_cell_vector: Iterator over cells incident to this cell.
 
         """
-        cdef vector[Delaunay_with_info_3[uint32_t].Cell] it
+        cdef vector[Delaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
         cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
         out.assign(self.T, it)
@@ -1558,14 +1561,14 @@ cdef class Delaunay3_cell_iter:
                 'all_end': The last cell in an iteration over all cells.
     
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ Triangulation object 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this cell belongs to. 
-        x (:obj:`Delaunay_with_info_3[uint32_t].All_cells_iter`): C++ cell
+        x (:obj:`Delaunay_with_info_3[info_t].All_cells_iter`): C++ cell
             object. Direct interaction with this object is not recommended.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef Delaunay_with_info_3[uint32_t].All_cells_iter x
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef Delaunay_with_info_3[info_t].All_cells_iter x
 
     def __cinit__(self, Delaunay3 T, str cell = None):
         self.T = T.T
@@ -1605,7 +1608,7 @@ cdef class Delaunay3_cell_iter:
         def __get__(self):
             cdef Delaunay3_cell out = Delaunay3_cell()
             out.T = self.T
-            out.x = Delaunay_with_info_3[uint32_t].Cell(self.x)
+            out.x = Delaunay_with_info_3[info_t].Cell(self.x)
             return out
 
 
@@ -1654,27 +1657,27 @@ cdef class Delaunay3_cell_vector:
     r"""Wrapper class for a vector of cells.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
             Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of C++ 
+        v (:obj:`vector[Delaunay_with_info_3[info_t].Cell]`): Vector of C++ 
             cells.
         n (int): The number of cells in the vector.
         i (int): The index of the currect cell.
 
     """
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef vector[Delaunay_with_info_3[uint32_t].Cell] v
+    cdef Delaunay_with_info_3[info_t] *T
+    cdef vector[Delaunay_with_info_3[info_t].Cell] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[uint32_t] *T,
-                     vector[Delaunay_with_info_3[uint32_t].Cell] v):
+    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
+                     vector[Delaunay_with_info_3[info_t].Cell] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object.
+            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
                 Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[uint32_t].Cell]`): Vector of 
+            v (:obj:`vector[Delaunay_with_info_3[info_t].Cell]`): Vector of 
                 C++ cells.
 
         """
@@ -1713,12 +1716,21 @@ cdef class Delaunay3:
 
     Attributes:
         n (int): The number of points inserted into the triangulation.
-        T (:obj:`Delaunay_with_info_3[uint32_t]`): C++ triangulation object. 
+        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object. 
             Direct interaction with this object is not recommended. 
 
     """
 
     _cache_to_clear_on_update = {}
+
+    cdef int n
+    cdef Delaunay_with_info_3[info_t] *T
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def __cinit__(self):
+        self.n = 0
+        self.T = new Delaunay_with_info_3[info_t]()
 
     def _update_tess(self):
         if self.T.updated:
@@ -1741,12 +1753,6 @@ cdef class Delaunay3:
                 solf._cache_to_clear_on_update[attr] = fget(solf)
             return solf._cache_to_clear_on_update[attr]
         return property(wrapped_fget, None, None, fget.__doc__)
-
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    def __cinit__(self):
-        self.n = 0
-        self.T = new Delaunay_with_info_3[uint32_t]()
 
     def is_valid(self):
         r"""Determine if the triangulation is a valid Delaunay triangulation. 
@@ -1854,16 +1860,18 @@ cdef class Delaunay3:
                 points to insert into the triangulation. 
 
         """
-        if pts.shape[0] != 0:
-            self._insert(pts)
-    cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts):
+        if pts.shape[0] == 0:
+            return
+    #     self._insert(pts)
+    # cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts):
+        global np_info, np_info_t
         cdef int Nold, Nnew, m
         Nold = self.n
         Nnew, m = pts.shape[0], pts.shape[1]
-        cdef np.ndarray[uint32_t, ndim=1] idx
-        idx = np.arange(Nold, Nold+Nnew).astype('uint32')
+        cdef np.ndarray[np_info_t, ndim=1] idx
+        idx = np.arange(Nold, Nold+Nnew).astype(np_info)
         assert(m == 3)
-        self.T.insert(&pts[0,0], &idx[0], <uint32_t>Nnew)
+        self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         if self.n != self.num_finite_verts:
             print "There were {} duplicates".format(self.n-self.num_finite_verts)
@@ -1884,9 +1892,9 @@ cdef class Delaunay3:
 
     @_dependent_property
     def edges(self):
-        r""":obj:`ndarray` of uint64: Vertex index pairs for edges."""
-        cdef np.ndarray[np.uint32_t, ndim=2] out
-        out = np.zeros([self.num_finite_edges, 2], 'uint32')
+        r""":obj:`ndarray` of info_t: Vertex index pairs for edges."""
+        cdef np.ndarray[np_info_t, ndim=2] out
+        out = np.zeros([self.num_finite_edges, 2], np_info)
         self.T.edge_info(&out[0,0])
         return out
 
@@ -1916,7 +1924,7 @@ cdef class Delaunay3:
 
         """
         assert(len(pos) == 3)
-        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        cdef Delaunay_with_info_3[info_t].Vertex v
         v = self.T.move(x.x, &pos[0])
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
@@ -1939,7 +1947,7 @@ cdef class Delaunay3:
 
         """
         assert(len(pos) == 3)
-        cdef Delaunay_with_info_3[uint32_t].Vertex v
+        cdef Delaunay_with_info_3[info_t].Vertex v
         v = self.T.move_if_no_collision(x.x, &pos[0])
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
@@ -2013,18 +2021,18 @@ cdef class Delaunay3:
         else:
             raise RuntimeError("Value of {} not expected from CGAL locate.".format(lt))
 
-    def get_vertex(self, np.uint64_t index):
+    def get_vertex(self, np_info_t index):
         r"""Get the vertex object corresponding to the given index. 
 
         Args: 
-            index (np.uint64_t): Index of vertex that should be found. 
+            index (np_info_t): Index of vertex that should be found. 
 
         Returns: 
             Delaunay3_vertex: Vertex corresponding to the given index. If the 
                 index is not found, the infinite vertex is returned. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex v = self.T.get_vertex(index)
+        cdef Delaunay_with_info_3[info_t].Vertex v = self.T.get_vertex(index)
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
         return out
@@ -2202,7 +2210,7 @@ cdef class Delaunay3:
             Delaunay3_vertex: Vertex closest to x. 
 
         """
-        cdef Delaunay_with_info_3[uint32_t].Vertex vc
+        cdef Delaunay_with_info_3[info_t].Vertex vc
         vc = self.T.nearest_vertex(&x[0])
         cdef Delaunay3_vertex v = Delaunay3_vertex()
         v.assign(self.T, vc)
@@ -2263,8 +2271,8 @@ cdef class Delaunay3:
                  with pos. 
 
         """
-        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
-                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
+                  vector[Delaunay_with_info_3[info_t].Facet]] cv
         cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef np.uint32_t i
@@ -2287,8 +2295,8 @@ cdef class Delaunay3:
             :obj:`list` of Delaunay3_cell: Cells in conflict with pos. 
 
         """
-        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
-                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
+                  vector[Delaunay_with_info_3[info_t].Facet]] cv
         cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_cells = []
         cdef np.uint32_t i
@@ -2313,8 +2321,8 @@ cdef class Delaunay3:
                 :obj:`list` of `Delaunay3_facet`s bounding the zone in conflict.
 
         """
-        cdef pair[vector[Delaunay_with_info_3[uint32_t].Cell],
-                  vector[Delaunay_with_info_3[uint32_t].Facet]] cv
+        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
+                  vector[Delaunay_with_info_3[info_t].Facet]] cv
         cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef object out_cells = []

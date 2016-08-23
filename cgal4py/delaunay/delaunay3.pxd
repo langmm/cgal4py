@@ -214,7 +214,3 @@ cdef extern from "c_delaunay3.hpp":
         bool is_Gabriel(const Facet f)
 
 
-cdef class Delaunay3:
-    cdef int n
-    cdef Delaunay_with_info_3[uint32_t] *T
-    cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
