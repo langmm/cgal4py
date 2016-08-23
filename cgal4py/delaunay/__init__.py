@@ -3,11 +3,25 @@ import numpy as np
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 
-def Delaunay(pts):
+FLAG_DOUBLE_AVAIL = False
+try:
+    from delaunay2_64bit import Delaunay2 as Delaunay2_64bit
+    from delaunay3_64bit import Delaunay3 as Delaunay3_64bit
+    FLAG_DOUBLE_AVAIL = True
+except:
+    warnings.warn("Could not import packages using long indices. This feature will be disabled.")
+
+
+def Delaunay(pts, use_double=False):
     r"""Get a triangulation for a set of points with arbitrary dimensionality.
 
     Args:
         pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
+        use_double (bool, optional): If True, 64bit integers are used to track 
+            points and up to 18446744073709551615 points can be triangulated.
+            Otherwise, 32bit integers are used and only 4294967295 points can be 
+            triangulated. Defaults to `False`. This option is only available if 
+            the 64bit versions could be succesfully imported.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
@@ -22,9 +36,15 @@ def Delaunay(pts):
         raise ValueError("pts must be a 2D array of coordinates")
     ndim = pts.shape[1]
     if ndim == 2:
-        T = Delaunay2()
+        if use_double and FLAG_DOUBLE_AVAIL:
+            T = Delaunay2_64bit()
+        else:
+            T = Delaunay2()
     elif ndim == 3:
-        T = Delaunay3()
+        if use_double and FLAG_DOUBLE_AVAIL:
+            T = Delaunay3_64bit()
+        else:
+            T = Delaunay3()
     else:
         raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
     T.insert(pts)
