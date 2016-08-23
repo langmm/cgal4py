@@ -17,11 +17,10 @@ def Delaunay(pts, use_double=False):
 
     Args:
         pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
-        use_double (bool, optional): If True, 64bit integers are used to track 
-            points and up to 18446744073709551615 points can be triangulated.
-            Otherwise, 32bit integers are used and only 4294967295 points can be 
-            triangulated. Defaults to `False`. This option is only available if 
-            the 64bit versions could be succesfully imported.
+        use_double (bool): If True, the triangulation is forced to use 64bit 
+            integers reguardless of if there are too many points for 32bit.
+            Otherwise 32bit integers are used so long as the number of points is 
+            <=4294967295. Defaults to False.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
@@ -30,18 +29,26 @@ def Delaunay(pts, use_double=False):
     Raises:
         ValueError: If pts is not a 2D array.
         NotImplementedError: If pts.shape[1] is not 2 or 3.
+        RuntimeError: If there are >=4294967295 points or `use_double == True` 
+            and the 64bit integer triangulation packages could not be imported.
 
     """
     if (pts.ndim != 2):
         raise ValueError("pts must be a 2D array of coordinates")
+    npts = pts.shape[0]
     ndim = pts.shape[1]
+    if npts >= np.iinfo('uint32').max or use_double:
+        if not FLAG_DOUBLE_AVAIL:
+            raise RuntimeError("The 64bit triangulation package couldn't "+
+                               "be imported and there are {} points.".format(npts))
+        use_double = True
     if ndim == 2:
-        if use_double and FLAG_DOUBLE_AVAIL:
+        if use_double:
             T = Delaunay2_64bit()
         else:
             T = Delaunay2()
     elif ndim == 3:
-        if use_double and FLAG_DOUBLE_AVAIL:
+        if use_double:
             T = Delaunay3_64bit()
         else:
             T = Delaunay3()

@@ -16,8 +16,7 @@ def make_64bit():
                ["cdef object np_info = np.uint32","cdef object np_info = np.uint64"],
                ["ctypedef np.uint32_t np_info_t","ctypedef np.uint64_t np_info_t"]]
     for fname32, fname64, import_line in fnames:
-        if True:
-        # if os.path.getmtime(fname64) < os.path.getmtime(fname32):
+        if os.path.getmtime(fname64) < os.path.getmtime(fname32):
             print("Creating 64bit version of {}...".format(fname32))
             with open(fname64,'w') as new_file:
                 with open(fname32,'r') as old_file:
