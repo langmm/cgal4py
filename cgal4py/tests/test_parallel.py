@@ -2,6 +2,7 @@ import numpy as np
 from nose import with_setup
 from nose.tools import assert_equal
 from nose.tools import assert_raises
+import multiprocessing as mp
 from cgal4py import Triangulate, domain_decomp, parallel
 from test_delaunay2 import pts as pts2
 from test_delaunay2 import left_edge as left_edge2
@@ -55,8 +56,36 @@ def test_ParallelLeaf_periodic():
     leaves3_periodic[0].incoming_points(1, out3[1][0], pts3[out3[1][0],:])
     leaves3_periodic[0].incoming_points(0, out3[0][0], pts3[out3[0][0],:])
 
-def test_parallel_Triangulate():
-    T2 = Triangulate(pts2, dd_kwargs={'leafsize':2}, nproc=5)
-    T3 = Triangulate(pts3, dd_kwargs={'leafsize':2}, nproc=5)
-    T2 = Triangulate(pts2, dd_kwargs={'leafsize':2}, nproc=5, periodic=True)
-    T3 = Triangulate(pts3, dd_kwargs={'leafsize':2}, nproc=5, periodic=True)
+def test_ParallelDelaunay():
+    T2 = parallel.ParallelDelaunay(leaves2, pts2, 2)
+    T3 = parallel.ParallelDelaunay(leaves3, pts3, 2)
+
+def test_ParallelDelaunay_periodic():
+    T2 = parallel.ParallelDelaunay(leaves2_periodic, pts2, 2)
+    T3 = parallel.ParallelDelaunay(leaves3_periodic, pts3, 2)
+
+def test_DelaunayProcess2():
+    pts = pts2
+    leaves = leaves2
+    nproc = len(leaves)
+    queues = [mp.Queue() for _ in xrange(nproc)]
+    # Split leaves 
+    task2leaves = [[] for _ in xrange(nproc)]
+    for leaf in leaves:
+        task = leaf.id % nproc
+        task2leaves[task].append(leaf)
+    # Create processes & tessellate
+    processes = []
+    for i in xrange(nproc):
+        P = parallel.DelaunayProcess(task2leaves[i], pts, queues, i)
+        P.tessellate_leaves()
+        processes.append(P)
+    # Outgoing
+    for P in processes:
+        P.outgoing_points()
+    i,j,arr = queues[0].get()
+    queues[0].put((i,j,np.array([])))
+    # Incoming
+    for P in processes:
+        P.incoming_points()
+
