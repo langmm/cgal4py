@@ -3,21 +3,22 @@ import numpy as np
 class Leaf(object):
     def __init__(self, leafid, idx, left_edge, right_edge,
                  periodic_left=None, periodic_right=None,
-                 neighbors=None, num_leaves=None):
+                 domain_width=None, neighbors=None, num_leaves=None):
         r"""A container for leaf info.
 
         Args:
             leafid (int): Unique index of this leaf.
             idx (np.ndarray of uint64): Indices of points in this leaf.
-            left_edge (np.ndarray of float64): Domain minimum along each 
-                dimension.
-            right_edge (np.ndarray of float64): Domain maximum along each 
-                dimension.
+            left_edge (np.ndarray of float64): Leaf min along each dimension.
+            right_edge (np.ndarray of float64): Leaf max along each dimension.
             periodic_left (np.ndarray of bool, optional): Truth of left edge 
                 being periodic in each dimension. Defaults to None. Is set by
                 :meth:`cgal4py.domain_decomp.leaves`.
             periodic_right (np.ndarray of bool, optional): Truth of right edge 
                 being periodic in each dimension. Defaults to None. Is set by 
+                :meth:`cgal4py.domain_decomp.leaves`.
+            domain_width (np.ndarray of float64, optional): Domain width along 
+                each dimension. Defaults to None. Is set by 
                 :meth:`cgal4py.domain_decomp.leaves`.
             neighbors (list of dict, optional): Indices of neighboring leaves in 
                 each dimension. Defaults to None. Is set by 
@@ -38,6 +39,8 @@ class Leaf(object):
                 periodic in each dimension. 
             periodic_right (np.ndarray of bool): Truth of right edge being 
                 periodic in each dimension. 
+            domain_width (np.ndarray of float64): Domain width along each 
+                dimension.
             neighbors (list of dict): Indices of neighboring leaves in each 
                 dimension. 
             num_leaves (int): Number of leaves in the domain decomposition. 
@@ -50,6 +53,7 @@ class Leaf(object):
         self.right_edge = right_edge
         self.periodic_left = periodic_left
         self.periodic_right = periodic_right
+        self.domain_width = domain_width
         self.neighbors = neighbors
         self.num_leaves = num_leaves
 
@@ -94,6 +98,11 @@ def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
         num_leaves = len(leaves)
         for leaf in leaves:
             leaf.num_leaves = num_leaves
+    # Set domain width
+    if leaves[0].domain_width is None:
+        domain_width = right_edge - left_edge
+        for leaf in leaves:
+            leaf.domain_width = domain_width
     # Determine if leaves are on periodic boundaries
     if leaves[0].periodic_left is None:
         if periodic:

@@ -106,6 +106,10 @@ class DelaunayLeaf(object):
         dimension."""
         return self.leaf.periodic_right
     @property
+    def domain_width(self):
+        r"""np.ndarray of float64: Domain width along each dimension."""
+        return self.leaf.domain_width
+    @property
     def neighbors(self):
         r"""list of dict: Indices of neighboring leaves in each dimension."""
         return self.leaf.neighbors

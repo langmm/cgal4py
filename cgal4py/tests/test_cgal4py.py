@@ -6,14 +6,10 @@ from cgal4py import Triangulate
 from test_delaunay2 import pts as pts2
 from test_delaunay3 import pts as pts3
 
-# TODO: Testing of parallel code with coverage
-
 def test_Delaunay():
     T2 = Triangulate(pts2)
     T3 = Triangulate(pts3)
     assert_raises(NotImplementedError, Triangulate, pts2, periodic=True)
-    T2 = Triangulate(pts2, dd_kwargs={'leafsize':2}, nproc=5)
-    # assert_raises(NotImplementedError, Triangulate, pts2, nproc=5)
     assert_raises(ValueError, Triangulate, np.zeros((3,3,3)))
     assert_raises(ValueError, Triangulate, pts2, left_edge=np.zeros(3))
     assert_raises(ValueError, Triangulate, pts2, right_edge=np.zeros(3))
