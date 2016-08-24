@@ -877,7 +877,7 @@ class Delaunay_with_info_3
     }
   }
 
-  void outgoing_points(double *left_edge, double *right_edge, bool periodic,
+  void boundary_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly, std::vector<Info>& lz,
                        std::vector<Info>& rx, std::vector<Info>& ry, std::vector<Info>& rz,
                        std::vector<Info>& alln)

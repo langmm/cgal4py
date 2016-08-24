@@ -8,7 +8,8 @@ import numpy as np
 import os
 from cgal4py.delaunay import Delaunay3
 
-
+left_edge = -2*np.ones(3, 'float64')
+right_edge = 2*np.ones(3, 'float64')
 pts = np.array([[ 0,  0,  0],
                 [-1, -1, -1],
                 [-1, -1,  1],

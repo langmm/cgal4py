@@ -12,7 +12,8 @@ try:
     import parallel
     FLAG_MULTIPROC = True
 except:
-    warnings.warn("multiprocessing could not be imported. Parallel features will be disabled.")
+    warnings.warn("Package for parallel triangulation could not be imported. "+
+                      "Parallel features will be disabled.")
 
 class Triangulate(object):
     def __init__(self, pts, left_edge=None, right_edge=None, periodic=False,

@@ -213,4 +213,7 @@ cdef extern from "c_delaunay3.hpp":
         bool is_Gabriel(const Edge e)
         bool is_Gabriel(const Facet f)
 
-
+        void boundary_points(double *left_edge, double *right_edge, bool periodic,
+                             vector[Info]& lx, vector[Info]& ly, vector[Info]& lz,
+                             vector[Info]& rx, vector[Info]& ry, vector[Info]& rz,
+                             vector[Info]& alln)

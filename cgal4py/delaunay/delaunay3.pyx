@@ -2338,3 +2338,57 @@ cdef class Delaunay3:
             f.assign(self.T, cv.second[i])
             out_facets.append(f)
         return out_cells, out_facets
+
+    def boundary_points(self,
+                        np.ndarray[np.float64_t, ndim=1] left_edge,
+                        np.ndarray[np.float64_t, ndim=1] right_edge,
+                        pybool periodic):
+        r"""Get the indices of points in tets that border a box. 
+
+        Args:                                                                                                                                                                      
+            left_edge (`np.ndarray` of `np.float64_t`): Minimum boundary of 
+                box in each dimension. 
+            right_edge (`np.ndarray` of `np.float64_t`): Maximum boundary of 
+                box in each dimension. 
+            periodic (bool): True if the domain is periodic, False otherwise. 
+
+        Returns: 
+            tuple: 3 groupings of indices: 
+                lind: list of np.ndarray indices of points in tets bordering the 
+                    left edge of the box in each direction. 
+                rind: list of np.ndarray indices of points in tets bordering the 
+                    right edge of the box in each direction. 
+                iind: indices of points in tets that are infinite. This will be 
+                    empty if `periodic == True`. 
+
+        """
+        global np_info
+        cdef int i, j, k
+        cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
+        self.T.boundary_points(&left_edge[0], &right_edge[0], periodic,
+                               lx, ly, lz, rx, ry, lz, alln)
+        # Get counts to preallocate 
+        cdef object lind = [None, None, None]
+        cdef object rind = [None, None, None]
+        cdef info_t iN = 0
+        for i, lr in enumerate([lx, ly, lz]):
+            iN = <info_t>lr.size()
+            lind[i] = np.zeros(iN, np_info)
+        for i, lr in enumerate([rx, ry, rz]):
+            iN = <info_t>lr.size()
+            rind[i] = np.zeros(iN, np_info)
+        # Fill in 
+        cdef np.ndarray[info_t] iind
+        cdef np.ndarray[info_t] lr_arr
+        iN = alln.size()
+        iind = np.array([alln[j] for j in xrange(<int>iN)], np_info)
+        for i, lr in enumerate([lx, ly, lz]):
+            iN = <info_t>lr.size()
+            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
+            lind[i] = lr_arr
+        for i, lr in enumerate([rx, ry, rz]):
+            iN = <info_t>lr.size()
+            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
+            rind[i] = lr_arr
+        # Return
+        return lind, rind, iind
