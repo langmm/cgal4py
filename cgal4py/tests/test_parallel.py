@@ -24,6 +24,13 @@ assert(len(leaves3) == 2)
 
 # TODO: Testing of parallel code with coverage
 
+def test_parallelize_leaf():
+    leaf = leaves2[0]
+    parallel.parallelize_leaf(leaf, pts2) # Regular leaf
+    parallel.parallelize_leaf(leaf, pts2) # Parallel leaf already
+    leaf = None
+    assert_raises(ValueError, parallel.parallelize_leaf, leaf, pts2)
+
 def test_ParallelLeaf():
     out2 = []
     for i,leaf in enumerate(leaves2):
