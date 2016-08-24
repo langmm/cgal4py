@@ -17,8 +17,8 @@ def Delaunay(pts, use_double=False):
 
     Args:
         pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
-        use_double (bool): If True, the triangulation is forced to use 64bit 
-            integers reguardless of if there are too many points for 32bit.
+        use_double (bool, optional): If True, the triangulation is forced to use 
+            64bit integers reguardless of if there are too many points for 32bit.
             Otherwise 32bit integers are used so long as the number of points is 
             <=4294967295. Defaults to False.
 
@@ -37,11 +37,13 @@ def Delaunay(pts, use_double=False):
         raise ValueError("pts must be a 2D array of coordinates")
     npts = pts.shape[0]
     ndim = pts.shape[1]
+    # Check if 64bit integers need/can be used
     if npts >= np.iinfo('uint32').max or use_double:
         if not FLAG_DOUBLE_AVAIL:
             raise RuntimeError("The 64bit triangulation package couldn't "+
                                "be imported and there are {} points.".format(npts))
         use_double = True
+    # Initialize correct tessellation
     if ndim == 2:
         if use_double:
             T = Delaunay2_64bit()
@@ -54,7 +56,9 @@ def Delaunay(pts, use_double=False):
             T = Delaunay3()
     else:
         raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
-    T.insert(pts)
+    # Insert points into tessellation
+    if npts > 0:
+        T.insert(pts)
     return T
 
             
