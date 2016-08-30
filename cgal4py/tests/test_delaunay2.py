@@ -41,6 +41,13 @@ def test_insert():
     T.insert(pts_dup)
     assert(T.is_valid())
 
+def test_equal():
+    T1 = Delaunay2()
+    T1.insert(pts)
+    T2 = Delaunay2()
+    T2.insert(pts)
+    assert(T1.is_equivalent(T2))
+
 def test_num_verts():
     # without duplicates
     T = Delaunay2()
@@ -179,6 +186,15 @@ def test_io():
     assert(Tout.num_verts == Tin.num_verts)
     assert(Tout.num_cells == Tin.num_cells)
     os.remove(fname)
+
+def test_serialize():
+    Tout = Delaunay2()
+    Tout.insert(pts)
+    f,n,i = Tout.serialize()
+    Tin = Delaunay2()
+    Tin.deserialize(pts,f,n,i)
+    assert(Tout.num_verts == Tin.num_verts)
+    assert(Tout.num_cells == Tin.num_cells)
 
 def test_locate():
     T = Delaunay2()

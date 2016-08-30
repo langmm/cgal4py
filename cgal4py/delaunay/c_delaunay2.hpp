@@ -90,6 +90,22 @@ public:
   uint32_t num_edges() const { return (num_finite_edges() + num_infinite_edges()); }
   uint32_t num_cells() const { return (num_finite_cells() + num_infinite_cells()); }
 
+  bool is_equal(const Delaunay_with_info_2<Info> other) const {
+    // Verts
+    if (num_verts() != other.num_verts()) return false;
+    if (num_finite_verts() != other.num_finite_verts()) return false;
+    if (num_infinite_verts() != other.num_infinite_verts()) return false;
+    // Cells
+    if (num_cells() != other.num_cells()) return false;
+    if (num_finite_cells() != other.num_finite_cells()) return false;
+    if (num_infinite_cells() != other.num_infinite_cells()) return false;
+    // Edges
+    if (num_edges() != other.num_edges()) return false;
+    if (num_finite_edges() != other.num_finite_edges()) return false;
+    if (num_infinite_edges() != other.num_infinite_edges()) return false;
+    return true;
+  }
+
   class Vertex;
   class Cell;
 
@@ -643,8 +659,6 @@ public:
     }
   }
 
-  
-
   void read_from_file(const char* filename)
   {
     std::ifstream is(filename, std::ios::binary);
@@ -725,57 +739,130 @@ public:
     }
   }
 
-  // void serialize_block(Info max, Info* faces, int* neighbors) const 
-  // {
-  //   Vertex_handle v = T.infinite_vertex();
-  //   int n = 0, m = 0;
-  //   int d = static_cast<int>(T.dimension());
+  template <typename I>
+  I serialize(I &n, I &m, int32_t &d,
+	      double* vert_pos, Info* vert_info, 
+	      I* faces, I* neighbors) const
+  {
+    I idx_inf = std::numeric_limits<I>::max();
 
-  //   // Count faces and vertices entirely in this block
-  //   for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
-  //     if (( v != vit ) && ( vit->info() < max )) {
-  // 	n++;
-  //     }
-  //   }
-  //   int nvert = 0;
-  //   for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
-  // 	 ib != T.tds().face_iterator_base_end(); ++ib) {
-  //     nvert = 0;
-  //     for (int j = 0; j < dim ; ++j) {
-  // 	if 
-  // 	index = V[ib->vertex(j)];
-  // 	os.write((char*)&index, sizeof(int));
-  // 	nvert++;
-  //     }
+    // Header
+    n = static_cast<I>(T.number_of_vertices());
+    m = static_cast<I>(T.tds().number_of_full_dim_faces());
+    d = static_cast<I>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
 
-    
-  //     // vertices of the faces
-  //     inum = 0;
-  //     int dim = (d == -1 ? 1 :  d + 1);
-  //     int index;
-  //     int nvert = 0;
-  //     for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
-  // 	   ib != T.tds().face_iterator_base_end(); ++ib) {
-  // 	F[ib] = inum++;
-  // 	for (int j = 0; j < dim ; ++j) {
-  // 	  index = V[ib->vertex(j)];
-  // 	  os.write((char*)&index, sizeof(int));
-  // 	  nvert++;
-  // 	}
-  //     }
+    Face_hash F;
+    Vertex_hash V;
+
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+    V[v] = -1;
+
+    // vertices
+    for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
+      if ( v != vit ) {
+	vert_pos[d*inum + 0] = static_cast<double>(vit->point().x());
+	vert_pos[d*inum + 1] = static_cast<double>(vit->point().y());
+	vert_info[inum] = vit->info();
+	V[vit] = inum++;
+      }
+    }
+      
+    // vertices of the faces
+    inum = 0;
+    for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+	 ib != T.tds().face_iterator_base_end(); ++ib) {
+      for (int j = 0; j < dim ; ++j) {
+	vit = ib->vertex(j);
+	if ( v == vit )
+	  faces[dim*inum + j] = idx_inf;
+	else
+	  faces[dim*inum + j] = V[vit];
+      }
+      F[ib] = inum++;
+    }
   
-  //     // neighbor pointers of the faces
-  //     for (All_faces_iterator it = T.tds().face_iterator_base_begin();
-  // 	   it != T.tds().face_iterator_base_end(); ++it) {
-  // 	for (int j = 0; j < d+1; ++j){
-  // 	  index = F[it->neighbor(j)];
-  // 	  os.write((char*)&index, sizeof(int));
-  // 	}
-  //     }
+    // neighbor pointers of the faces
+    inum = 0;
+    for (All_faces_iterator it = T.tds().face_iterator_base_begin();
+	 it != T.tds().face_iterator_base_end(); ++it) {
+      for (int j = 0; j < d+1; ++j){
+	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+      }
+      inum++;
+    }
+    return idx_inf;
+  }
 
-  //     os.close();
-  //   }
-  // }
+  template <typename I>
+  void deserialize(I n, I m, int32_t d,
+		   double* vert_pos, Info* vert_info, 
+		   I* faces, I* neighbors, I idx_inf)
+  {
+    if (T.number_of_vertices() != 0) 
+      T.clear();
+  
+    if (n==0) {
+      T.set_infinite_vertex(Vertex_handle());
+      return;
+    }
+
+    T.tds().set_dimension(d);
+
+    All_faces_iterator to_delete = T.tds().face_iterator_base_begin();
+
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Face_handle> F(m);
+
+    // infinite vertex
+    V[n] = T.infinite_vertex();
+
+    // read vertices
+    I i;
+    for(i = 0; i < n; ++i) {
+      V[i] = T.tds().create_vertex();
+      V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1]);
+      V[i]->info() = vert_info[i];
+    }
+
+    // Creation of the faces
+    Vertex_handle v;
+    I index;
+    int dim = (d == -1 ? 1 : d + 1);
+    for(i = 0; i < m; ++i) {
+      F[i] = T.tds().create_face() ;
+      for(int j = 0; j < dim ; ++j){
+	index = faces[dim*i + j];
+	if (index == idx_inf)
+	  v = V[n];
+	else
+	  v = V[index];
+	F[i]->set_vertex(j, v);
+	// The face pointer of vertices is set too often,
+	// but otherwise we had to use a further map 
+	v->set_face(F[i]);
+      }
+    }
+
+    // Setting the neighbor pointers
+    for(i = 0; i < m; ++i) {
+      for(int j = 0; j < d+1; ++j){
+	index = neighbors[(d+1)*i + j];
+	F[i]->set_neighbor(j, F[index]);
+      }
+    }
+
+    // Remove flat face
+    T.tds().delete_face(to_delete);
+
+    T.set_infinite_vertex(V[n]);
+  }
 
   void info_ordered_vertices(double* pos) const {
     Info i;
@@ -817,31 +904,52 @@ public:
     Info hv;
     Point cc, p1;
     double cr;
-    int i;
+    int i, iinf;
 
     for (All_faces_iterator it = T.all_faces_begin(); it != T.all_faces_end(); it++) {
       if (T.is_infinite(it) == true) {
-        if (periodic == false) {
-          for (i = 0; i < 3; i++) {
-            v = it->vertex(i);
-            if (T.is_infinite(v) == false) {
-              hv = v->info();
-              alln.push_back(hv);
-            }
-          }
-        }
+	// Find index of infinite vertex
+	for (i = 0; i < 3; i++) {
+	  v = it->vertex(i);
+	  if (T.is_infinite(v)) {
+	    iinf = i;
+	    break;
+	  }
+	}
+	cc = it->vertex((iinf+1) % 3)->point();
+	p1 = it->vertex((iinf+2) % 3)->point();
+	cr = 2.0*std::sqrt(static_cast<double>(CGAL::squared_distance(p1, cc)));
+	cc = Point((cc.x()+p1.x())/2.0, (cc.y()+p1.y())/2.0);
+	if ((cc.x() + cr) >= right_edge[0])
+	  for (i = 1; i < 3; i++) rx.push_back((it->vertex((iinf+i)%3))->info());
+	if ((cc.y() + cr) >= right_edge[1])
+	  for (i = 1; i < 3; i++) ry.push_back((it->vertex((iinf+i)%3))->info());
+	if ((cc.x() - cr) < left_edge[0])
+	  for (i = 1; i < 3; i++) lx.push_back((it->vertex((iinf+i)%3))->info());
+	if ((cc.y() - cr) < left_edge[1])
+	  for (i = 1; i < 3; i++) ly.push_back((it->vertex((iinf+i)%3))->info());
+
+        // if (periodic == false) {
+        //   for (i = 0; i < 3; i++) {
+        //     v = it->vertex(i);
+        //     if (T.is_infinite(v) == false) {
+        //       hv = v->info();
+        //       alln.push_back(hv);
+        //     }
+        //   }
+        // }
       } else {
         p1 = it->vertex(0)->point();
         cc = T.circumcenter(it);
         cr = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, cc)));
-        if ((cc.x() + cr) > right_edge[0])
-          for (i = 0; i < 3; i++) rx.push_back((it->vertex(i))->info());
-        if ((cc.y() + cr) > right_edge[1])
-          for (i = 0; i < 3; i++) ry.push_back((it->vertex(i))->info());
-        if ((cc.x() - cr) < left_edge[0])
-          for (i = 0; i < 3; i++) lx.push_back((it->vertex(i))->info());
-        if ((cc.y() - cr) < left_edge[1])
-          for (i = 0; i < 3; i++) ly.push_back((it->vertex(i))->info());
+	if ((cc.x() + cr) >= right_edge[0])
+	  for (i = 0; i < 3; i++) rx.push_back((it->vertex(i))->info());
+	if ((cc.y() + cr) >= right_edge[1])
+	  for (i = 0; i < 3; i++) ry.push_back((it->vertex(i))->info());
+	if ((cc.x() - cr) < left_edge[0])
+	  for (i = 0; i < 3; i++) lx.push_back((it->vertex(i))->info());
+	if ((cc.y() - cr) < left_edge[1])
+	  for (i = 0; i < 3; i++) ly.push_back((it->vertex(i))->info());
       }
     }
     std::sort( alln.begin(), alln.end() );

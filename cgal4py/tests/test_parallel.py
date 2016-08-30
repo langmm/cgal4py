@@ -3,78 +3,109 @@ from nose import with_setup
 from nose.tools import assert_equal
 from nose.tools import assert_raises
 import multiprocessing as mp
-from cgal4py import domain_decomp, parallel
+from cgal4py import domain_decomp, parallel, delaunay
 from test_delaunay2 import pts as pts2
 from test_delaunay2 import left_edge as left_edge2
 from test_delaunay2 import right_edge as right_edge2
 from test_delaunay3 import pts as pts3
 from test_delaunay3 import left_edge as left_edge3
 from test_delaunay3 import right_edge as right_edge3
-import time
+import time, copy, os
 
-leaves2 = domain_decomp.leaves("kdtree", pts2, left_edge2, right_edge2,
-                               periodic=False, leafsize=pts2.shape[0]/2 + 2)
-leaves3 = domain_decomp.leaves("kdtree", pts3, left_edge3, right_edge3,
-                               periodic=False, leafsize=pts3.shape[0]/2 + 2)
-leaves2_periodic = domain_decomp.leaves("kdtree", pts2, left_edge2, right_edge2,
-                                        periodic=True, leafsize=pts2.shape[0]/2 + 2)
-leaves3_periodic = domain_decomp.leaves("kdtree", pts3, left_edge3, right_edge3,
-                                        periodic=True, leafsize=pts3.shape[0]/2 + 2)
-assert(len(leaves2) == 2)
-assert(len(leaves3) == 2)
+tree2 = domain_decomp.tree("kdtree", pts2, left_edge2, right_edge2,
+                           periodic=False, leafsize=pts2.shape[0]/2 + 2)
+tree3 = domain_decomp.tree("kdtree", pts3, left_edge3, right_edge3,
+                           periodic=False, leafsize=pts3.shape[0]/2 + 2)
+tree2_periodic = domain_decomp.tree("kdtree", pts2, left_edge2, right_edge2,
+                                    periodic=True, leafsize=pts2.shape[0]/2 + 2)
+tree3_periodic = domain_decomp.tree("kdtree", pts3, left_edge3, right_edge3,
+                                    periodic=True, leafsize=pts3.shape[0]/2 + 2)
+assert(tree2.num_leaves == 2)
+assert(tree3.num_leaves == 2)
 
-# TODO: Testing of parallel code with coverage
-
-def test_parallelize_leaf():
-    leaf = leaves2[0]
-    parallel.parallelize_leaf(leaf, pts2) # Regular leaf
-    parallel.parallelize_leaf(leaf, pts2) # Parallel leaf already
-    leaf = None
-    assert_raises(ValueError, parallel.parallelize_leaf, leaf, pts2)
-
-def test_ParallelLeaf():
-    out2 = []
-    for i,leaf in enumerate(leaves2):
-        parallel.parallelize_leaf(leaf, pts2)
+def test_ParallelLeaf_2D():
+    tree = tree2 ; pts = pts2
+    out = []
+    pleaves = []
+    for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        out2.append(leaf.outgoing_points())
-    leaves2[0].incoming_points(1, out2[1][0], pts2[out2[1][0],:])
-    leaves2[0].incoming_points(0, out2[0][0], pts2[out2[0][0],:])
-    out3 = []
-    for i,leaf in enumerate(leaves3):
-        parallel.parallelize_leaf(leaf, pts3)
-        assert(leaf.id == i)
-        out3.append(leaf.outgoing_points())
-    leaves3[0].incoming_points(1, out3[1][0], pts3[out3[1][0],:])
-    leaves3[0].incoming_points(0, out3[0][0], pts3[out3[0][0],:])
+        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf.tessellate(pts2)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
+    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
 
-def test_ParallelLeaf_periodic():
-    out2 = []
-    for i,leaf in enumerate(leaves2_periodic):
-        parallel.parallelize_leaf(leaf, pts2)
+def test_ParallelLeaf_3D():
+    tree = tree3 ; pts = pts3
+    out = []
+    pleaves = []
+    for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        out2.append(leaf.outgoing_points())
-    leaves2_periodic[0].incoming_points(1, out2[1][0], pts2[out2[1][0],:])
-    leaves2_periodic[0].incoming_points(0, out2[0][0], pts2[out2[0][0],:])
-    out3 = []
-    for i,leaf in enumerate(leaves3_periodic):
-        parallel.parallelize_leaf(leaf, pts3)
+        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
+    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
+
+def test_ParallelLeaf_periodic_2D():
+    tree = tree2_periodic ; pts = pts2
+    out = []
+    pleaves = []
+    for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        out3.append(leaf.outgoing_points())
-    leaves3_periodic[0].incoming_points(1, out3[1][0], pts3[out3[1][0],:])
-    leaves3_periodic[0].incoming_points(0, out3[0][0], pts3[out3[0][0],:])
+        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
+    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
 
-def test_ParallelDelaunay():
-    T2 = parallel.ParallelDelaunay(pts2, leaves2, 2)
-    T3 = parallel.ParallelDelaunay(pts3, leaves3, 2)
+def test_ParallelLeaf_periodic_3D():
+    tree = tree3_periodic ; pts = pts3
+    out = []
+    pleaves = []
+    for i,leaf in enumerate(tree.leaves):
+        assert(leaf.id == i)
+        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
+    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
 
-def test_ParallelDelaunay_periodic():
-    T2 = parallel.ParallelDelaunay(pts2, leaves2_periodic, 2)
-    T3 = parallel.ParallelDelaunay(pts3, leaves3_periodic, 2)
+def test_ParallelDelaunay_2D():
+    tree = tree2 ; pts = pts2
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    # fname_test = "test_parallel_plot2D.png"
+    # axs = T_para.plot(plotfile=fname_test, title='Test')
+    # os.remove(fname_test)
+    T_seri = delaunay.Delaunay(pts)
+    assert(T_para.is_equivalent(T_seri))
+
+def test_ParallelDelaunay_3D():
+    tree = tree3 ; pts = pts3
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    T_seri = delaunay.Delaunay(pts)
+    assert(T_para.is_equivalent(T_seri))
+
+# def test_ParallelDelaunay_periodic_2D():
+#     leaves2_periodic = copy.deepcopy(leaves20_periodic)
+#     T2_para = parallel.ParallelDelaunay(pts2, leaves2_periodic, 2)
+#     T2_seri = delaunay.Delaunay(pts2)
+#     assert(T2_para.is_equivalent(T2_seri))
+
+# def test_ParallelDelaunay_periodic_3D():
+#     leaves3_periodic = copy.deepcopy(leaves30_periodic)
+#     T3_para = parallel.ParallelDelaunay(pts3, leaves3_periodic, 2)
+#     T3_seri = delaunay.Delaunay(pts3)
+#     assert(T3_para.is_equivalent(T3_seri))
 
 def test_DelaunayProcess2():
-    pts = pts2
-    leaves = leaves2
+    pts = pts2 ; tree = tree2
+    leaves = tree.leaves
+    # leaves = copy.deepcopy(leaves20)
     nproc = 2 # len(leaves)
     queues = [mp.Queue() for _ in xrange(nproc)]
     # Split leaves 

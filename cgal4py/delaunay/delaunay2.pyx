@@ -21,7 +21,7 @@ from libcpp cimport bool as cbool
 from cpython cimport bool as pybool
 from cython.operator cimport dereference
 from cython.operator cimport preincrement, predecrement
-from libc.stdint cimport uint32_t, uint64_t
+from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 ctypedef uint32_t info_t
 cdef object np_info = np.uint32
@@ -1183,23 +1183,57 @@ cdef class Delaunay2:
     r"""Wrapper class for a 2D Delaunay triangulation.
 
     Attributes:
-        n (int): The number of points inserted into the triangulation.
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ triangulation object. 
             Direct interaction with this object is not recommended.
+        n (int): The number of points inserted into the triangulation.
+        n_per_insert (list of int): The number of points inserted at each 
+            insert.
 
     """
 
     _cache_to_clear_on_update = {}
 
     cdef Delaunay_with_info_2[info_t] *T
-    cdef int n
-    # cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)
+    cdef readonly int n
+    cdef public object n_per_insert
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__(self):
-        self.n = 0
         self.T = new Delaunay_with_info_2[info_t]()
+        self.n = 0
+        self.n_per_insert = []
+
+    def is_equivalent(Delaunay2 self, Delaunay2 solf):
+        r"""Determine if two triangulations are equivalent. Currently only 
+        checks that the triangulations have the same numbers of vertices, cells, 
+        and edges.
+
+        Args: 
+            solf (:class:`cgal4py.delaunay.Delaunay2`): Triangulation this one 
+                should be compared to.
+
+        Returns: 
+            bool: True if the two triangulations are equivalent. 
+
+        """
+        return <pybool>(self.T.is_equal(dereference(solf.T)))
+
+    @classmethod
+    def from_serial(*args):
+        r"""Create a triangulation from serialized information.
+
+        Args:
+            *args: All arguments are passed to :meth:`cgal4py.delaunay.Delaunay2.deserialize`.
+
+        Returns:
+            :class:`cgal4py.delaunay.Delaunay2`: Triangulation constructed from 
+                deserialized information.
+
+        """
+        T = Delaunay2()
+        T.deserialize(*args)
+        return T
 
     def _update_tess(self):
         if self.T.updated:
@@ -1256,6 +1290,68 @@ cdef class Delaunay2:
         cdef char* cfname = fname
         self.T.read_from_file(cfname)
         self.n = self.num_finite_verts
+        self.n_per_insert.append(self.n)
+
+    def serialize(self):
+        r"""Serialize triangulation.
+        
+        Returns: 
+            tuple with 2 arrays:
+                cells (np.ndarray of info_t): (n,m) Indices for m vertices in 
+                    each of the n cells. A value of np.iinfo(np_info).max 
+                    indicates the infinite vertex.
+                neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of 
+                    the m neighbors to each of the n cells.
+        
+        """
+        cdef info_t n, m
+        cdef int32_t d
+        cdef np.ndarray[np.float64_t, ndim=2] vert_pos
+        cdef np.ndarray[np_info_t, ndim=1] vert_info
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        # Initialize arrays based on properties
+        n = self.num_finite_verts
+        m = self.num_cells
+        d = 2
+        vert_pos = np.zeros((n,d), np.float64)
+        vert_info = np.zeros(n, np_info)
+        cells = np.zeros((m, d+1), np_info)
+        neighbors = np.zeros((m, d+1), np_info)
+        # Serialize and convert to original vertex order
+        cdef info_t idx_inf
+        idx_inf = self.T.serialize[info_t]( 
+            n, m, d, &vert_pos[0,0], &vert_info[0], 
+            &cells[0,0], &neighbors[0,0])
+        # print(max(vert_info))
+        cells[cells != idx_inf] = vert_info[cells[cells != idx_inf]]
+        return cells, neighbors, idx_inf
+
+    @_update_to_tess
+    def deserialize(self, np.ndarray[np.float64_t, ndim=2] pos,
+                    np.ndarray[np_info_t, ndim=2] cells,
+                    np.ndarray[np_info_t, ndim=2] neighbors,
+                    info_t idx_inf):
+        r"""Deserialize triangulation.
+
+        Args:
+            pos (np.ndarray of float64): Coordinates of points.
+            cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
+                of the n cells. A value of np.iinfo(np_info).max A value of 
+                np.iinfo(np_info).max indicates the infinite vertex.
+            neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m
+                neighbors to each of the n cells.
+            idx_inf (info_t): Index indicating a vertex is infinite.
+
+        """
+        cdef info_t n = pos.shape[0]
+        cdef info_t m = cells.shape[0]
+        cdef int32_t d = neighbors.shape[1]-1
+        cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
+        self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0], 
+                                   &cells[0,0], &neighbors[0,0], idx_inf)
+        self.n = n
+        self.n_per_insert.append(n)
 
     def plot(self, *args, **kwargs):
         r"""Plot the triangulation.
@@ -1319,25 +1415,22 @@ cdef class Delaunay2:
         global np_info, np_info_t
         if pts.shape[0] == 0:
             return
-    #     self._insert(pts)
-    # cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts):
         cdef int Nold, Nnew, m
         Nold = self.n
         Nnew, m = pts.shape[0], pts.shape[1]
+        assert(m == 2)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
-        assert(m == 2)
         self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
+        self.n_per_insert.append(Nnew)
         if self.n != self.num_finite_verts:
             print("There were {} duplicates".format(self.n-self.num_finite_verts))
-        # assert(self.n == self.num_finite_verts)
 
     @_update_to_tess
     def clear(self):
         r"""Removes all vertices and cells from the triangulation."""
         self.T.clear()
-
 
     @_dependent_property
     def vertices(self):

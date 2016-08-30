@@ -77,9 +77,13 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
         raise NotImplementedError("'limit_mem' has not yet been implemented.")
     # Parallel 
     if nproc > 1 and FLAG_MULTIPROC:
-        leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, 
-                                      periodic, **dd_kwargs)
-        T = parallel.ParallelDelaunay(pts, leaves, nproc, 
+        # leaves = domain_decomp.leaves(dd_method, pts, left_edge, right_edge, 
+        #                               periodic, **dd_kwargs)
+        # T = parallel.ParallelDelaunay(pts, leaves, nproc, 
+        #                               use_double=use_double)
+        tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge, 
+                                  periodic, **dd_kwargs)
+        T = parallel.ParallelDelaunay(pts, tree, nproc, 
                                       use_double=use_double)
     # Serial
     else:

@@ -3,23 +3,25 @@ from libcpp.vector cimport vector
 from libcpp.set cimport set as cset
 from libcpp.pair cimport pair
 from libcpp cimport bool
-from libc.stdint cimport uint32_t
+from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 cdef extern from "c_delaunay2.hpp":
     cdef cppclass Delaunay_with_info_2[Info]:
         Delaunay_with_info_2() except +
         Delaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
         bool updated
-        bool is_valid()
-        uint32_t num_finite_verts()
-        uint32_t num_finite_edges()
-        uint32_t num_finite_cells()
-        uint32_t num_infinite_verts()
-        uint32_t num_infinite_edges()
-        uint32_t num_infinite_cells()
-        uint32_t num_verts()
-        uint32_t num_edges()
-        uint32_t num_cells()
+        bool is_valid() const
+        uint32_t num_finite_verts() const
+        uint32_t num_finite_edges() const
+        uint32_t num_finite_cells() const
+        uint32_t num_infinite_verts() const
+        uint32_t num_infinite_edges() const
+        uint32_t num_infinite_cells() const
+        uint32_t num_verts() const
+        uint32_t num_edges() const
+        uint32_t num_cells() const
+
+        bool is_equal(const Delaunay_with_info_2[Info] other) const
 
         cppclass Vertex
         cppclass Edge
@@ -33,6 +35,12 @@ cdef extern from "c_delaunay2.hpp":
 
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +
+        I serialize[I](I &n, I &m, int32_t &d,
+                       double* vert_pos, Info* vert_info,
+                       I* faces, I* neighbors) const
+        void deserialize[I](I n, I m, int32_t d,
+                         double* vert_pos, Info* vert_info,
+                         I* faces, I* neighbors, I idx_inf) const
 
         Vertex get_vertex(Info index) except +
         Cell locate(double* pos, int& lt, int& li)

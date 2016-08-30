@@ -46,6 +46,13 @@ def test_insert():
     T.insert(pts_dup)
     assert(T.is_valid())
 
+def test_equal():
+    T1 = Delaunay3()
+    T1.insert(pts)
+    T2 = Delaunay3()
+    T2.insert(pts)
+    assert(T1.is_equivalent(T2))
+
 def test_num_verts():
     # without duplicates
     T = Delaunay3()

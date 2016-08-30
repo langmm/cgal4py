@@ -62,19 +62,39 @@ class Delaunay_with_info_3
   bool updated = false;
   Delaunay_with_info_3() {};
   Delaunay_with_info_3(double *pts, Info *val, uint32_t n) { insert(pts, val, n); }
-  bool is_valid() { return T.is_valid(); }
-  uint32_t num_finite_verts() { return static_cast<uint32_t>(T.number_of_vertices()); }
-  uint32_t num_finite_edges() { return static_cast<uint32_t>(T.number_of_finite_edges()); }
-  uint32_t num_finite_facets() { return static_cast<uint32_t>(T.number_of_finite_facets()); }
-  uint32_t num_finite_cells() { return static_cast<uint32_t>(T.number_of_finite_cells()); }
-  uint32_t num_infinite_verts() { return 1; }
-  uint32_t num_infinite_edges() { return (T.number_of_edges() - T.number_of_finite_edges()); }
-  uint32_t num_infinite_facets() { return (T.number_of_facets() - T.number_of_finite_facets()); }
-  uint32_t num_infinite_cells() { return (T.number_of_cells() - T.number_of_finite_cells()); }
-  uint32_t num_verts() { return (T.number_of_vertices() + num_infinite_verts()); }
-  uint32_t num_edges() { return T.number_of_edges(); }
-  uint32_t num_facets() { return T.number_of_facets(); }
-  uint32_t num_cells() { return T.number_of_cells(); }
+  bool is_valid() const { return T.is_valid(); }
+  uint32_t num_finite_verts() const { return static_cast<uint32_t>(T.number_of_vertices()); }
+  uint32_t num_finite_edges() const { return static_cast<uint32_t>(T.number_of_finite_edges()); }
+  uint32_t num_finite_facets() const { return static_cast<uint32_t>(T.number_of_finite_facets()); }
+  uint32_t num_finite_cells() const { return static_cast<uint32_t>(T.number_of_finite_cells()); }
+  uint32_t num_infinite_verts() const { return 1; }
+  uint32_t num_infinite_edges() const { return (T.number_of_edges() - T.number_of_finite_edges()); }
+  uint32_t num_infinite_facets() const { return (T.number_of_facets() - T.number_of_finite_facets()); }
+  uint32_t num_infinite_cells() const { return (T.number_of_cells() - T.number_of_finite_cells()); }
+  uint32_t num_verts() const { return (T.number_of_vertices() + num_infinite_verts()); }
+  uint32_t num_edges() const { return T.number_of_edges(); }
+  uint32_t num_facets() const { return T.number_of_facets(); }
+  uint32_t num_cells() const { return T.number_of_cells(); }
+
+  bool is_equal(const Delaunay_with_info_3<Info> other) const {
+    // Verts
+    if (num_verts() != other.num_verts()) return false;
+    if (num_finite_verts() != other.num_finite_verts()) return false;
+    if (num_infinite_verts() != other.num_infinite_verts()) return false;
+    // Cells
+    if (num_cells() != other.num_cells()) return false;
+    if (num_finite_cells() != other.num_finite_cells()) return false;
+    if (num_infinite_cells() != other.num_infinite_cells()) return false;
+    // Edges
+    if (num_edges() != other.num_edges()) return false;
+    if (num_finite_edges() != other.num_finite_edges()) return false;
+    if (num_infinite_edges() != other.num_infinite_edges()) return false;
+    // Facets
+    if (num_facets() != other.num_facets()) return false;
+    if (num_finite_facets() != other.num_finite_facets()) return false;
+    if (num_infinite_facets() != other.num_infinite_facets()) return false;
+    return true;
+  }
 
   class Vertex;
   class Edge;
@@ -845,6 +865,128 @@ class Delaunay_with_info_3
     }
   }
 
+  template <typename I>
+  I serialize(I &n, I &m, int32_t &d,
+              double* vert_pos, Info* vert_info,
+              I* cells, I* neighbors) const
+  {
+    I idx_inf = std::numeric_limits<I>::max();
+
+    // Header
+    n = static_cast<int>(T.number_of_vertices());
+    m = static_cast<int>(T.tds().number_of_cells());
+    d = static_cast<int>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
+
+    Vertex_hash V;
+    Cell_hash C;
+      
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+    V[v] = -1;
+    
+    // other vertices
+    for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
+      if ( v != vit ) {
+	vert_pos[d*inum + 0] = static_cast<double>(vit->point().x());
+	vert_pos[d*inum + 1] = static_cast<double>(vit->point().y());
+	vert_pos[d*inum + 2] = static_cast<double>(vit->point().z());
+	vert_info[inum] = vit->info();
+	V[vit] = inum++;
+      }
+    }
+    
+    // vertices of the cells
+    inum = 0;
+    for( Cell_iterator ib = T.tds().cells_begin(); 
+	 ib != T.tds().cells_end(); ++ib) {
+      for (int j = 0; j < dim ; ++j) {
+	vit = ib->vertex(j);
+	if ( v == vit )
+	  cells[dim*inum + j] = idx_inf;
+	else
+	  cells[dim*inum + j] = V[vit];
+      }
+      C[ib] = inum++;
+    }
+  
+    // neighbor pointers of the cells
+    inum = 0;
+    for( Cell_iterator it = T.tds().cells_begin();
+	 it != T.tds().cells_end(); ++it) {
+      for (int j = 0; j < d+1; ++j){
+	neighbors[(d+1)*inum + j] = C[it->neighbor(j)];
+      }
+      inum++;
+    }
+    return idx_inf;
+  }
+
+  template <typename I>
+  void deserialize(I n, I m, int32_t d,
+                   double* vert_pos, Info* vert_info,
+                   I* cells, I* neighbors, I idx_inf)
+  {
+    if (T.number_of_vertices() != 0)  
+      T.clear();
+ 
+    if (n==0) {
+      return;
+    }
+
+    T.tds().set_dimension(d);
+
+    All_cells_iterator to_delete = T.tds().cells_begin();
+
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Cell_handle> C(m);
+
+    // infinite vertex
+    V[n] = T.infinite_vertex();
+
+    // read vertices
+    I i;
+    for(i = 0; i < n; ++i) {
+      V[i] = T.tds().create_vertex();
+      V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1], vert_pos[d*i + 2]);
+      V[i]->info() = vert_info[i];
+    }
+
+    // Creation of the cells
+    Vertex_handle v;
+    I index;
+    int dim = (d == -1 ? 1 : d + 1);
+    for(i = 0; i < m; ++i) {
+      C[i] = T.tds().create_cell() ;
+      for(int j = 0; j < dim ; ++j){
+        index = cells[dim*i + j];
+        if (index == idx_inf)
+          v = V[n];
+        else
+          v = V[index];
+        C[i]->set_vertex(j, v);
+        v->set_cell(C[i]);
+      }
+    }
+
+    // Setting the neighbor pointers
+    for(i = 0; i < m; ++i) {
+      for(int j = 0; j < d+1; ++j){
+        index = neighbors[(d+1)*i + j];
+        C[i]->set_neighbor(j, C[index]);
+      }
+    }
+
+    // delete flat cell
+    T.tds().delete_cell(to_delete);
+
+  }
+
   void info_ordered_vertices(double* pos) const {
     Info i;
     Point p;
@@ -884,21 +1026,54 @@ class Delaunay_with_info_3
   {
     Vertex_handle v;
     Info hv;
-    Point cc, p1;
-    double cr;
-    int i;
+    Point cc, p1, p2;
+    double cr, icr;
+    int i, iinf;
 
     for (All_cells_iterator it = T.all_cells_begin(); it != T.all_cells_end(); it++) {
       if (T.is_infinite(it) == true) {
-        if (periodic == false) {
-          for (i = 0; i < 4; i++) {
-            v = it->vertex(i);
-            if (T.is_infinite(v) == false) {
-              hv = v->info();
-              alln.push_back(hv);
-            }
+        for (i = 0; i < 4; i++) {
+          v = it->vertex(i);
+          if (T.is_infinite(v)) {
+            iinf = i;
+            break;
           }
         }
+        cc = it->vertex((iinf+1) % 4)->point();
+        p1 = it->vertex((iinf+2) % 4)->point();
+        p2 = it->vertex((iinf+3) % 4)->point();
+	cr = 0;
+        icr = std::sqrt(static_cast<double>(CGAL::squared_distance(cc, p1)));
+	if (icr > cr) cr = icr;
+        icr = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, p2)));
+	if (icr > cr) cr = icr;
+        icr = std::sqrt(static_cast<double>(CGAL::squared_distance(p2, cc)));
+	if (icr > cr) cr = icr;
+	cc = Point((cc.x()+p1.x()+p2.x())/3.0, 
+		   (cc.y()+p1.y()+p2.y())/3.0, 
+		   (cc.z()+p1.z()+p2.z())/3.0);
+        if ((cc.x() + cr) > right_edge[0])
+          for (i = 1; i < 4; i++) rx.push_back((it->vertex((iinf+i)%4))->info());
+        if ((cc.y() + cr) > right_edge[1])
+          for (i = 1; i < 4; i++) ry.push_back((it->vertex((iinf+i)%4))->info());
+        if ((cc.z() + cr) > right_edge[2])
+          for (i = 1; i < 4; i++) rz.push_back((it->vertex((iinf+i)%4))->info());
+        if ((cc.x() - cr) < left_edge[0])
+          for (i = 1; i < 4; i++) lx.push_back((it->vertex((iinf+i)%4))->info());
+        if ((cc.y() - cr) < left_edge[1])
+          for (i = 1; i < 4; i++) ly.push_back((it->vertex((iinf+i)%4))->info());
+        if ((cc.z() - cr) < left_edge[2])
+          for (i = 1; i < 4; i++) lz.push_back((it->vertex((iinf+i)%4))->info());
+
+        // if (periodic == false) {
+        //   for (i = 0; i < 4; i++) {
+        //     v = it->vertex(i);
+        //     if (T.is_infinite(v) == false) {
+        //       hv = v->info();
+        //       alln.push_back(hv);
+        //     }
+        //   }
+        // }
       } else {
         p1 = it->vertex(0)->point();
 	cc = it->circumcenter();
