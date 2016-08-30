@@ -180,6 +180,7 @@ class consolidate_leaves(object):
                     oth_c = self.split_cells[tuple(sorted(self.get_cell_verts(curr_leaf, neigh[n_local])))]
                 else:
                     continue
+                print 'test'
                 if (self.neigh[c_total, n_total] >= 0) and (self.neigh[c_total, n_total] != oth_c):
                     print(self.neigh[c_total,:], self.neigh[c_total, n_total], oth_c)
                 else:
