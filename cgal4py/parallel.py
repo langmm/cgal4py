@@ -109,55 +109,165 @@ class consolidate_leaves(object):
             self.walk_neigh(i)
         self.cells = self.cells[:self.ncells,:]
         self.neigh = self.neigh[:self.ncells,:]
-        print self.cells
-        print self.neigh
-        print(np.sum(self.cells < 0),np.sum(self.neigh < 0))
+        self.walk_final()
+        # print self.cells
+        # print self.neigh
+        # print(np.sum(self.cells < 0),np.sum(self.neigh < 0))
         assert(np.sum(self.cells < 0) == 0)
         assert(np.sum(self.neigh < 0) == 0)
         cells = self.cells
         cells[cells != new_idx_inf] = idx_sort[cells[cells != new_idx_inf]]
         self.T.deserialize(pts, cells.astype(type(new_idx_inf)), 
-                               self.neigh.astype(type(new_idx_inf)), new_idx_inf)
+                           self.neigh.astype(type(new_idx_inf)), new_idx_inf)
+
+    def get_cell_verts(self, leafid, cidx):
+        r"""Get the global leaf-sorted vertex indices for a cell on a leaf.
+
+        Args:
+            leafid (int): Index specifying a leaf in the tree.
+            cidx (int): Index of a cell on the leaf.
+
+        Returns:
+            np.ndarray of int: Global leaf-sorted indices of vertices in the 
+                specified cell.
+
+        """
+        verts = self.leaf_cells[leafid][cidx,:]
+        finite = (verts != self.idx_inf)
+        idx_verts = copy.copy(verts)
+        idx_verts[finite] = self.leaf_idx[leafid][verts[finite]]
+        idx_verts[np.logical_not(finite)] = self.new_idx_inf
+        return idx_verts
+
+    def get_cell_neigh(self, leafid, cidx):
+        r"""Get the neighboring cells for a cell on a leaf.
+
+        Args:
+            leafid (int): Index specifying a leaf in the tree.
+            cidx (int): Index of a cell on the leaf.
+
+        Returns:
+            np.ndarray of int: Indices of neighboring cells on this leaf.
+
+        """
+        return self.leaf_neigh[leafid][cidx,:]
+
+    def add_cell(self, c, n, start=0, stop=None):
+        r"""Add a cell to the serial tessellation.
+
+        Args:
+            c (np.ndarray of int): Indices of vertices in new cell.
+            n (np.ndarray of int): Indices of neighbors to new cell.
+            start (int, optional): Cell to start search for neighbors at. 
+                Defaults to 0.
+            stop (int, optional): Cell to stop search for neighbors at. 
+                Defaults to None.
+
+        """
+        c, n = self.find_neigh(c, n, start=start, stop=stop)
+        self.cells = np.concatenate([self.cells, c.reshape((1,len(c)))])
+        self.neigh = np.concatenate([self.neigh, n.reshape((1,len(n)))])
+        self.ncells += 1
+
+    def find_leaves(self, c):
+        r"""Determine which leaves originally owned vertices in the set.
+
+        Args:
+            c (np.ndarray of int): Vertex indices.
+
+        Returns:
+            list of int: Indices of leaves that own one or more of the vertices.
+
+        """
+        leaves = []
+        for x in c:
+            if x == self.new_idx_inf:
+                pass
+            for i in xrange(self.num_leaves):
+                leaf = self.tree.leaves[i]
+                if x < leaf.stop_idx:
+                    leaves.append(i)
+                    break
+        return leaves
+
+    def find_neigh(self, c1, n1, start=0, stop=None):
+        r"""Look for neighbors in existing cells.
+
+        Args:
+            c1 (np.ndarray of int): Indices of vertices in new cell.
+            n1 (np.ndarray of int): Indices of neighbors to new cell.
+            start (int, optional): Cell to start search at. Defaults to 0.
+            stop (int, optional): Cell to stop search at. Defaults to None. If 
+                None, set to `self.ncells`.
+
+        """
+        if -1 not in n1:
+            return c1, n1
+        if stop is None:
+            stop = self.ncells
+        for i2 in range(start,stop):
+            c2 = self.cells[i2,:]
+            n2 = self.neigh[i2,:]
+            matches1 = np.zeros(self.ndim+1, 'int') - 1
+            matches2 = np.zeros(self.ndim+1, 'int') - 1
+            for v2 in range(self.ndim+1):
+                if c2[v2] in c1:
+                    v1 = list(c1).index(c2[v2])
+                    matches2[v2] = v1
+                    matches1[v1] = v2
+            if np.sum(matches1 < 0) == 1:
+                n1[(matches1 < 0)] = i2
+                self.neigh[i2,(matches2 < 0)] = self.ncells
+        return c1, n1
 
     def walk_cells(self, curr_leaf):
+        r"""Iterate over cells on a leaf, adding those to the global list that 
+        have at least one vertex originating from that leaf.
+
+        Args:
+            curr_leaf (int): Index of the leaf that should be processed.
+
+        """
         leaf = self.tree.leaves[curr_leaf]
         for curr_cell in range(self.leaf_cells[curr_leaf].shape[0]):
             verts = self.get_cell_verts(curr_leaf, curr_cell)
             neigh = self.get_cell_neigh(curr_leaf, curr_cell)
             fin = (verts != self.new_idx_inf)
-            # All points on other leaves
-            if np.all(np.logical_or(verts < leaf.start_idx, verts >= leaf.stop_idx)):
-                self.visited[curr_leaf][curr_cell] = -999
-            # All points in this leaf
-            elif (min(verts) >= leaf.start_idx) and (max(verts) < leaf.stop_idx):
-                self.cells[self.ncells,:] = verts
-                self.visited[curr_leaf][curr_cell] = self.ncells
-                self.ncells += 1
-            # Infinite, but otherwise on this leaf
-            elif (min(verts[fin]) >= leaf.start_idx) and (max(verts[fin]) < leaf.stop_idx):
-                self.cells[self.ncells,:] = verts
-                self.visited[curr_leaf][curr_cell] = self.ncells
-                self.ncells += 1
-            # Infinite, with a mix
-            elif (max(verts) == self.new_idx_inf):
-                if tuple(sorted(verts)) in self.split_cells:
-                    self.visited[curr_leaf][curr_cell] = -888
-                else:
-                    self.cells[self.ncells,:] = verts
-                    self.visited[curr_leaf][curr_cell] = self.ncells
-                    self.split_cells[tuple(sorted(verts))] = self.ncells
-                    self.ncells += 1
-            # Mix of points, but not infinite
+            key = tuple(sorted(verts))
+            # Infinite
+            if (max(verts) == self.new_idx_inf):
+                self.visited[curr_leaf][curr_cell] = -777
+            # Finite
             else:
-                if tuple(sorted(verts)) in self.split_cells:
-                    self.visited[curr_leaf][curr_cell] = -888
+                leaves = self.find_leaves(verts)
+                # All points on a single leaf
+                if len(leaves) == 1:
+                    # This leaf
+                    if leaves[0] == curr_leaf:
+                        self.cells[self.ncells,:] = verts
+                        self.visited[curr_leaf][curr_cell] = self.ncells
+                        self.ncells += 1
+                    # Other leaf
+                    else:
+                        self.visited[curr_leaf][curr_cell] = -999
+                # Split between leaves
                 else:
-                    self.cells[self.ncells,:] = verts
-                    self.visited[curr_leaf][curr_cell] = self.ncells
-                    self.split_cells[tuple(sorted(verts))] = self.ncells
-                    self.ncells += 1
+                    if key in self.split_cells:
+                        self.visited[curr_leaf][curr_cell] = -888
+                    else:
+                        self.cells[self.ncells,:] = verts
+                        self.visited[curr_leaf][curr_cell] = self.ncells
+                        self.split_cells[key] = self.ncells
+                        self.ncells += 1
 
     def walk_neigh(self, curr_leaf):
+        r"""Iterate over cells on a leaf, adding neighbors to the global list
+        for those cells that were processed by :class:`consolidate_leaves.walk_cells`.
+
+        Args:
+            curr_leaf (int): Index of the leaf that should be processed.
+
+        """
         leaf = self.tree.leaves[curr_leaf]
         for c_local in range(self.leaf_neigh[curr_leaf].shape[0]):
             neigh = self.get_cell_neigh(curr_leaf, c_local)
@@ -180,161 +290,46 @@ class consolidate_leaves(object):
                     oth_c = self.split_cells[tuple(sorted(self.get_cell_verts(curr_leaf, neigh[n_local])))]
                 else:
                     continue
-                print 'test'
                 if (self.neigh[c_total, n_total] >= 0) and (self.neigh[c_total, n_total] != oth_c):
                     print(self.neigh[c_total,:], self.neigh[c_total, n_total], oth_c)
                 else:
                     self.neigh[c_total, n_total] = oth_c
-            
 
-    # Function to find leaf that owns an index
-    def get_cell_verts(self, leafid, cidx):
-        verts = self.leaf_cells[leafid][cidx,:]
-        finite = (verts != self.idx_inf)
-        idx_verts = copy.copy(verts)
-        idx_verts[finite] = self.leaf_idx[leafid][verts[finite]]
-        idx_verts[np.logical_not(finite)] = self.new_idx_inf
-        return idx_verts
+    def walk_final(self):
+        r"""Perform a final iteration over the global cell neighbor list, adding 
+        infinite cells where neighbors are missing."""
+        norig = self.ncells
+        mult_miss = []
+        for c in range(norig):
+            idx_neigh = (self.neigh[c,:] >= 0)
+            Nneigh = np.sum(idx_neigh)
+            if (Nneigh == self.ndim+1):
+                continue
+            elif (Nneigh == self.ndim):
+                for idx_miss in np.where(self.neigh[c,:] < 0)[0]:
+                    new_cell = np.zeros(self.ndim+1, 'int') - 1
+                    new_cell = copy.deepcopy(self.cells[c,:])
+                    new_cell[idx_miss] = self.new_idx_inf
+                    new_neigh = np.zeros(self.ndim+1, 'int') - 1
+                    new_neigh[idx_miss] = c
+                    self.neigh[c, idx_miss] = self.ncells
+                    self.add_cell(new_cell, new_neigh, start=norig, stop=self.ncells)
+            else:
+                print("{} neighbors missing from cell {}...".format(self.ndim+1-Nneigh,c))
+                print("    cells = {}, neigh = {}".format(self.cells[c,:], self.neigh[c,:]))
+                mult_miss.append(c)
+        # Remove things
+        # for r in sorted(remove)[::-1]:
+        #     self.cells = np.delete(self.cells, r, axis=0)
+        #     self.neigh = np.delete(self.neigh, r, axis=0)
+        #     self.ncells -= 1
+        # # for r in sorted(remove)[::-1]:
+        # #     idx_r = (self.neigh == r)
+        # #     assert(np.sum(idx_r) == 0)
+        # # for r in sorted(remove)[::-1]:
+        #     idx_upper = (self.neigh > r)
+        #     self.neigh[idx_upper] -= 1
 
-    def get_cell_neigh(self, leafid, cidx):
-        return self.leaf_neigh[leafid][cidx,:]
-
-    # def find_leaf(idx):
-    #     for leaf in tree.leaves:
-    #         if idx < leaf.stop_idx:
-    #             return leaf
-
-    # split_cells = {}
-    # ncells = 0
-    # incl_cells = [np.zeros(s[0].shape[0], 'int') - 1 for s in serial]
-    # for leaf in tree.leaves:
-    #     s = serial[leaf.id]
-    #     idx = total_idx[leaf.id]
-    #     icells = s[0]
-    #     idx_inf = s[2]
-    #     iincl = incl_cells[leaf.id]
-    #     for c in range(icells.shape[0]):
-    #         verts = icells[c,:]
-    #         finite = (verts != idx_inf)
-    #         idx_verts = copy.copy(verts)
-    #         idx_verts[finite] = idx[verts[finite]]
-    #         idx_verts[np.logical_not(finite)] = new_idx_inf
-    #         vmin = np.argmin(idx_verts)
-    #         key_verts = tuple(sorted(idx_verts)) 
-    #         # All points on this leaf
-    #         if (min(idx_verts) >= leaf.start_idx) and \
-    #           (max(idx_verts) < leaf.stop_idx):
-    #             iincl[c] = ncells
-    #             cells[ncells, :] = idx_verts
-    #             ncells += 1
-    #             print 'All in', leaf.start_idx, leaf.stop_idx, idx_verts
-    #         # All not on this leaf 
-    #         elif np.all(np.logical_or(idx_verts < leaf.start_idx,
-    #                                 idx_verts >= leaf.stop_idx)):
-    #             pass
-    #         elif max(idx_verts) == new_idx_inf:
-    #             if (min(idx_verts[finite]) >= leaf.start_idx) and \
-    #               (max(idx_verts[finite]) < leaf.stop_idx):
-    #                 iincl[c] = ncells
-    #                 cells[ncells, :] = idx_verts
-    #                 ncells += 1
-    #                 print 'All in', leaf.start_idx, leaf.stop_idx, idx_verts
-    #             elif (min(idx_verts) >= leaf.start_idx) and \
-    #               (min(idx_verts) < leaf.stop_idx):
-    #                 if key_verts not in split_cells:
-    #                     iincl[c] = ncells
-    #                     cells[ncells, :] = idx_verts
-    #                     split_cells[key_verts] = ncells
-    #                     ncells += 1
-    #                     print 'Partial', leaf.start_idx, leaf.stop_idx, idx_verts
-    #             else:
-    #                 print 'Skipped', leaf.start_idx, leaf.stop_idx, idx_verts
-    #         elif np.any(np.logical_and(idx_verts >= leaf.start_idx,
-    #                                    idx_verts < leaf.stop_idx)):
-    #         # elif (min(idx_verts) >= leaf.start_idx) and \
-    #         #       (min(idx_verts) < leaf.stop_idx):
-    #             if key_verts not in split_cells:
-    #                 iincl[c] = ncells
-    #                 cells[ncells, :] = idx_verts
-    #                 split_cells[key_verts] = ncells
-    #                 ncells += 1
-    #                 print 'Partial', leaf.start_idx, leaf.stop_idx, idx_verts
-    #         else:
-    #             print 'Skipped', leaf.start_idx, leaf.stop_idx, idx_verts
-    #         # # if min(verts) < leaf.norig:
-    #         # # if min(idx_verts) in leaf.idx[:leaf.norig]:
-    #         # # if True:
-    #         # if verts[vmin] < leaf.norig:
-    #         #     # print leaf.id, key_verts, verts, verts[vmin], leaf.norig
-    #         #     # if True:
-    #         #     if key_verts not in split_cells:
-    #         #         iincl[c] = ncells
-    #         #         cells[ncells, :] = idx_verts
-    #         #         # key_verts = tuple(sorted(idx_verts))
-    #         #         # if key_verts in split_cells:
-    #         #         #     print verts, leaf.norig, vmin, idx_verts
-    #         #         # if max(verts[finite]) > leaf.norig:
-    #         #         split_cells[key_verts] = ncells
-    #         #         ncells += 1
-    #         # else:
-    #         #     print verts, leaf.norig, vmin, idx_verts 
-    #     incl_cells.append(iincl)
-    # cells = cells[:ncells,:]
-    # # Neighbors
-    # neighbors = np.zeros((ncells, ndim+1), int) - 1
-    # nnbors = 0
-    # for leaf in tree.leaves:
-    #     idx = total_idx[leaf.id]
-    #     s = serial[leaf.id]
-    #     iincl = incl_cells[leaf.id]
-    #     icells = s[0]
-    #     ineighbors = s[1]
-    #     idx_inf = s[2]
-    #     for c_local in range(ineighbors.shape[0]):
-    #         # Get info for this cell or its replacement
-    #         if iincl[c_local] >= 0:
-    #             c_total = nnbors
-    #             nlist_total = range(icells.shape[1])
-    #             nnbors += 1
-    #         else:
-    #             idx_verts = copy.copy(icells[c_local,:])
-    #             finite = (idx_verts != idx_inf)
-    #             idx_verts[finite] = idx[idx_verts[finite]]
-    #             idx_verts[np.logical_not(finite)] = new_idx_inf
-    #             c_total = split_cells.get(tuple(sorted(idx_verts)),-1)
-    #             if c_total == -1: continue
-    #             nlist_total = [list(cells[c_total,:]).index(_) for _ in idx_verts]
-    #         # Loop over neighbors for this cell
-    #         for n_local, n_total in enumerate(nlist_total):
-    #             if iincl[ineighbors[c_local, n_local]] >= 0:
-    #                 oth_c = iincl[ineighbors[c_local, n_local]]
-    #             else:
-    #                 idx_verts = copy.copy(icells[ineighbors[c_local, n_local],:])
-    #                 finite = (idx_verts != idx_inf)
-    #                 idx_verts[finite] = idx[idx_verts[finite]]
-    #                 idx_verts[np.logical_not(finite)] = new_idx_inf
-    #                 idx_verts = list(idx_verts)
-    #                 oth_c = split_cells.get(tuple(sorted(idx_verts)),-1)
-    #             if oth_c >= 0:
-    #                 if (neighbors[c_total, n_total] >= 0) and (neighbors[c_total, n_total]!=oth_c):
-    #                     print neighbors[c_total,:], n_total, oth_c
-    #                 neighbors[c_total, n_total] = oth_c
-    # assert(ncells == nnbors)
-    # print cells
-    # print neighbors
-    # print(ncells, nnbors)
-    # print(np.sum(cells < 0),np.sum(neighbors < 0))
-    # assert(np.sum(cells < 0) == 0)
-    # assert(np.sum(neighbors < 0) == 0)
-    # if use_double:
-    #     cells = cells.astype('uint64')
-    #     neighbors = neighbors.astype('uint64')
-    # else:
-    #     cells = cells.astype('uint32')
-    #     neighbors = neighbors.astype('uint32')
-    # # Deserialize
-    # T.deserialize(pts, cells, neighbors, new_idx_inf)
-    # return T
 
 class DelaunayProcess(mp.Process):
     r"""`multiprocessing.Process` subclass for coordinating operations on a 
@@ -364,6 +359,20 @@ class DelaunayProcess(mp.Process):
         else:
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
+
+    # def plot_leaves(self, plotbase=None):
+    #     r"""Plots the tessellation for each leaf on this process.
+
+    #     Args:
+    #         plotbase (str, optional): Base path to which leaf IDs should be 
+    #             appended to create plot filenames. Defaults to None. If None, 
+    #             set to `'Process{}of{}_'.format(self._proc_idx,self._num_proc)`.
+
+    #     """
+    #     if plotbase is None:
+    #         plotbase = 'Process{}of{}_'.format(self._proc_idx,self._num_proc)
+    #     for leaf in self._leaves:
+    #         leaf.plot(plotbase=plotbase)
 
     def tessellate_leaves(self):
         r"""Performs the tessellation for each leaf on this process."""
@@ -436,6 +445,17 @@ class ParallelLeaf(object):
             return getattr(self._leaf, name)
         else:
             raise AttributeError
+
+    # def plot(self, plotbase=''):
+    #     r"""Plots the tessellation for this leaf.
+
+    #     Args:
+    #         plotbase (str, optional): Base path to which leaf ID should be 
+    #             appended to create plot filenames. Defaults to empty string.
+
+    #     """
+    #     plotfile = plotbase+'leaf{}of{}'.format(self.id,self.num_leaves)
+    #     self.T.plot(plotfile=plotfile)
 
     def tessellate(self, pts):
         r"""Perform tessellation on leaf.

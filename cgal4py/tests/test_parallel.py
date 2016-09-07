@@ -86,8 +86,15 @@ def test_ParallelDelaunay_2D():
 
 def test_ParallelDelaunay_3D():
     tree = tree3 ; pts = pts3
-    T_para = parallel.ParallelDelaunay(pts, tree, 2)
     T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    # for name,T in zip(["Serial:","Parallel:"],[T_seri,T_para]):
+    #     print(name)
+    #     print('    verts',T.num_finite_verts, T.num_infinite_verts, T.num_verts)
+    #     print('    cells',T.num_finite_cells, T.num_infinite_cells, T.num_cells)
+    #     print('    edges',T.num_finite_edges, T.num_infinite_edges, T.num_edges)
+    #     print('    facets',T.num_finite_facets, T.num_infinite_facets, T.num_facets)
+    # print(T_para.is_equivalent(T_seri))
     assert(T_para.is_equivalent(T_seri))
 
 # def test_ParallelDelaunay_periodic_2D():
