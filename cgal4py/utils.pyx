@@ -3,9 +3,9 @@ cimport numpy as np
 cimport cython
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair
-from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int64_t, int32_t
-
+from libcpp cimport bool as cbool
+from cpython cimport bool as pybool
 import copy
 
 import scipy

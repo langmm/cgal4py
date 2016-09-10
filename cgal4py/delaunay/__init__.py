@@ -1,5 +1,6 @@
 import numpy as np
 
+import tools
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 
@@ -62,7 +63,7 @@ def Delaunay(pts, use_double=False):
     return T
 
             
-__all__ = ["Delaunay", "Delaunay2", "Delaunay3"]        
+__all__ = ["tools", "Delaunay", "Delaunay2", "Delaunay3"]        
 
 if FLAG_DOUBLE_AVAIL:
     __all__ += ["Delaunay2_64bit", "Delaunay3_64bit"]

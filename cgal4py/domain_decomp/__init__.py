@@ -1,6 +1,41 @@
 import numpy as np
 import cykdtree
 
+def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
+    r"""Get tree for a given domain decomposition schema.
+
+    Args:
+        method (str): Domain decomposition method. Supported options are:
+            'kdtree': KDTree based on median position along the dimension 
+                with the greatest domain width. See 
+                :meth:`cgal4py.domain_decomp.kdtree` for details on 
+                accepted keyword arguments.
+        pts (np.ndarray of float64): (n,m) array of n coordinates in a 
+            m-dimensional domain. 
+        left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
+        right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
+        periodic (bool): True if domain is periodic, False otherwise.
+        *args: Variable argument list. Passed to the selected domain 
+            decomposition method.
+        **kwargs: Variable keyword argument list. Passed to the selected domain 
+            decomposition method.
+
+    Returns:
+        object: Tree of type specified by `method`.
+
+    Raises:
+        ValueError: If `method` is not one of the supported domain decomposition 
+            methods listed above.
+
+    """
+    # Get leaves
+    if method.lower() == 'kdtree':
+        tree = cykdtree.PyKDTree(pts, left_edge, right_edge, *args, **kwargs)
+    else:
+        raise ValueError("'{}' is not a supported domain decomposition.".format(method))
+    # Return tree
+    return tree
+
 class Leaf(object):
     def __init__(self, leafid, idx, left_edge, right_edge,
                  periodic_left=None, periodic_right=None,
@@ -68,46 +103,6 @@ class Leaf(object):
         self.start_idx = start_idx
 
 from kdtree import kdtree
-
-def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
-    r"""Get tree for a given domain decomposition schema.
-
-    Args:
-        method (str): Domain decomposition method. Supported options are:
-            'kdtree': KDTree based on median position along the dimension 
-                with the greatest domain width. See 
-                :meth:`cgal4py.domain_decomp.kdtree` for details on 
-                accepted keyword arguments.
-        pts (np.ndarray of float64): (n,m) array of n coordinates in a 
-            m-dimensional domain. 
-        left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
-        right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
-        periodic (bool): True if domain is periodic, False otherwise.
-        *args: Variable argument list. Passed to the selected domain 
-            decomposition method.
-        **kwargs: Variable keyword argument list. Passed to the selected domain 
-            decomposition method.
-
-    Returns:
-        object: Tree of type specified by `method`.
-
-    Raises:
-        ValueError: If `method` is not one of the supported domain decomposition 
-            methods listed above.
-
-    """
-    # Get leaves
-    if method.lower() == 'kdtree':
-        tree = cykdtree.PyKDTree(pts, left_edge, right_edge, *args, **kwargs)
-    else:
-        raise ValueError("'{}' is not a supported domain decomposition.".format(method))
-    # Set domain width
-    # if leaves[0].domain_width is None:
-    #     domain_width = right_edge - left_edge
-    #     for leaf in leaves:
-    #         leaf.domain_width = domain_width
-    # Return tree
-    return tree
 
 def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     r"""Get list of leaves for a given domain decomposition.

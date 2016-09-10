@@ -66,6 +66,11 @@ if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
 
 if use_cython:
+    ext_modules += cythonize(Extension("cgal4py/delaunay/tools",
+                                       sources=["cgal4py/delaunay/tools.pyx"],
+                                       language="c++",
+                                       include_dirs=[numpy.get_include()],
+                                       extra_compile_args=["-std=gnu++11"]))
     ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay2",
                                        sources=["cgal4py/delaunay/delaunay2.pyx","cgal4py/delaunay/c_delaunay2.cpp"],
                                        **ext_options))
@@ -91,6 +96,8 @@ if use_cython:
     cmdclass.update({ 'build_ext': build_ext })
 else:
     ext_modules += [
+        Extension("cgal4py.delaunay.tools", ["cgal4py/delaunay/c_tools.cpp"],
+                  include_dirs=[numpy.get_include()]),
         Extension("cgal4py.delaunay.delaunay2", ["cgal4py/delaunay/c_delaunay2.cpp"],
                   include_dirs=[numpy.get_include()]),
         Extension("cgal4py.delaunay.delaunay3", ["cgal4py/delaunay/c_delaunay3.cpp"],

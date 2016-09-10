@@ -664,6 +664,7 @@ public:
     std::ifstream is(filename, std::ios::binary);
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
+      updated = true;
 
       if (T.number_of_vertices() != 0) 
       	T.clear();
@@ -805,6 +806,8 @@ public:
 		   double* vert_pos, Info* vert_info, 
 		   I* faces, I* neighbors, I idx_inf)
   {
+    updated = true;
+
     if (T.number_of_vertices() != 0) 
       T.clear();
   

@@ -10,6 +10,7 @@ import numpy as np
 cimport numpy as np
 
 from cgal4py import plot
+from cgal4py.delaunay.tools cimport sortSerializedTess
 
 from functools import wraps
 
@@ -1202,7 +1203,8 @@ cdef class Delaunay2:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__(self):
-        self.T = new Delaunay_with_info_2[info_t]()
+        with nogil:
+            self.T = new Delaunay_with_info_2[info_t]()
         self.n = 0
         self.n_per_insert = []
 
@@ -1219,7 +1221,10 @@ cdef class Delaunay2:
             bool: True if the two triangulations are equivalent. 
 
         """
-        return <pybool>(self.T.is_equal(dereference(solf.T)))
+        cdef cbool out
+        with nogil:
+            out = self.T.is_equal(dereference(solf.T))
+        return <pybool>(out)
 
     @classmethod
     def from_serial(*args):
@@ -1266,8 +1271,10 @@ cdef class Delaunay2:
             bool: True if the triangulation is valid, False otherwise.
         
         """
-
-        return <pybool>self.T.is_valid()
+        cdef cbool out
+        with nogil:
+            out = self.T.is_valid()
+        return <pybool>out
 
     def write_to_file(self, fname):
         r"""Write the serialized tessellation information to a file.
@@ -1278,7 +1285,8 @@ cdef class Delaunay2:
 
         """
         cdef char* cfname = fname
-        self.T.write_to_file(cfname)
+        with nogil:
+            self.T.write_to_file(cfname)
 
     @_update_to_tess
     def read_from_file(self, fname):
@@ -1290,12 +1298,20 @@ cdef class Delaunay2:
 
         """
         cdef char* cfname = fname
-        self.T.read_from_file(cfname)
+        with nogil:
+            self.T.read_from_file(cfname)
         self.n = self.num_finite_verts
         self.n_per_insert.append(self.n)
 
-    def serialize(self):
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def serialize(self, pybool sort = False):
         r"""Serialize triangulation.
+
+        Args:
+            sort (bool, optional): If True, cells info is sorted so that the 
+                verts are in descending order for each cell and ascending order 
+                overall. Defaults to False.
         
         Returns: 
             tuple with 2 arrays:
@@ -1322,14 +1338,20 @@ cdef class Delaunay2:
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
-        idx_inf = self.T.serialize[info_t]( 
-            n, m, d, &vert_pos[0,0], &vert_info[0], 
-            &cells[0,0], &neighbors[0,0])
-        # print(max(vert_info))
+        with nogil:
+            idx_inf = self.T.serialize[info_t]( 
+                n, m, d, &vert_pos[0,0], &vert_info[0], 
+                &cells[0,0], &neighbors[0,0])
         cells[cells != idx_inf] = vert_info[cells[cells != idx_inf]]
+        # Sort if desired
+        if sort:
+            with nogil:
+                sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def deserialize(self, np.ndarray[np.float64_t, ndim=2] pos,
                     np.ndarray[np_info_t, ndim=2] cells,
                     np.ndarray[np_info_t, ndim=2] neighbors,
@@ -1349,9 +1371,12 @@ cdef class Delaunay2:
         cdef info_t n = pos.shape[0]
         cdef info_t m = cells.shape[0]
         cdef int32_t d = neighbors.shape[1]-1
+        if (n == 0) or (m == 0):
+            return
         cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
-        self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0], 
-                                   &cells[0,0], &neighbors[0,0], idx_inf)
+        with nogil:
+            self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0], 
+                                       &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)
 
@@ -1406,6 +1431,8 @@ cdef class Delaunay2:
         return self.T.num_cells()
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def insert(self, np.ndarray[double, ndim=2, mode="c"] pts not None):
         r"""Insert points into the triangulation.
 
@@ -1420,10 +1447,13 @@ cdef class Delaunay2:
         cdef int Nold, Nnew, m
         Nold = self.n
         Nnew, m = pts.shape[0], pts.shape[1]
+        if Nnew == 0:
+            return
         assert(m == 2)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
-        self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
+        with nogil:
+            self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
         if self.n != self.num_finite_verts:
@@ -1432,23 +1462,34 @@ cdef class Delaunay2:
     @_update_to_tess
     def clear(self):
         r"""Removes all vertices and cells from the triangulation."""
-        self.T.clear()
+        with nogil:
+            self.T.clear()
 
     @_dependent_property
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def vertices(self):
         r"""ndarray: The x,y coordinates of the vertices"""
         cdef np.ndarray[np.float64_t, ndim=2] out
         out = np.zeros([self.n, 2], 'float64')
-        self.T.info_ordered_vertices(&out[0,0])
+        if self.n == 0:
+            return out
+        with nogil:
+            self.T.info_ordered_vertices(&out[0,0])
         return out
 
     @_dependent_property
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def edges(self):
         r""":obj:`ndarray` of info_t: Vertex index pairs for edges."""
         global np_info, np_info_t
         cdef np.ndarray[np_info_t, ndim=2] out
         out = np.zeros([self.num_finite_edges, 2], np_info)
-        self.T.edge_info(&out[0,0])
+        if out.shape[0] == 0:
+            return out
+        with nogil:
+            self.T.edge_info(&out[0,0])
         return out
         
     @_update_to_tess
@@ -1459,9 +1500,12 @@ cdef class Delaunay2:
             x (Delaunay2_vertex): Vertex that should be removed.
 
         """
-        self.T.remove(x.x)
+        with nogil:
+            self.T.remove(x.x)
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def move(self, Delaunay2_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 
@@ -1478,12 +1522,15 @@ cdef class Delaunay2:
         """
         assert(len(pos) == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
-        v = self.T.move(x.x, &pos[0])
+        with nogil:
+            v = self.T.move(x.x, &pos[0])
         cdef Delaunay2_vertex out = Delaunay2_vertex()
         out.assign(self.T, v)
         return out
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def move_if_no_collision(self, Delaunay2_vertex x, 
                              np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location only if there is not already a 
@@ -1501,7 +1548,8 @@ cdef class Delaunay2:
         """
         assert(len(pos) == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
-        v = self.T.move_if_no_collision(x.x, &pos[0])
+        with nogil:
+            v = self.T.move_if_no_collision(x.x, &pos[0])
         cdef Delaunay2_vertex out = Delaunay2_vertex()
         out.assign(self.T, v)
         return out
@@ -1522,7 +1570,10 @@ cdef class Delaunay2:
                 always be flipped).
 
         """
-        return <pybool>self.T.flip(x.x, i)
+        cdef cbool out
+        with nogil:
+            out = self.T.flip(x.x, i)
+        return <pybool>out
 
     @_update_to_tess
     def flip_flippable(self, Delaunay2_cell x, int i):
@@ -1535,7 +1586,8 @@ cdef class Delaunay2:
                 to the edge that should be flipped.
 
         """
-        self.T.flip_flippable(x.x, i)
+        with nogil:
+            self.T.flip_flippable(x.x, i)
 
     def get_vertex(self, info_t index):
         r"""Get the vertex object corresponding to the given index.
@@ -1548,7 +1600,9 @@ cdef class Delaunay2:
                 index is not found, the infinite vertex is returned.
 
         """
-        cdef Delaunay_with_info_2[info_t].Vertex v = self.T.get_vertex(index)
+        cdef Delaunay_with_info_2[info_t].Vertex v
+        with nogil:
+            v = self.T.get_vertex(index)
         cdef Delaunay2_vertex out = Delaunay2_vertex()
         out.assign(self.T, v)
         return out
@@ -1676,7 +1730,10 @@ cdef class Delaunay2:
             bool: True if v1 and v2 form an edge, False otherwise.
 
         """
-        return <pybool>self.T.is_edge(v1.x, v2.x, c.x, i)
+        cdef cbool out
+        with nogil:
+            out = self.T.is_edge(v1.x, v2.x, c.x, i)
+        return <pybool>out
 
     def is_cell(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
                 Delaunay2_vertex v3, Delaunay2_cell c = Delaunay2_cell()):
@@ -1693,7 +1750,10 @@ cdef class Delaunay2:
             bool: True if v1, v2, and v3 form a cell, False otherwise.
 
         """
-        return <pybool>self.T.is_cell(v1.x, v2.x, v3.x, c.x)
+        cdef cbool out
+        with nogil:
+            out = self.T.is_cell(v1.x, v2.x, v3.x, c.x)
+        return <pybool>out
 
     def includes_edge(self, Delaunay2_vertex va, Delaunay2_vertex vb,
                       Delaunay2_vertex vbr = Delaunay2_vertex(),
@@ -1716,8 +1776,13 @@ cdef class Delaunay2:
                 va and vb.
 
         """
-        return <pybool>self.T.includes_edge(va.x, vb.x, vbr.x, c.x, i)
+        cdef cbool out
+        with nogil:
+            out = self.T.includes_edge(va.x, vb.x, vbr.x, c.x, i)
+        return <pybool>out
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
         r"""Determine which vertex is closes to a given set of x,y coordinates
 
@@ -1728,8 +1793,10 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex closest to x.
 
         """
+        assert(len(x) == 2)
         cdef Delaunay_with_info_2[info_t].Vertex vc
-        vc = self.T.nearest_vertex(&x[0])
+        with nogil:
+            vc = self.T.nearest_vertex(&x[0])
         cdef Delaunay2_vertex v = Delaunay2_vertex()
         v.assign(self.T, vc)
         return v
@@ -1776,6 +1843,8 @@ cdef class Delaunay2:
         """
         return x.mirror_vertex(i)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                                   Delaunay2_cell start):
         r"""Get the edges of the cell in conflict with a given point.
@@ -1789,8 +1858,10 @@ cdef class Delaunay2:
                  pos.
 
         """
+        assert(len(pos) == 2)
         cdef vector[Delaunay_with_info_2[info_t].Edge] ev
-        ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
+        with nogil:
+            ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
         cdef object out = []
         cdef np.uint32_t i
         cdef Delaunay2_edge x
@@ -1800,6 +1871,8 @@ cdef class Delaunay2:
             out.append(x)
         return out
         
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                       Delaunay2_cell start):
         r"""Get the cells that are in conflict with a given point.
@@ -1812,8 +1885,10 @@ cdef class Delaunay2:
             :obj:`list` of Delaunay2_cell: Cells in conflict with pos.
 
         """
+        assert(len(pos) == 2)
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
-        cv = self.T.get_conflicts(&pos[0], start.x)
+        with nogil:
+            cv = self.T.get_conflicts(&pos[0], start.x)
         cdef object out = []
         cdef np.uint32_t i
         cdef Delaunay2_cell x
@@ -1823,6 +1898,8 @@ cdef class Delaunay2:
             out.append(x)
         return out
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
                                    Delaunay2_cell start):
         r"""Get the cells and edges of cells that are in conflict with a given 
@@ -1838,9 +1915,11 @@ cdef class Delaunay2:
                 conflicting cells.
 
         """
+        assert(len(pos) == 2)
         cdef pair[vector[Delaunay_with_info_2[info_t].Cell],
                   vector[Delaunay_with_info_2[info_t].Edge]] cv
-        cv = self.T.get_conflicts_and_boundary(&pos[0], start.x)
+        with nogil:
+            cv = self.T.get_conflicts_and_boundary(&pos[0], start.x)
         cdef object out_cells = []
         cdef object out_edges = []
         cdef np.uint32_t i
@@ -1856,6 +1935,8 @@ cdef class Delaunay2:
             out_edges.append(e)
         return out_cells, out_edges
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def line_walk(self, np.ndarray[np.float64_t, ndim=1] pos1,
                   np.ndarray[np.float64_t, ndim=1] pos2):
         r"""Get the cells intersected by a line.
@@ -1869,17 +1950,22 @@ cdef class Delaunay2:
                 pos2.
 
         """
+        assert(len(pos1)==2)
+        assert(len(pos2)==2)
         cdef object out = []
         cdef np.uint32_t i
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
         cdef Delaunay2_cell c
-        cv = self.T.line_walk(&pos1[0], &pos2[0])
+        with nogil:
+            cv = self.T.line_walk(&pos1[0], &pos2[0])
         for i in range(cv.size()):
             c = Delaunay2_cell()
             c.assign(self.T, cv[i])
             out.append(c)
         return out
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def boundary_points(self, 
                         np.ndarray[np.float64_t, ndim=1] left_edge,
                         np.ndarray[np.float64_t, ndim=1] right_edge, 
@@ -1903,11 +1989,15 @@ cdef class Delaunay2:
                     empty if `periodic == True`.
 
         """
+        assert(len(left_edge)==2)
+        assert(len(right_edge)==2)
         global np_info
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
-        self.T.boundary_points(&left_edge[0], &right_edge[0], periodic,
-                               lx, ly, rx, ry, alln)
+        cdef cbool cperiodic = <cbool>periodic
+        with nogil:
+            self.T.boundary_points(&left_edge[0], &right_edge[0], cperiodic,
+                                   lx, ly, rx, ry, alln)
         # Get counts to preallocate
         cdef object lind = [None, None]
         cdef object rind = [None, None]

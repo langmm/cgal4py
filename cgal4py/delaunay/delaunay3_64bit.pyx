@@ -10,6 +10,7 @@ import numpy as np
 cimport numpy as np
 
 from cgal4py import plot
+from cgal4py.delaunay.tools cimport sortSerializedTess
 
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
@@ -1826,8 +1827,13 @@ cdef class Delaunay3:
         self.n = self.num_finite_verts
         self.n_per_insert.append(self.n)
 
-    def serialize(self):
+    def serialize(self, pybool sort = False):
         r"""Serialize triangulation. 
+
+        Args:
+            sort (bool, optional): If True, cells info is sorted so that the 
+                verts are in descending order for each cell and ascending order 
+                overall. Defaults to False.
 
         Returns: 
             tuple with 2 arrays: 
@@ -1858,6 +1864,9 @@ cdef class Delaunay3:
             n, m, d, &vert_pos[0,0], &vert_info[0],
             &cells[0,0], &neighbors[0,0])
         cells[cells != idx_inf] = vert_info[cells[cells != idx_inf]]
+        # Sort if desired
+        if sort:
+            sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
     @_update_to_tess

@@ -6,7 +6,7 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 cdef extern from "c_delaunay2.hpp":
-    cdef cppclass Delaunay_with_info_2[Info]:
+    cdef cppclass Delaunay_with_info_2[Info] nogil:
         Delaunay_with_info_2() except +
         Delaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
         bool updated
@@ -37,7 +37,7 @@ cdef extern from "c_delaunay2.hpp":
         void read_from_file(const char* filename) except +
         I serialize[I](I &n, I &m, int32_t &d,
                        double* vert_pos, Info* vert_info,
-                       I* faces, I* neighbors) const
+                       I* faces, I* neighbors)
         void deserialize[I](I n, I m, int32_t d,
                          double* vert_pos, Info* vert_info,
                          I* faces, I* neighbors, I idx_inf) const
