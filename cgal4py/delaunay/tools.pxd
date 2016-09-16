@@ -5,6 +5,7 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int64_t, int32_t
 
 cdef extern from "c_tools.hpp":
+    bool arg_tLT[I](I *cells, uint32_t *idx_verts, uint32_t ndim, uint64_t i1, uint64_t i2) nogil
     bool tEQ[I](I *cells, uint32_t ndim, int64_t i1, int64_t i2) nogil
     bool tGT[I](I *cells, uint32_t ndim, int64_t i1, int64_t i2) nogil
     bool tLT[I](I *cells, uint32_t ndim, int64_t i1, int64_t i2) nogil
@@ -19,3 +20,11 @@ cdef extern from "c_tools.hpp":
     void sortCellVerts[I](I *cells, I *neigh, uint64_t ncells, uint32_t ndim) nogil
     void sortSerializedTess[I](I *cells, I *neigh, 
                                uint64_t ncells, uint32_t ndim) nogil
+    int64_t arg_partition_tess[I](I *cells, uint32_t *idx_verts, uint64_t *idx_cells, 
+                                  uint32_t ndim, int64_t l, int64_t r, int64_t p) nogil
+    void arg_quickSort_tess[I](I *cells, uint32_t *idx_verts, uint64_t *idx_cells, 
+                               uint32_t ndim, int64_t l, int64_t r) nogil
+    void arg_sortCellVerts[I](I *cells, uint32_t *idx_verts, uint64_t ncells, uint32_t ndim) nogil
+    void arg_sortSerializedTess[I](I *cells, uint64_t ncells, uint32_t ndim,
+                                   uint32_t *idx_verts, uint64_t *idx_cells) nogil
+                                   

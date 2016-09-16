@@ -24,6 +24,22 @@ def test_Delaunay_double():
     assert_raises(ValueError, Delaunay, np.zeros((3,3,3)), True)
 
 # Tools
+def test_arg_tLT():
+    cells = np.array([[2,1,0],
+                      [3,1,0],
+                      [2,2,0],
+                      [2,1,1]], 'int64')
+    idx_verts = np.empty(cells.shape, 'uint32')
+    for i in range(cells.shape[1]):
+        idx_verts[:,i] = i
+    assert(tools.py_arg_tLT(cells, idx_verts, 0, 0) == False)
+    assert(tools.py_arg_tLT(cells, idx_verts, 0, 1) == True)
+    assert(tools.py_arg_tLT(cells, idx_verts, 0, 2) == True)
+    assert(tools.py_arg_tLT(cells, idx_verts, 0, 3) == True)
+    assert(tools.py_arg_tLT(cells, idx_verts, 1, 0) == False)
+    assert(tools.py_arg_tLT(cells, idx_verts, 2, 0) == False)
+    assert(tools.py_arg_tLT(cells, idx_verts, 3, 0) == False)
+
 def test_tEQ():
     cells = np.array([[2,1,0],
                       [3,1,0],
@@ -147,3 +163,77 @@ def test_sortSerializedTess():
             if cells[i,d] != cells[i-1,d]:
                 break
         assert(cells[i,d] >= cells[i-1,d])
+
+# argsort
+def test_arg_sortCellVerts():
+    npts = 20; ndim = 3;
+    cells = np.zeros((npts, ndim), 'uint32') - 1
+    for i in range(npts):
+        for j in range(ndim):
+            x = np.random.randint(0,npts)
+            while x in cells[i,:j]:
+                x = np.random.randint(0,npts)
+            cells[i,j] = x
+    cells0 = copy.copy(cells)
+    idx_verts = tools.py_arg_sortCellVerts(cells)
+    for i in range(npts):
+        assert(np.all(cells[i,idx_verts[i,:]] == np.sort(cells0[i,:])[::-1]))
+
+def test_arg_partition_tess():
+    npts = 20; ndim = 3;
+    cells = np.zeros((npts, ndim), 'int64')
+    idx_verts = np.empty((npts, ndim), 'uint32')
+    for i in range(ndim):
+        idx_verts[:,i] = i
+    idx_cells = np.arange(npts).astype('uint64')
+    for i in range(npts):
+        for j in range(ndim):
+            cells[i,j] = np.random.randint(0,npts)
+    cells0 = copy.copy(cells)
+    pivot = copy.copy(cells[0,:])
+    x = tools.py_arg_partition_tess(cells, idx_verts, idx_cells, 0, npts-1, 0)
+    for i in range(x):
+        for d in range(ndim):
+            if cells[idx_cells[i],d] != pivot[d]:
+                break
+        assert(cells[idx_cells[i],d] < pivot[d])
+    for i in range(x, npts):
+        for d in range(ndim):
+            if cells[idx_cells[i],d] != pivot[d]:
+                break
+        assert(cells[idx_cells[i],d] >= pivot[d])
+
+def test_arg_quickSort_tess():
+    npts = 20; ndim = 3;
+    cells = np.zeros((npts, ndim), 'int64')
+    idx_verts = np.empty((npts, ndim), 'uint32')
+    for i in range(ndim):
+        idx_verts[:,i] = i
+    idx_cells = np.arange(npts).astype('uint64')
+    for i in range(npts):
+        for j in range(ndim):
+            cells[i,j] = np.random.randint(0,npts)
+    cells0 = copy.copy(cells)
+    tools.py_arg_quickSort_tess(cells, idx_verts, idx_cells, 0, npts-1)
+    for i in range(1,npts):
+        for d in range(ndim):
+            if cells[idx_cells[i],d] != cells[idx_cells[i-1],d]:
+                break
+        assert(cells[idx_cells[i],d] >= cells[idx_cells[i-1],d])
+
+def test_arg_sortSerializedTess():
+    npts = 20; ndim = 3;
+    cells = np.zeros((npts, ndim), 'int64')
+    for i in range(npts):
+        for j in range(ndim):
+            cells[i,j] = np.random.randint(0,npts)
+    cells0 = copy.copy(cells)
+    idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
+    for i in range(1,npts):
+        assert(np.all(cells[i,idx_verts[i,:]] == np.sort(cells[i,:])[::-1]))
+        for d in range(ndim):
+            if cells[idx_cells[i],idx_verts[i,d]] != cells[idx_cells[i-1],idx_verts[i,d]]:
+                break
+        i_old = idx_cells[i-1]
+        i_new = idx_cells[i]
+        assert(cells[i_new,idx_verts[i_new,d]] >= cells[i_old,idx_verts[i_old,d]])

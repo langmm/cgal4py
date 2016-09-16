@@ -1199,6 +1199,7 @@ cdef class Delaunay2:
     cdef Delaunay_with_info_2[info_t] *T
     cdef readonly int n
     cdef public object n_per_insert
+    # cdef pybool _locked
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1207,6 +1208,7 @@ cdef class Delaunay2:
             self.T = new Delaunay_with_info_2[info_t]()
         self.n = 0
         self.n_per_insert = []
+        # self._locked = False
 
     def is_equivalent(Delaunay2 self, Delaunay2 solf):
         r"""Determine if two triangulations are equivalent. Currently only 
@@ -1250,8 +1252,11 @@ cdef class Delaunay2:
     @staticmethod
     def _update_to_tess(func):
         def wrapped_func(solf, *args, **kwargs):
+            # self.T.updated = <cbool>True
+            # solf._locked = True
+            out = func(solf, *args, **kwargs)
             solf._update_tess()
-            return func(solf, *args, **kwargs)
+            return out
         return wrapped_func
 
     @staticmethod
@@ -1349,9 +1354,9 @@ cdef class Delaunay2:
                 sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
-    @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
+    @_update_to_tess
     def deserialize(self, np.ndarray[np.float64_t, ndim=2] pos,
                     np.ndarray[np_info_t, ndim=2] cells,
                     np.ndarray[np_info_t, ndim=2] neighbors,

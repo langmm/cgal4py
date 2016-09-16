@@ -18,7 +18,7 @@ pts = np.array([[ 0,  0,  0],
                 [ 1, -1, -1],
                 [ 1, -1,  1],
                 [ 1,  1, -1],
-                [ 1,  1,  1]], 'float64')
+                [ 1,  1,  1.0000001]], 'float64')
 pts_dup = np.concatenate([pts, np.reshape(pts[0,:],(1,pts.shape[1]))])
 nverts_fin = pts.shape[0]
 nverts_inf = 1

@@ -86,13 +86,13 @@ class Delaunay_with_info_3
     if (num_finite_cells() != other.num_finite_cells()) return false;
     if (num_infinite_cells() != other.num_infinite_cells()) return false;
     // Edges
-    // if (num_edges() != other.num_edges()) return false;
-    // if (num_finite_edges() != other.num_finite_edges()) return false;
-    // if (num_infinite_edges() != other.num_infinite_edges()) return false;
+    if (num_edges() != other.num_edges()) return false;
+    if (num_finite_edges() != other.num_finite_edges()) return false;
+    if (num_infinite_edges() != other.num_infinite_edges()) return false;
     // Facets
-    // if (num_facets() != other.num_facets()) return false;
-    // if (num_finite_facets() != other.num_finite_facets()) return false;
-    // if (num_infinite_facets() != other.num_infinite_facets()) return false;
+    if (num_facets() != other.num_facets()) return false;
+    if (num_finite_facets() != other.num_finite_facets()) return false;
+    if (num_infinite_facets() != other.num_infinite_facets()) return false;
     return true;
   }
 

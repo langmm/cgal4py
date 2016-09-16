@@ -64,15 +64,23 @@ public:
       count++;
     return count;
   }
-  uint32_t num_finite_cells() const { return static_cast<uint32_t>(T.number_of_faces()); }
+  // uint32_t num_finite_cells() const { return static_cast<uint32_t>(T.number_of_faces()); }
+  uint32_t num_finite_cells() const { return (num_cells() - num_infinite_cells()); }
   uint32_t num_infinite_verts() const { return static_cast<uint32_t>(1); }
   uint32_t num_infinite_edges() const {
     Edge_circulator ec = T.incident_edges(T.infinite_vertex()), done(ec);
     if (ec == 0)
       return 0;
+    if ( ec.is_empty() )
+      return 0;
     int count = 0;
+    int32_t max = 100*(int32_t)num_finite_verts();
     do {
       count++;
+      if (count > max) {
+	printf("Error counting edges.\n");
+	return 0;
+      }
     } while (++ec != done);
     return count;
   }
@@ -80,15 +88,27 @@ public:
     Face_circulator fc = T.incident_faces(T.infinite_vertex()), done(fc);
     if (fc == 0)
       return 0;
+    if ( fc.is_empty() )
+      return 0;
     int count = 0;
+    int32_t max = 100*(int32_t)num_finite_verts();
     do {
       count++;
+      // printf("%d, %d, %d\n", 
+      // 	     (fc->vertex(0))->info(),
+      // 	     (fc->vertex(1))->info(),
+      // 	     (fc->vertex(2))->info());
+      if (count > max) {
+	printf("Error counting cells.\n");
+	return 0;
+      }
     } while (++fc != done);
     return count;
   }
   uint32_t num_verts() const { return (num_finite_verts() + num_infinite_verts()); }
   uint32_t num_edges() const { return (num_finite_edges() + num_infinite_edges()); }
-  uint32_t num_cells() const { return (num_finite_cells() + num_infinite_cells()); }
+  // uint32_t num_cells() const { return (num_finite_cells() + num_infinite_cells()); }
+  uint32_t num_cells() const { return static_cast<uint32_t>(T.tds().number_of_faces()); }
 
   bool is_equal(const Delaunay_with_info_2<Info> other) const {
     // Verts
@@ -808,6 +828,7 @@ public:
   {
     updated = true;
 
+    T.clear();
     if (T.number_of_vertices() != 0) 
       T.clear();
   
@@ -822,25 +843,41 @@ public:
 
     std::vector<Vertex_handle> V(n+1);
     std::vector<Face_handle> F(m);
+    Vertex_handle v;
+    I index;
+    int dim = (d == -1 ? 1 : d + 1);
+    I i;
+    int j;
 
     // infinite vertex
+    // V[n] = T.tds().create_vertex();
     V[n] = T.infinite_vertex();
 
-    // read vertices
-    I i;
+    // Create vertices
     for(i = 0; i < n; ++i) {
       V[i] = T.tds().create_vertex();
       V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1]);
       V[i]->info() = vert_info[i];
     }
 
+    // First face
+    i = 0;
+    F[i] = to_delete;
+    for (j = 0; j < dim; ++j) {
+      index = faces[dim*i + j];
+      if (index == idx_inf)
+	v = V[n];
+      else
+	v = V[index];
+      F[i]->set_vertex(j, v);
+      v->set_face(F[i]);
+    }
+    i++;
+
     // Creation of the faces
-    Vertex_handle v;
-    I index;
-    int dim = (d == -1 ? 1 : d + 1);
-    for(i = 0; i < m; ++i) {
+    for( ; i < m; ++i) {
       F[i] = T.tds().create_face() ;
-      for(int j = 0; j < dim ; ++j){
+      for(j = 0; j < dim ; ++j){
 	index = faces[dim*i + j];
 	if (index == idx_inf)
 	  v = V[n];
@@ -862,8 +899,7 @@ public:
     }
 
     // Remove flat face
-    T.tds().delete_face(to_delete);
-
+    // T.tds().delete_face(to_delete);
     T.set_infinite_vertex(V[n]);
   }
 

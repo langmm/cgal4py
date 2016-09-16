@@ -7,6 +7,20 @@
 #include <stdint.h>
 
 template<typename I>
+bool arg_tLT(I *cells, uint32_t *idx_verts, uint32_t ndim, uint64_t i1, uint64_t i2)
+{
+  uint32_t d;
+  for (d = 0; d < ndim; d++) {
+    if (cells[i1*ndim+idx_verts[i1*ndim+d]] < cells[i2*ndim+idx_verts[i2*ndim+d]])
+      return true;
+    else if (cells[i1*ndim+idx_verts[i1*ndim+d]] > cells[i2*ndim+idx_verts[i2*ndim+d]])
+      return false;
+  }
+  // Equal
+  return false;
+}
+
+template<typename I>
 bool tEQ(I *cells, uint32_t ndim, int64_t i1, int64_t i2)
 {
   uint32_t d;
@@ -191,5 +205,80 @@ void sortSerializedTess(I *cells, I *neigh,
 
   free(idx_fwd);
   free(idx_rev);
+}
+
+// Version only getting indexes of sort
+template<typename I>
+int64_t arg_partition_tess(I *cells, uint32_t *idx_verts, uint64_t *idx_cells,
+			   uint32_t ndim, int64_t l, int64_t r, int64_t p)
+{ 
+  uint64_t t;
+  int64_t i, j;
+
+  // Put pivot element in lowest element
+  t = idx_cells[l]; idx_cells[l] = idx_cells[p]; idx_cells[p] = t;
+  p = l;
+
+  for (i = l+1, j = r; i <= j; ) {
+    if ((arg_tLT(cells, idx_verts, ndim, idx_cells[p], idx_cells[i])) && 
+	(not arg_tLT(cells, idx_verts, ndim, idx_cells[p], idx_cells[j]))) {
+      t = idx_cells[i]; idx_cells[i] = idx_cells[j]; idx_cells[j] = t;
+    }
+    if (not arg_tLT(cells, idx_verts, ndim, idx_cells[p], idx_cells[i])) i++;
+    if (arg_tLT(cells, idx_verts, ndim, idx_cells[p], idx_cells[j])) j--;
+  }
+
+  // Put pivot element at j
+  t = idx_cells[l]; idx_cells[l] = idx_cells[j]; idx_cells[j] = t;
+
+  return j;
+}
+
+template<typename I>
+void arg_quickSort_tess(I *cells, uint32_t *idx_verts, uint64_t *idx_cells, 
+			uint32_t ndim, int64_t l, int64_t r)
+{
+  int64_t j;
+  if ( l < r )
+    {
+      j = arg_partition_tess(cells, idx_verts, idx_cells, ndim, l, r, (l+r)/2);
+      arg_quickSort_tess(cells, idx_verts, idx_cells, ndim, l, j-1);
+      arg_quickSort_tess(cells, idx_verts, idx_cells, ndim, j+1, r);
+    }
+}
+
+template<typename I>
+void arg_sortCellVerts(I *cells, uint32_t *idx, uint64_t ncells, uint32_t ndim)
+{
+  int64_t i, j, c;
+  I t;
+  int64_t l;
+  int64_t r;
+
+  for (c = 0; c < (int64_t)ncells; c++) {
+    l = ndim*c;
+    r = l + ndim - 1;
+
+    if (l == r) continue;
+    for (i = l+1; i <= r; i++) {
+      t = idx[i];
+      j = i - 1;
+      while ((j >= l) && (cells[l+idx[j]] < cells[l+t])) {
+	idx[j+1] = idx[j];
+	j--;
+      }
+      idx[j+1] = t;
+    }
+  }
+}
+
+template<typename I>
+void arg_sortSerializedTess(I *cells, uint64_t ncells, uint32_t ndim, 
+			    uint32_t *idx_verts, uint64_t *idx_cells)
+{
+  // Sort vertices in each cell w/ neighbors
+  arg_sortCellVerts(cells, idx_verts, ncells, ndim);
+  // Get indices to sort cells
+  arg_quickSort_tess(cells, idx_verts, idx_cells, ndim, 0, ncells-1);
 }
 
