@@ -140,17 +140,58 @@ def test_ParallelDelaunay_3D():
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
 
-# def test_ParallelDelaunay_periodic_2D():
-#     leaves2_periodic = copy.deepcopy(leaves20_periodic)
-#     T2_para = parallel.ParallelDelaunay(pts2, leaves2_periodic, 2)
-#     T2_seri = delaunay.Delaunay(pts2)
-#     assert(T2_para.is_equivalent(T2_seri))
+def test_ParallelDelaunay_periodic_2D():
+    pts, tree = make_test(0, 2, periodic=True)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    pts, tree = make_test(1000, 2, periodic=True)
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    T_seri = delaunay.Delaunay(pts)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+    #     print name
+    #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
+    #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
+    #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
 
-# def test_ParallelDelaunay_periodic_3D():
-#     leaves3_periodic = copy.deepcopy(leaves30_periodic)
-#     T3_para = parallel.ParallelDelaunay(pts3, leaves3_periodic, 2)
-#     T3_seri = delaunay.Delaunay(pts3)
-#     assert(T3_para.is_equivalent(T3_seri))
+def test_ParallelDelaunay_periodic_3D():
+    pts, tree = make_test(0, 3, periodic=True)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+    #     print name
+    #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
+    #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
+    #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
+    #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    pts, tree = make_test(1000, 3, periodic=True)
+    T_para = parallel.ParallelDelaunay(pts, tree, 2)
+    T_seri = delaunay.Delaunay(pts)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+    #     print name
+    #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
+    #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
+    #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
+    #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
 
 def test_DelaunayProcess2():
     pts, tree = make_test(0, 2)

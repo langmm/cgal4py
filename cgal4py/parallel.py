@@ -172,6 +172,7 @@ class consolidate_leaves(object):
         self.pts = pts
         self.npts = pts.shape[0]
         self.ndim = pts.shape[1]
+        self.dim_range = range(self.ndim + 1)
         if self.npts >= np.iinfo('uint32').max:
             use_double = True
         if use_double:
@@ -209,19 +210,18 @@ class consolidate_leaves(object):
         ncells = np.sum(self.leaf_counts)
         self.cells = np.zeros((ncells, self.ndim+1), int) - 1
         self.neigh = np.zeros((ncells, self.ndim+1), int) - 1
-        self.source = np.zeros((ncells, 2), int) - 1
         self.ncells = 0
         self.split_dict = CellDict()
+        self.inf_dict = CellDict()
         self.split_index = CellIndex(ncells, self.ndim)
         self.inf_index = CellIndex(ncells, self.ndim)
         for i in range(self.num_leaves):
             self.walk_cells(i)
+        self.walk_inf()
         self.cells = self.cells[:self.ncells,:]
         self.neigh = self.neigh[:self.ncells,:]
-        self.source = self.source[:self.ncells,:]
-        self.walk_inf()
         if np.sum(self.neigh < 0) != 0:
-            for i in range(self.cells.shape[0]):
+            for i in self.dim_range:
                 print i,self.cells[i,:], self.neigh[i,:]
         assert(np.sum(self.cells < 0) == 0)
         assert(np.sum(self.neigh < 0) == 0)
@@ -229,46 +229,6 @@ class consolidate_leaves(object):
         cells[cells != idx_inf] = tree.idx[cells[cells != idx_inf]]
         self.T.deserialize(pts[tree.idx,:], cells.astype(type(idx_inf)), 
                            self.neigh.astype(type(idx_inf)), idx_inf)
-
-    def get_cell_verts(self, leafid, cidx):
-        r"""Get the global leaf-sorted vertex indices for a cell on a leaf.
-
-        Args:
-            leafid (int): Index specifying a leaf in the tree.
-            cidx (int): Index of a cell on the leaf.
-
-        Returns:
-            np.ndarray of int: Global leaf-sorted indices of vertices in the 
-                specified cell.
-
-        """
-        return self.leaf_cells[self.leaf_start[leafid]+cidx,:]
-
-    def get_cell_neigh(self, leafid, cidx):
-        r"""Get the neighboring cells for a cell on a leaf.
-
-        Args:
-            leafid (int): Index specifying a leaf in the tree.
-            cidx (int): Index of a cell on the leaf.
-
-        Returns:
-            np.ndarray of int: Indices of neighboring cells on this leaf.
-
-        """
-        return self.leaf_neigh[self.leaf_start[leafid]+cidx,:]
-
-    def get_cell_visit(self, leafid, cidx):
-        r"""Get the status of the cell.
-
-        Args:
-            leafid (int): Index specifying a leaf in the tree.
-            cidx (int): Index of a cell on the leaf.
-
-        Returns:
-            int: Integer specifying the status of the cell.
-
-        """
-        return self.visited[self.leaf_start[leafid]+int(cidx)]
 
     def set_cell_visit(self, leafid, cidx, value):
         r"""Set the status of the cell.
@@ -289,12 +249,15 @@ class consolidate_leaves(object):
             curr_leaf (int): Index of the leaf that should be processed.
 
         """
-        leaf = self.tree.leaves[curr_leaf]
+        istart = self.leaf_start[curr_leaf]
         for curr_cell in xrange(self.leaf_counts[curr_leaf]):
-            verts = self.get_cell_verts(curr_leaf, curr_cell)
-            neigh = self.get_cell_neigh(curr_leaf, curr_cell)
-            self.add_cell(curr_leaf, curr_cell, verts)
-            self.add_neigh(curr_leaf, curr_cell, verts, neigh)
+            i = istart + curr_cell
+            verts = self.leaf_cells[i, :]
+            neigh = self.leaf_neigh[i, :]
+            idx = self.add_cell(curr_leaf, curr_cell, verts)
+            if idx >= 0:
+                neigh = self.leaf_neigh[i, :]
+                self.add_neigh(curr_leaf, curr_cell, verts, neigh, idx)
 
     def walk_inf(self):
         r"""Perform an iteration over the global cell neighbor list, adding 
@@ -316,97 +279,81 @@ class consolidate_leaves(object):
                     new_neigh = np.zeros(self.ndim+1, 'int') - 1
                     new_neigh[idx_miss] = c
                     idx_sort_verts = np.argsort(new_cell)
-                    idx = self.inf_index.insert(new_cell[idx_sort_verts], self.ncells)
+                    idx = self.inf_dict.insert(new_cell[idx_sort_verts], self.ncells)
+                    # idx = self.inf_index.insert(new_cell[idx_sort_verts], self.ncells)
                     self.neigh[c, idx_miss] = idx
                     if idx == self.ncells:
                         self.append_cell(new_cell, new_neigh, start=norig, stop=self.ncells)
             else:
                 print("{} neighbors missing from cell {}...".format(self.ndim+1-Nneigh,c))
                 print("    cells = {}, neigh = {}".format(self.cells[c,:], self.neigh[c,:]))
-                src = self.source[c,:]
-                print("    source = {}, visited = {}".format(src,self.get_cell_visit(src[0],src[1])))
-                for n in self.get_cell_neigh(src[0], src[1]):
-                    print('        ',self.get_cell_verts(src[0], n), self.get_cell_visit(src[0],n))
                 mult_miss.append(c)
 
     def add_cell(self, curr_leaf, curr_cell, verts):
-        if (self.get_cell_visit(curr_leaf,curr_cell) != -1):
-            return
         idx_sort_verts = self.leaf_idx_verts[self.leaf_start[curr_leaf]+curr_cell,:]
         # Infinite
         if (verts[idx_sort_verts[0]] == self.idx_inf):
             self.set_cell_visit(curr_leaf,curr_cell,-777)
             return
         # Finite
-        leaves = self.find_leaves(verts)
+        leaves = self.find_leaves(verts[idx_sort_verts])
         # All points on a single leaf
         if len(leaves) == 1:
             # This leaf
             if leaves[0] == curr_leaf:
-                idx = self.get_cell_visit(curr_leaf,curr_cell)
+                idx = self.visited[self.leaf_start[curr_leaf]+curr_cell]
                 if idx < 0:
                     idx = self.ncells
                     self.cells[idx,:] = verts
-                    self.source[idx,:] = np.array([curr_leaf,curr_cell])
                     self.ncells += 1
-                self.set_cell_visit(curr_leaf,curr_cell,idx)
+                    self.set_cell_visit(curr_leaf,curr_cell,idx)
             else:
                 oth_leaf = leaves[0]
                 oth_cell = self.find_cell_on_leaf(oth_leaf, verts, idx_sort_verts)
                 if oth_cell >= 0:
-                    idx = self.get_cell_visit(oth_leaf, oth_cell)
+                    idx = self.visited[self.leaf_start[oth_leaf]+oth_cell]
                     if idx < 0:
                         idx = self.ncells
                         self.cells[idx,:] = verts
-                        self.source[idx,:] = np.array([curr_leaf,curr_cell])
                         self.set_cell_visit(oth_leaf,oth_cell,idx)
                         self.ncells += 1
-                    self.set_cell_visit(curr_leaf,curr_cell,idx)
+                        self.set_cell_visit(curr_leaf,curr_cell,idx)
+                else:
+                    idx = -1
         # Split between leaves
         else:
-            # idx = self.split_dict.insert(verts, self.ncells)
-            idx = self.split_index.insert(verts[idx_sort_verts], self.ncells)
+            idx = self.split_dict.insert(verts[idx_sort_verts], self.ncells)
+            # idx = self.split_index.insert(verts[idx_sort_verts], self.ncells)
             self.set_cell_visit(curr_leaf,curr_cell,idx)
             if idx == self.ncells:
                 self.cells[self.ncells,:] = verts
-                self.source[self.ncells,:] = np.array([curr_leaf,curr_cell])
                 self.ncells += 1
+        return idx
 
-    def add_neigh(self, curr_leaf, curr_cell, verts, neigh):
-        c_total = self.get_cell_visit(curr_leaf, curr_cell)
-        if c_total < 0:
-            return
-        nlist_total = [list(self.cells[c_total,:]).index(_) for _ in verts]
+    def add_neigh(self, curr_leaf, curr_cell, verts, neigh, c_total):
         # Loop over neighbors for this cell  
-        idx_sort = np.zeros(self.ndim+1, 'int') - 1
-        new_neigh = self.neigh[c_total, :]
-        for n_local in range(self.ndim+1):
-            n_total = list(self.cells[c_total,:]).index(verts[n_local])
-            assert(verts[n_local] == self.cells[c_total, n_total])
-            oth_c = self.get_cell_visit(curr_leaf, neigh[n_local])
+        for n_local in self.dim_range:
+            oth_c = self.visited[self.leaf_start[curr_leaf]+neigh[n_local]]
             if oth_c < 0:
                 continue
-            for n_other in range(self.ndim+1):
-                if self.cells[oth_c, n_other] not in self.cells[c_total,:]:
+            for n_total in self.dim_range:
+                if self.cells[c_total,n_total] == verts[n_local]:
                     break
+            # assert(verts[n_local] == self.cells[c_total, n_total])
             old_c = self.neigh[c_total, n_total]
-            if (old_c >= 0): 
-                if (old_c == oth_c):
-                    # assert(self.neigh[old_c, n_total] == c_total)
-                    # assert(n_total == n_other)
-                    continue
-                else:
-                    print(n_total, n_other, self.cells[c_total,:], self.cells[old_c,:], self.cells[oth_c,:])
-                    old_src = self.source[old_c,:]
-                    oth_src = self.source[oth_c,:]
-                    print("    old",old_src,self.get_cell_visit(old_src[0],old_src[1]))
-                    print("    oth",oth_src,self.get_cell_visit(oth_src[0],oth_src[1]))
-                    print("        leaves", self.find_leaves(self.cells[c_total,:],full=True),
-                              self.find_leaves(self.cells[old_c,:],full=True), 
-                              self.find_leaves(self.cells[oth_c,:],full=True))
-            else:
+            if old_c < 0:
+                for n_other in self.dim_range:
+                    if self.cells[oth_c, n_other] not in self.cells[c_total,:]:
+                        break
                 self.neigh[c_total, n_total] = oth_c
                 self.neigh[oth_c, n_other] = c_total
+            elif (old_c == oth_c):
+                # assert(self.neigh[old_c, n_total] == c_total)
+                # assert(n_total == n_other)
+                continue
+            else:
+                print(c_total, n_total, self.cells[c_total,:], self.cells[old_c,:], self.cells[oth_c,:])
+                raise Exception("There are conflicting neighbors.")
 
     def find_swap(self, i, n1, n2, orig=None, level=0):
         if orig is None:
@@ -436,7 +383,7 @@ class consolidate_leaves(object):
     def find_cell_on_leaf(self, curr_leaf, verts, idx_sort):
         i = self.leaf_start[curr_leaf]
         d = 0
-        dims = range(self.ndim+1)
+        dims = self.dim_range
         quit = False
         while (i < self.leaf_stop[curr_leaf]):
             isort = self.leaf_idx_cells[i]
@@ -451,23 +398,11 @@ class consolidate_leaves(object):
                     quit = True
                     break
             if equal:
-                return isort
+                return int(isort)
             if quit:
                 break
             else:
                 i += 1
-        # key = tuple(sorted(verts))
-        # for curr_cell in xrange(self.leaf_counts[curr_leaf]):
-        #     key2 = tuple(sorted(self.get_cell_verts(curr_leaf, curr_cell)))
-        #     equal = True
-        #     for d in range(self.ndim+1):
-        #         if key[d] != key2[d]:
-        #             equal = False
-        #             break
-        #     if equal:
-        #         return curr_cell
-            # if key == tuple(sorted(self.get_cell_verts(curr_leaf, curr_cell))):
-            #     return curr_cell
         return -1
 
     def append_cell(self, c, n, start=0, stop=None):
@@ -483,38 +418,40 @@ class consolidate_leaves(object):
 
         """
         c, n = self.find_neigh(c, n, start=start, stop=stop)
-        self.cells = np.concatenate([self.cells, c.reshape((1,len(c)))])
-        self.neigh = np.concatenate([self.neigh, n.reshape((1,len(n)))])
+        self.cells[self.ncells,:] = c
+        self.neigh[self.ncells,:] = n
+        # self.cells = np.concatenate([self.cells, c.reshape((1,len(c)))])
+        # self.neigh = np.concatenate([self.neigh, n.reshape((1,len(n)))])
         self.ncells += 1
 
-    def find_leaves(self, c, full=False):
+    def find_leaves(self, c):
         r"""Determine which leaves originally owned vertices in the set.
 
         Args:
             c (np.ndarray of int): Vertex indices.
-            full (bool, optional): If True, a leaf is recorded for every vertex 
-                including `None` for the infinite vertex. Otherwise, a unique 
-                set of leaves is returned. Defaults to `False`.
 
         Returns:
             list of int: Indices of leaves that own one or more of the vertices.
 
         """
         leaves = []
-        for x in c:
-            if x == self.idx_inf:
-                if full:
-                    leaves.append(None)
-                continue
-            for i in xrange(self.num_leaves):
-                leaf = self.tree.leaves[i]
-                if x < leaf.stop_idx:
-                    leaves.append(i)
-                    break
-        if full:
-            return leaves
-        else:
-            return list(set(leaves))
+        ic_final = len(c); il_final = self.num_leaves
+        if c[0] == self.idx_inf:
+            ic_final -= 1
+        ic = 0; il = 0
+        while ic < ic_final and il < il_final:
+            sidx = self.tree.leaves[il].start_idx
+            while (ic < ic_final) and (c[-(ic + 1)] < sidx):
+                ic += 1
+            if (ic >= ic_final): break
+            x = c[-(ic + 1)]
+            while (il < il_final) and (x >= self.tree.leaves[il].stop_idx):
+                il += 1
+            if (il >= il_final): break
+            leaves.append(il)
+            ic += 1
+            il += 1
+        return leaves
 
     def find_neigh(self, c1, n1, start=0, stop=None):
         r"""Look for neighbors in existing cells.
@@ -531,17 +468,25 @@ class consolidate_leaves(object):
             return c1, n1
         if stop is None:
             stop = self.ncells
+        matches1 = np.empty(self.ndim+1, 'int')
+        matches2 = np.empty(self.ndim+1, 'int')
         for i2 in range(start,stop):
             c2 = self.cells[i2,:]
             n2 = self.neigh[i2,:]
-            matches1 = np.zeros(self.ndim+1, 'int') - 1
-            matches2 = np.zeros(self.ndim+1, 'int') - 1
-            for v2 in range(self.ndim+1):
+            if -1 not in n2:
+                continue
+            matches1[:] = -1
+            matches2[:] = -1
+            match_count = 0
+            for v2 in self.dim_range:
                 if c2[v2] in c1:
-                    v1 = list(c1).index(c2[v2])
+                    for v1 in self.dim_range:
+                        if c1[v1] == c2[v2]:
+                            break
                     matches2[v2] = v1
                     matches1[v1] = v2
-            if np.sum(matches1 < 0) == 1:
+                    match_count += 1
+            if match_count == self.ndim:
                 n1[(matches1 < 0)] = i2
                 self.neigh[i2,(matches2 < 0)] = self.ncells
         return c1, n1
