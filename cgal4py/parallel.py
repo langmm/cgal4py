@@ -31,30 +31,26 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
         task = leaf.id % nproc
         task2leaves[task].append(leaf)
     # Create & execute processes
-    queues = [mp.Queue() for _ in xrange(nproc)]
+    queues = [mp.Queue() for _ in xrange(nproc+1)]
     processes = [DelaunayProcess(task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
     for p in processes:
         p.start()
-    done = False
-    while not done:
-        time.sleep(0.01)
-        done = True
-        for p in processes:
-            if p.exitcode is None:
-                done = False
-                break
-    for p in processes:
-        p.join()
-    for p in processes:
-        p.terminate()
     # Get leaves with tessellation
     serial = [None for _ in xrange(tree.num_leaves)]
-    for q in queues:
-        ileaves = q.get()
+    count = 0
+    while count < nproc:
+        ileaves = queues[-1].get()
         for iid, s in ileaves:
             assert(tree.leaves[iid].id == iid)
             serial[iid] = s
+        count += 1
+        time.sleep(0.01)
+    for q in queues:
         q.close()
+    for p in processes:
+        p.join()
+    # for p in processes:
+        p.terminate()
     # Consolidate tessellation
     idx_sort = np.argsort(tree.idx)
     t0 = time.time()
@@ -411,87 +407,19 @@ class consolidate_leaves(object):
             else:
                 self.neigh[c_total, n_total] = oth_c
                 self.neigh[oth_c, n_other] = c_total
-                # print 'before',n_total,n_other, c_total, oth_c, self.neigh[c_total,:], self.neigh[oth_c, :]
-                # found = self.find_swap(c_total, n_total, n_other, orig=[c_total, oth_c])
-                # print 'after',n_total,n_other, c_total, oth_c, self.neigh[c_total,:], self.neigh[oth_c, :]
-                # # if not found:
-                # #     print 'before oth',n_total,n_other, c_total, oth_c, self.neigh[c_total,:], self.neigh[oth_c, :]
-                # #     found = self.find_swap(oth_c, n_other, n_total, orig=[oth_c, c_total])
-                # #     print 'after oth',n_total,n_other, c_total, oth_c, self.neigh[c_total,:], self.neigh[oth_c, :]
-                    
-                # if found:
-                #     assert(self.neigh[c_total, n_other] == -1)
-                #     assert(self.neigh[oth_c, n_other] == -1)
-                #     self.neigh[c_total, n_other] = oth_c
-                #     self.neigh[oth_c, n_other] = c_total
-                # # if self.neigh[c_total, n_other] < 0:
-                # #     self.swap_neigh(c_total, n_other, n_total)
-                # #     self.neigh[c_total, n_other] = oth_c
-                # #     self.neigh[oth_c, n_other] = c_total
-                # # elif self.neigh[oth_c, n_total] < 0:
-                # #     self.swap_neigh(oth_c, n_other, n_total)
-                # #     self.neigh[c_total, n_total] = oth_c
-                # #     self.neigh[oth_c, n_total] = c_total
-                # # elif self.neigh[self.neigh[c_total, n_other], n_total] < 0:
-                # #     self.swap_neigh(self.neigh[c_total, n_other], n_total, n_other)
-                # #     self.swap_neigh(c_total, n_total, n_other)
-                # #     self.neigh[c_total, n_other] = oth_c
-                # #     self.neigh[oth_c, n_other] = c_total
-                # # elif self.neigh[self.neigh[oth_c, n_total], n_other] < 0:
-                # #     self.swap_neigh(self.neigh[oth_c, n_total], n_total, n_other)
-                # #     self.swap_neigh(oth_c, n_total, n_other)
-                # #     self.neigh[c_total, n_total] = oth_c
-                # #     self.neigh[oth_c, n_total] = c_total
-                # else:
-                #     self.neigh[c_total, n_total] = oth_c
-                #     self.neigh[oth_c, n_other] = c_total
-                # #     found = False
-                # #     for i in range(self.ndim+1):
-                # #         if (self.neigh[c_total,i] == -1) and (self.neigh[oth_c,i] == -1):
-                # #             self.swap_neigh(c_total, n_total, i)
-                # #             self.swap_neigh(oth_c, n_other, i)
-                # #             self.neigh[c_total, i] = oth_c
-                # #             self.neigh[oth_c, i] = c_total
-                # #             found = True
-                # #             break
-                # # #     # for i,n in enumerate(self.neigh[c_total,:]):
-                # # #     #     if self.neigh[n, n_total] < 0:
-                # # #     #         print i, n_total
-                # # #     #         self.swap_neigh(c_total, i, n_total)
-                # # #     #         self.swap_neigh(n, i, n_total)
-                # # #     #         break
-                # #     if not found:
-                # #         print c_total, self.neigh[c_total,:]
-                # #         print oth_c, self.neigh[oth_c,:]
-                # #         print n_total, n_other
-                # #         print 'this'
-                # #         for n in self.neigh[c_total,:]:
-                # #             if n >= 0:
-                # #                 print n
-                # #                 print n, self.neigh[n,:]
-                # #                 for n2 in self.neigh[n,:]:
-                # #                     print '    ',n2,self.neigh[n2,:]
-                # #         print 'other'
-                # #         for n in self.neigh[oth_c,:]:
-                # #             if n >= 0:
-                # #                 print n, self.neigh[n,:]
-                # #         raise Exception
 
     def find_swap(self, i, n1, n2, orig=None, level=0):
         if orig is None:
             orig = [i]
         else:
             if (level > 0) and (i in orig):
-                print i, orig
                 return False
         if (n1 == n2):
             return True
         elif (self.neigh[i,n2] == -1):
-            print 'swap', n1, n2, self.neigh[i,:]
             self.swap_neigh(i, n1, n2)
             return True
         else:
-            print orig, i, n1, n2, self.neigh[i,:]
             out = self.find_swap(self.neigh[i,n2], n2, n1, orig=orig, level=level+1)
             if out:
                 self.swap_neigh(i, n1, n2)
@@ -647,6 +575,7 @@ class DelaunayProcess(mp.Process):
         else:
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
+        self._done = False
 
     # def plot_leaves(self, plotbase=None):
     #     r"""Plots the tessellation for each leaf on this process.
@@ -674,6 +603,7 @@ class DelaunayProcess(mp.Process):
             for i in xrange(self._total_leaves):
                 task = i % self._num_proc
                 self._queues[task].put((i,leaf.id,hvall[i]))
+                time.sleep(0.01)
 
     def incoming_points(self):
         r"""Takes points from the queue and adds them to the triangulation."""
@@ -694,7 +624,9 @@ class DelaunayProcess(mp.Process):
     def finalize_process(self):
         r"""Enqueue resulting tessellation."""
         out = [(leaf.id,leaf.serialize()) for leaf in self._leaves]
-        self._queues[self._proc_idx].put(out)
+        # self._queues[self._proc_idx].put(out)
+        self._queues[-1].put(out)
+        self._done = True
         
     def run(self):
         r"""Performs tessellation and communication for each leaf on this process."""
