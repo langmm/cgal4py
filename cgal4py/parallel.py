@@ -6,6 +6,8 @@ import sys, os, time, copy
 
 import multiprocessing as mp
 
+use_python = False
+
 def ParallelDelaunay(pts, tree, nproc, use_double=False):
     r"""Return a triangulation that is constructed in parallel.
 
@@ -52,13 +54,72 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     # for p in processes:
         p.terminate()
     # Consolidate tessellation
-    idx_sort = np.argsort(tree.idx)
     t0 = time.time()
-    out = consolidate_leaves(tree, serial, pts,
-                             idx_sort, use_double=use_double).T
+    out = consolidate_tess(tree, serial, pts, use_double=use_double)
     t1 = time.time()
     print("Consolidation took {} s".format(t1-t0))
     return out
+
+def consolidate_tess(tree, serial, pts, use_double=False):
+    r"""Creates a single triangulation from the triangulations of leaves.
+
+    Args:
+        tree (object): Domain decomposition tree for splitting points among the 
+            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        serial (list): Serialized tessellation info for each leaf.
+        pts (np.ndarray of float64): (n,m) Array of n mD points. 
+        use_double (bool, optional): If True, the triangulation is forced to use 
+            64bit integers reguardless of if there are too many points for 32bit. 
+            Otherwise 32bit integers are used so long as the number of points is 
+            <=4294967295. Defaults to False.
+
+    Returns:
+        :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
+            consolidated 2D or 3D triangulation object.
+
+    """
+    npts = pts.shape[0]
+    ndim = pts.shape[1]
+    num_leaves = tree.num_leaves
+    if npts >= np.iinfo('uint32').max:
+        use_double = True
+    if use_double:
+        idx_inf = np.uint64(np.iinfo('uint64').max)
+    else:
+        idx_inf = np.uint32(np.iinfo('uint32').max)
+    leaf_vidx_start = np.empty(num_leaves, 'uint64')
+    leaf_vidx_stop = np.empty(num_leaves, 'uint64')
+    for i in xrange(num_leaves):
+        leaf_vidx_start[i] = tree.leaves[i].start_idx
+        leaf_vidx_stop[i] = tree.leaves[i].stop_idx
+
+    if use_python:
+        obj = ConsolidatedLeaves(ndim, idx_inf, serial, 
+                                 leaf_vidx_start, leaf_vidx_stop)
+        cells = obj.cells
+        neigh = obj.neigh
+    else:
+        from cgal4py.delaunay.tools import consolidate_leaves
+        cells, neigh = consolidate_leaves(ndim, idx_inf, serial,
+                                          leaf_vidx_start, leaf_vidx_stop)
+
+        if np.sum(neigh == idx_inf) != 0:
+            for i in range(cells.shape[0]):
+                print i,cells[i,:], neigh[i,:]
+        assert(np.sum(neigh == idx_inf) == 0)
+    # Translate vertices to original values in tree
+    ncells = cells.shape[0]
+    for i in xrange(ncells):
+        for j in range(ndim+1):
+            if cells[i,j] != idx_inf:
+                cells[i,j] = tree.idx[cells[i,j]]
+    if cells.dtype != type(idx_inf):
+        cells = cells.astype(type(idx_inf))
+        neigh = neigh.astype(type(idx_inf))
+    # Do tessellation
+    T = Delaunay(np.zeros([0,ndim]), use_double=use_double)
+    T.deserialize(pts[tree.idx,:], cells, neigh, idx_inf)
+    return T
 
 class CellIndex(object):
 
@@ -147,44 +208,26 @@ class CellDict(object):
         else:
             return i
 
-class consolidate_leaves(object):
+class ConsolidatedLeaves(object):
 
     r"""Creates a single triangulation from the triangulations of leaves.
 
     Args:
-        tree (object): Domain decomposition tree for splitting points among the 
-            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        ndim (int): Number of dimensions.
         serial (list): Serialized tessellation info for each leaf.
-        pts (np.ndarray of float64): (n,m) Array of n mD points. 
-        use_double (bool, optional): If True, the triangulation is forced to use 
-            64bit integers reguardless of if there are too many points for 32bit. 
-            Otherwise 32bit integers are used so long as the number of points is 
-            <=4294967295. Defaults to False.
-
-    Returns:
-        :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
-            consolidated 2D or 3D triangulation object.
 
     """
-    def __init__(self, tree, serial, pts, idx_sort, use_double=False):
-        self.tree = tree
-        self.num_leaves = len(tree.leaves)
-        self.pts = pts
-        self.npts = pts.shape[0]
-        self.ndim = pts.shape[1]
-        self.dim_range = range(self.ndim + 1)
-        if self.npts >= np.iinfo('uint32').max:
-            use_double = True
-        if use_double:
-            idx_inf = np.uint64(np.iinfo('uint64').max)
-        else:
-            idx_inf = np.uint32(np.iinfo('uint32').max)
-        self.use_double = use_double
+    def __init__(self, ndim, idx_inf, serial, leaf_vidx_start, leaf_vidx_stop):
+        self.ndim = ndim
         self.idx_inf = idx_inf
+        self.leaf_vidx_start = leaf_vidx_start
+        self.leaf_vidx_stop = leaf_vidx_stop
+        self.num_leaves = len(leaf_vidx_start)
+        self.dim_range = range(self.ndim + 1)
         # Get counts
-        self.leaf_counts = np.zeros(self.num_leaves,'int')
-        self.leaf_start = np.zeros(self.num_leaves,'int')
-        self.leaf_stop = np.zeros(self.num_leaves,'int')
+        self.leaf_counts = np.empty(self.num_leaves,'int')
+        self.leaf_start = np.empty(self.num_leaves,'int')
+        self.leaf_stop = np.empty(self.num_leaves,'int')
         prev = 0
         for i,s in enumerate(serial):
             curr = s[0].shape[0]
@@ -206,7 +249,6 @@ class consolidate_leaves(object):
             self.leaf_cells[islc, :][s[0] == s[2]] = self.idx_inf
             self.leaf_idx_verts[islc, :] = s[3]
             self.leaf_idx_cells[islc] = s[4] + self.leaf_start[i]
-        self.T = Delaunay(np.zeros([0,self.ndim]), use_double=use_double)
         ncells = np.sum(self.leaf_counts)
         self.cells = np.zeros((ncells, self.ndim+1), int) - 1
         self.neigh = np.zeros((ncells, self.ndim+1), int) - 1
@@ -220,15 +262,12 @@ class consolidate_leaves(object):
         self.walk_inf()
         self.cells = self.cells[:self.ncells,:]
         self.neigh = self.neigh[:self.ncells,:]
+        # Check that cells/neighbors are filled in
         if np.sum(self.neigh < 0) != 0:
-            for i in self.dim_range:
+            for i in range(ndim+1):
                 print i,self.cells[i,:], self.neigh[i,:]
         assert(np.sum(self.cells < 0) == 0)
         assert(np.sum(self.neigh < 0) == 0)
-        cells = self.cells
-        cells[cells != idx_inf] = tree.idx[cells[cells != idx_inf]]
-        self.T.deserialize(pts[tree.idx,:], cells.astype(type(idx_inf)), 
-                           self.neigh.astype(type(idx_inf)), idx_inf)
 
     def set_cell_visit(self, leafid, cidx, value):
         r"""Set the status of the cell.
@@ -294,7 +333,7 @@ class consolidate_leaves(object):
         # Infinite
         if (verts[idx_sort_verts[0]] == self.idx_inf):
             self.set_cell_visit(curr_leaf,curr_cell,-777)
-            return
+            return -1
         # Finite
         leaves = self.find_leaves(verts[idx_sort_verts])
         # All points on a single leaf
@@ -440,12 +479,12 @@ class consolidate_leaves(object):
             ic_final -= 1
         ic = 0; il = 0
         while ic < ic_final and il < il_final:
-            sidx = self.tree.leaves[il].start_idx
+            sidx = self.leaf_vidx_start[il]
             while (ic < ic_final) and (c[-(ic + 1)] < sidx):
                 ic += 1
             if (ic >= ic_final): break
             x = c[-(ic + 1)]
-            while (il < il_final) and (x >= self.tree.leaves[il].stop_idx):
+            while (il < il_final) and (x >= self.leaf_vidx_stop[il]):
                 il += 1
             if (il >= il_final): break
             leaves.append(il)
@@ -722,8 +761,12 @@ class ParallelLeaf(object):
 
         """
         cells, neigh, idx_inf = self.T.serialize()
-        fin = (cells != idx_inf)
-        cells[fin] = self.idx[cells[fin]]
+        for i in xrange(cells.shape[0]):
+            for j in xrange(cells.shape[1]):
+                if cells[i,j] != idx_inf:
+                    cells[i,j] = self.idx[cells[i,j]]
+        # fin = (cells != idx_inf)
+        # cells[fin] = self.idx[cells[fin]]
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
         return cells, neigh, idx_inf, idx_verts, idx_cells
 

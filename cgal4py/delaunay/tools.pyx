@@ -452,3 +452,130 @@ def py_arg_partition_tess(np.ndarray[np.int64_t, ndim=2] cells,
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     return arg_partition_tess[int64_t](&cells[0,0], &idx_verts[0,0], &idx_cells[0], 
                                        ndim, l, r, p)
+
+cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial,
+                                        np.ndarray[np.uint64_t] leaf_start,
+                                        np.ndarray[np.uint64_t] leaf_stop):
+    cdef int i
+    cdef object s
+    cdef sLeaves32 leaves
+    cdef np.uint32_t idx_inf
+    cdef np.ndarray[np.uint32_t, ndim=2] verts
+    cdef np.ndarray[np.uint32_t, ndim=2] neigh
+    cdef np.ndarray[np.uint32_t, ndim=2] sort_verts
+    cdef np.ndarray[np.uint64_t, ndim=1] sort_cells
+    for i,s in enumerate(serial):
+        verts = s[0]
+        neigh = s[1]
+        idx_inf = s[2]
+        sort_verts = s[3]
+        sort_cells = s[4]
+        leaves.push_back(sLeaf32(i, ndim, <int64_t>s[0].shape[0],
+                                 <uint32_t>leaf_start[i], <uint32_t>leaf_stop[i],
+                                 idx_inf, &verts[0,0], &neigh[0,0],
+                                 &sort_verts[0,0], &sort_cells[0]))
+    return leaves
+
+cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial,
+                                        np.ndarray[np.uint64_t] leaf_start,
+                                        np.ndarray[np.uint64_t] leaf_stop):
+    cdef int i
+    cdef object s
+    cdef sLeaves64 leaves
+    cdef np.uint64_t idx_inf
+    cdef np.ndarray[np.uint64_t, ndim=2] verts
+    cdef np.ndarray[np.uint64_t, ndim=2] neigh
+    cdef np.ndarray[np.uint32_t, ndim=2] sort_verts
+    cdef np.ndarray[np.uint64_t, ndim=1] sort_cells
+    for i,s in enumerate(serial):
+        verts = s[0]
+        neigh = s[1]
+        idx_inf = s[2]
+        sort_verts = s[3]
+        sort_cells = s[4]
+        leaves.push_back(sLeaf64(i, ndim, <int64_t>s[0].shape[0],
+                                 <uint64_t>leaf_start[i], <uint64_t>leaf_stop[i],
+                                 idx_inf, &verts[0,0], &neigh[0,0],
+                                 &sort_verts[0,0], &sort_cells[0]))
+    return leaves
+        
+cdef np.int64_t _consolidate_uint32_uint64(np.uint32_t ndim, np.uint64_t idx_inf,
+                                           object serial,
+                                           np.ndarray[np.uint64_t] leaf_start,
+                                           np.ndarray[np.uint64_t] leaf_stop,
+                                           np.ndarray[np.uint64_t, ndim=2] verts, 
+                                           np.ndarray[np.uint64_t, ndim=2] cells):
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
+    cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef ConsolidatedLeaves[uint64_t,uint32_t] obj
+    obj = ConsolidatedLeaves[uint64_t,uint32_t](ndim, num_leaves, idx_inf, 
+                                                &verts[0,0], &cells[0,0], leaves)
+    cdef np.int64_t ncells = obj.ncells
+    return ncells
+
+cdef np.int64_t _consolidate_uint32_uint32(np.uint32_t ndim, np.uint32_t idx_inf,
+                                           object serial,
+                                           np.ndarray[np.uint64_t] leaf_start,
+                                           np.ndarray[np.uint64_t] leaf_stop,
+                                           np.ndarray[np.uint32_t, ndim=2] verts, 
+                                           np.ndarray[np.uint32_t, ndim=2] cells):
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
+    cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
+    obj = ConsolidatedLeaves[uint32_t,uint32_t](ndim, num_leaves, idx_inf, 
+                                                &verts[0,0], &cells[0,0], leaves)
+    cdef np.int64_t ncells = obj.ncells
+    return ncells
+
+cdef np.int64_t _consolidate_uint64_uint64(np.uint32_t ndim, np.uint64_t idx_inf,
+                                           object serial,
+                                           np.ndarray[np.uint64_t] leaf_start,
+                                           np.ndarray[np.uint64_t] leaf_stop,
+                                           np.ndarray[np.uint64_t, ndim=2] verts, 
+                                           np.ndarray[np.uint64_t, ndim=2] cells):
+    cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial, leaf_start, leaf_stop)
+    cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef ConsolidatedLeaves[uint64_t,uint64_t] obj
+    obj = ConsolidatedLeaves[uint64_t,uint64_t](ndim, num_leaves, idx_inf, 
+                                                &verts[0,0], &cells[0,0], leaves)
+    cdef np.int64_t ncells = obj.ncells
+    return ncells
+
+def consolidate_leaves(ndim, idx_inf, serial, leaf_start, leaf_stop):
+    dtype_comb = type(idx_inf)
+    dtype_leaf = serial[0][0].dtype
+    ncells = 0
+    for s in serial:
+        ncells += s[0].shape[0]
+    if dtype_comb == np.uint32:
+        verts = idx_inf*np.ones((ncells, ndim+1), 'uint32')
+        neigh = idx_inf*np.ones((ncells, ndim+1), 'uint32')
+        if dtype_leaf == np.uint32:
+            ncells = _consolidate_uint32_uint32(<np.uint32_t>ndim, idx_inf, serial, 
+                                                leaf_start, leaf_stop,
+                                                verts, neigh)
+        # This case makes no sense so it is not currently supported
+        # elif dtype_leaf == np.uint64:
+        #     ncells = _consolidate_uint64_uint32(ndim, idx_inf, serial, 
+        #                                         leaf_start, leaf_stop,
+        #                                         verts, neigh)
+        else:
+            raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
+    elif dtype_comb == np.uint64:
+        verts = idx_inf*np.ones((ncells, ndim+1), 'uint64')
+        neigh = idx_inf*np.ones((ncells, ndim+1), 'uint64')
+        if dtype_leaf == np.uint32:
+            ncells = _consolidate_uint32_uint64(ndim, idx_inf, serial, 
+                                                leaf_start, leaf_stop,
+                                                verts, neigh)
+        elif dtype_leaf == np.uint64:
+            ncells = _consolidate_uint64_uint64(ndim, idx_inf, serial, 
+                                                leaf_start, leaf_stop,
+                                                verts, neigh)
+        else:
+            raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
+    else:
+        raise TypeError("Combined type {} not supported.".format(dtype_comb))
+    verts.resize((ncells, ndim+1))
+    neigh.resize((ncells, ndim+1))
+    return verts, neigh
