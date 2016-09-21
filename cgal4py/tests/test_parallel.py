@@ -25,16 +25,6 @@ np.random.seed(10)
 # assert(tree2.num_leaves == 2)
 # assert(tree3.num_leaves == 2)
 
-def test_CellIndex():
-    ci = parallel.CellIndex(10, 2)
-    cells = np.array([[1,0,2],
-                      [1,2,3]], 'int')
-    for i in range(cells.shape[0]):
-        ci.insert(cells[i,:], i)
-    for i in range(cells.shape[0]):
-        assert(ci[cells[i,:]] == i)
-    assert(ci.insert(cells[0,:],3) == 0)
-
 def test_ParallelLeaf_2D():
     pts, tree = make_test(0, 2)
     out = []
