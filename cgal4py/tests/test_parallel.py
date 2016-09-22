@@ -14,17 +14,6 @@ from test_delaunay3 import right_edge as right_edge3
 import time, copy, os
 np.random.seed(10)
 
-# tree2 = domain_decomp.tree("kdtree", pts2, left_edge2, right_edge2,
-#                            periodic=False, leafsize=pts2.shape[0]/2 + 2)
-# tree3 = domain_decomp.tree("kdtree", pts3, left_edge3, right_edge3,
-#                            periodic=False, leafsize=pts3.shape[0]/2 + 2)
-# tree2_periodic = domain_decomp.tree("kdtree", pts2, left_edge2, right_edge2,
-#                                     periodic=True, leafsize=pts2.shape[0]/2 + 2)
-# tree3_periodic = domain_decomp.tree("kdtree", pts3, left_edge3, right_edge3,
-#                                     periodic=True, leafsize=pts3.shape[0]/2 + 2)
-# assert(tree2.num_leaves == 2)
-# assert(tree3.num_leaves == 2)
-
 def test_ParallelLeaf_2D():
     pts, tree = make_test(0, 2)
     out = []
@@ -159,12 +148,6 @@ def test_ParallelDelaunay_periodic_3D():
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
     c_para, n_para, inf_para = T_para.serialize(sort=True)
-    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-    #     print name
-    #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
-    #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
-    #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
-    #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
@@ -173,21 +156,37 @@ def test_ParallelDelaunay_periodic_3D():
     T_seri = delaunay.Delaunay(pts)
     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
     c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
     #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
     #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
     #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
-    assert(np.all(c_seri == c_para))
-    assert(np.all(n_seri == n_para))
-    assert(T_para.is_equivalent(T_seri))
+
+    # pts, tree = make_test(1000, 3, leafsize=10, periodic=True)
+    # print tree.num_leaves
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)#tree.num_leaves)
+    # # T_seri = delaunay.Delaunay(pts)
+    # # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+    #     print name
+    #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
+    #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
+    #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
+    #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
 
 def test_DelaunayProcess2():
     pts, tree = make_test(0, 2)
     leaves = tree.leaves
     nproc = 2 # len(leaves)
-    queues = [mp.Queue() for _ in xrange(nproc)]
+    queues = [mp.Queue() for _ in xrange(nproc+1)]
     # Split leaves 
     task2leaves = [[] for _ in xrange(nproc)]
     for leaf in leaves:

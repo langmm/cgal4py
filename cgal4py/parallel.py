@@ -1,4 +1,3 @@
-from cgal4py.domain_decomp import Leaf
 from cgal4py.delaunay import Delaunay, tools
 
 import numpy as np
@@ -45,17 +44,18 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
             serial[iid] = s
         count += 1
         time.sleep(0.01)
+    # Consolidate tessellation
+    t0 = time.time()
+    out = consolidate_tess(tree, serial, pts, use_double=use_double)
+    t1 = time.time()
+    print("Consolidation took {} s".format(t1-t0))
+    # Close queues and processes
     for q in queues:
         q.close()
     for p in processes:
         p.join()
     # for p in processes:
         p.terminate()
-    # Consolidate tessellation
-    t0 = time.time()
-    out = consolidate_tess(tree, serial, pts, use_double=use_double)
-    t1 = time.time()
-    print("Consolidation took {} s".format(t1-t0))
     return out
 
 def consolidate_tess(tree, serial, pts, use_double=False):
@@ -118,8 +118,8 @@ class DelaunayProcess(mp.Process):
     single process during a parallel Delaunay triangulation.
 
     Args:
-        leaves (list of :class:`cgal4py.domain_decomp.Leaf`): Leaves that should 
-            be triangulated on this process.
+        leaves (list of leaf objects): Leaves that should be triangulated on 
+            this process. The leaves are created by :meth:`cgal4py.domain_decomp.tree`.
         pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates. 
             Each leaf has a set of indices identifying coordinates within `pts` 
             that belong to that leaf.
@@ -134,7 +134,7 @@ class DelaunayProcess(mp.Process):
         self._leaves = [ParallelLeaf(leaf) for leaf in leaves]
         self._pts = pts
         self._queues = queues
-        self._num_proc = len(queues)
+        self._num_proc = len(queues)-1
         self._local_leaves = len(leaves)
         if self._local_leaves == 0:
             self._total_leaves = 0

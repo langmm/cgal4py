@@ -1,5 +1,5 @@
 import numpy as np
-import cykdtree
+import cykdtree #as kdtree
 
 def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     r"""Get tree for a given domain decomposition schema.
@@ -14,7 +14,6 @@ def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
             m-dimensional domain. 
         left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
         right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
-        periodic (bool): True if domain is periodic, False otherwise.
         *args: Variable argument list. Passed to the selected domain 
             decomposition method.
         **kwargs: Variable keyword argument list. Passed to the selected domain 
@@ -36,126 +35,155 @@ def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     # Return tree
     return tree
 
-class Leaf(object):
-    def __init__(self, leafid, idx, left_edge, right_edge,
-                 periodic_left=None, periodic_right=None,
-                 domain_width=None, neighbors=None, num_leaves=None,
-                 start_idx=None):
-        r"""A container for leaf info.
+class GenericLeaf(object):
+    def __init__(self, npts, left_edge, right_edge):
+        r"""A generic container for leaf info with the minimum required info.
+        These leaves must still be processed to add additional properties using 
+        :meth:`cgal4py.domain_decomp.process_leaves`, but can serve as a base 
+        class for supplemental domain decompositions and be provided to
+        :class:`cgal4py.domain_decomp.GenericTree`.
 
         Args:
-            leafid (int): Unique index of this leaf.
-            idx (np.ndarray of uint64): Indices of points in this leaf.
+            npts (int): Number of points on this leaf.
             left_edge (np.ndarray of float64): Leaf min along each dimension.
             right_edge (np.ndarray of float64): Leaf max along each dimension.
-            periodic_left (np.ndarray of bool, optional): Truth of left edge 
-                being periodic in each dimension. Defaults to None. Is set by
-                :meth:`cgal4py.domain_decomp.leaves`.
-            periodic_right (np.ndarray of bool, optional): Truth of right edge 
-                being periodic in each dimension. Defaults to None. Is set by 
-                :meth:`cgal4py.domain_decomp.leaves`.
-            domain_width (np.ndarray of float64, optional): Domain width along 
-                each dimension. Defaults to None. Is set by 
-                :meth:`cgal4py.domain_decomp.leaves`.
-            neighbors (list of dict, optional): Indices of neighboring leaves in 
-                each dimension. Defaults to None. Is set by 
-                :meth:`cgal4py.domain_decomp.leaves`.
-            num_leaves (int, optional): Number of leaves in the domain 
-                decomposition. Defaults to None. Is set by 
-                :meth:`cgal4py.domain_decomp.leaves`.  
-            start_idx (int, optional): Number of points on previous leaves or 
-                starting  index of this leaf in tree idx. Defaults to None. Is 
-                set by :meth:`cgal4py.domain_decomp.leaves`.
 
         Attributes:
-            id (int): Unique index of this leaf.
-            idx (np.ndarray of uint64): Indices of points in this leaf.
-            ndim (int): Number of dimensions in the domain.
+            npts (int): Number of points on this leaf, including those added 
+                during communication.
             left_edge (np.ndarray of float64): Domain minimum along each 
                 dimension.
             right_edge (np.ndarray of float64): Domain maximum along each 
                 dimension.
-            periodic_left (np.ndarray of bool): Truth of left edge being 
-                periodic in each dimension. 
-            periodic_right (np.ndarray of bool): Truth of right edge being 
-                periodic in each dimension. 
-            domain_width (np.ndarray of float64): Domain width along each 
-                dimension.
-            neighbors (list of dict): Indices of neighboring leaves in each 
-                dimension. 
-            num_leaves (int): Number of leaves in the domain decomposition. 
-            norig (int): Number of points initially on this leaf.
-            start_idx (int): Number of points on previous leaves or starting 
-                index of this leaf in tree idx.
 
         """
-        self.id = leafid
-        self.idx = idx
-        self.ndim = len(left_edge)
+        self.npts = npts
         self.left_edge = left_edge
         self.right_edge = right_edge
-        self.periodic_left = periodic_left
-        self.periodic_right = periodic_right
-        self.domain_width = domain_width
-        self.neighbors = neighbors
-        self.num_leaves = num_leaves
-        self.norig = len(idx)
-        self.start_idx = start_idx
 
-from kdtree import kdtree
+class GenericTree(object):
+    def __init__(self, idx, leaves, left_edge, right_edge, periodic):
+        r"""Generic container for domain decomposition with the minimal 
+        required info. The leaves must have at least the following 
+        attributes:
+            npts (int): Number of points on the leaf.
+            left_edge (np.ndarray of float): min of leaf extent in each dimension.
+            right_edge (np.ndarray of float): max of leaf extent in each dimension.
 
-def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
-    r"""Get list of leaves for a given domain decomposition.
+        Args:
+            idx (np.ndarray of int): Indices sorting points in the tree by the 
+                leaf that contains them.
+            leaves (list of leaf objects): Leaves in an arbitrary domain 
+                decomposition.
+            left_edge (np.ndarray of float): domain minimum in each dimension. 
+            right_edge (np.ndarray of float): domain maximum in each dimension. 
+            periodic (bool): True if domain is periodic, False otherwise.
+
+        Attributes:
+            idx (np.ndarray of int): Indices sorting points in the tree by the 
+                leaf that contains them.
+            leaves (list of leaf objects): Leaves in an arbitrary domain 
+                decomposition.
+            left_edge (np.ndarray of float): domain minimum in each dimension. 
+            right_edge (np.ndarray of float): domain maximum in each dimension. 
+            periodic (bool): True if domain is periodic, False otherwise.
+            num_leaves (int): Number of leaves in the tree.
+            domain_width (np.ndarray of float): Domain width in each dimension.
+
+        """
+        self.idx = idx
+        self.left_edge = left_edge
+        self.right_edge = right_edge
+        self.periodic = periodic
+        self.domain_width = right_edge - left_edge
+        self.num_leaves = len(leaves)
+        self.leaves = process_leaves(leaves, left_edge, right_edge, periodic)
+
+def process_leaves(leaves, left_edge, right_edge, periodic):
+    r"""Process leaves ensuring they have the necessary information/methods 
+    for parallel tessellation. Each leaf must have at least the following 
+    attributes:
+        npts (int): Number of points on the leaf.
+        left_edge (np.ndarray of float): min of leaf extent in each dimension.
+        right_edge (np.ndarray of float): max of leaf extent in each dimension.
 
     Args:
-        method (str): Domain decomposition method. Supported options are:
-            'kdtree': KDTree based on median position along the dimension 
-                with the greatest domain width. See 
-                :meth:`cgal4py.domain_decomp.kdtree` for details on 
-                accepted keyword arguments.
-        pts (np.ndarray of float64): (n,m) array of n coordinates in a 
-            m-dimensional domain. 
-        left_edge (np.ndarray of float64): (m,) domain minimum in each dimension. 
-        right_edge (np.ndarray of float64): (m,) domain maximum in each dimension. 
+        leaves (list of leaf objects): Leaves in an arbitrary domain 
+            decomposition.
+        left_edge (np.ndarray of float64): domain minimum in each dimension. 
+        right_edge (np.ndarray of float64): domain maximum in each dimension. 
         periodic (bool): True if domain is periodic, False otherwise.
-        *args: Variable argument list. Passed to the selected domain 
-            decomposition method.
-        **kwargs: Variable keyword argument list. Passed to the selected domain 
-            decomposition method.
 
     Returns:
-        list of :class:`cgal4py.domain_decomp.Leaf`s: Leaves returned by the 
-            domain decomposition.
+        list of leaf objects: Leaves process with additional attributes added if 
+            they do not exist and can be added.
 
     Raises:
-        ValueError: If `method` is not one of the supported domain decomposition 
-            methods listed above.
+        AttributeError: If a leaf does not have one of the required attributes.
+        TypeError: If a leaf has a required attribute, but of the wrong type.
+        ValueError: If a leaf has a required attribute, but of the wrong size.
 
     """
-    m = pts.shape[1]
-    # Get leaves
-    if method.lower() == 'kdtree':
-        leaves = kdtree(pts, left_edge, right_edge, *args, **kwargs)
+    ndim = len(left_edge)
+    req_attr = {'npts':[int,long,np.int32,np.uint32,np.int64,np.uint64],
+                'left_edge':([float, np.float32, np.float64], (ndim,)),
+                'right_edge':([float, np.float32, np.float64], (ndim,))}
+    # Check for necessary attributes
+    for k,v in req_attr.items():
+        if isinstance(v,tuple):
+            for i,leaf in enumerate(leaves):
+                if not hasattr(leaf,k):
+                    raise AttributeError("Leaf {} does not have attribute {}.".format(i,k))
+                lv = getattr(leaf,k)
+                if not isinstance(lv, np.ndarray):
+                    raise TypeError("Attribute {} of leaf {} is not an array.\n".format(k,i) +
+                                    "It is type {}.".format(type(lv)))
+                if lv.dtype not in v[0]:
+                    raise TypeError("Attribute {} of leaf {} is not an array with dtype {}.\n".format(k,i,v[0]) +
+                                    "It is type {}.".format(lv.dtype))
+                if v[1] is not None and lv.shape != v[1]:
+                    raise ValueError("Attribute {} of leaf {} is not an array with shape {}.\n".format(k, i, v[1]) +
+                                     "It is shape {}.".format(lv.shape))
+        else:
+            for i,leaf in enumerate(leaves):
+                if not hasattr(leaf,k):
+                    raise AttributeError("Leaf {} does not have attribute {}.".format(i,k))
+                lv = getattr(leaf,k)
+                if not isinstance(lv, tuple(v)):
+                    raise TypeError("Attribute {} of leaf {} is not of type {}.\n".format(k,i,v) +
+                                    "It is type {}.".format(type(lv)))
+    # Set id & ensure leaves are sorted
+    if getattr(leaves[0],'id',None) is None:
+        for i,leaf in enumerate(leaves):
+            leaf.id = i
     else:
-        raise ValueError("'{}' is not a supported domain decomposition.".format(method))
+        leaves = sorted(leaves, key=lambda l: l.id)
+    # Set number of dimensions
+    if getattr(leaves[0],'ndim',None) is None:
+        for leaf in leaves:
+            leaf.ndim = ndim
     # Set total number of leaves
-    if leaves[0].num_leaves is None:
+    if getattr(leaves[0],'num_leaves',None) is None:
         num_leaves = len(leaves)
         for leaf in leaves:
             leaf.num_leaves = num_leaves
     # Set starting index
-    if leaves[0].start_idx is None:
+    if getattr(leaves[0],'start_idx',None) is None:
         nprev = 0
         for leaf in leaves:
             leaf.start_idx = nprev
-            nprev += leaf.norig
+            nprev += leaf.npts
+    # Set stopping index
+    if getattr(leaves[0], 'stop_idx',None) is None:
+        for leaf in leaves:
+            leaf.stop_idx = leaf.start_idx + leaf.npts
     # Set domain width
-    if leaves[0].domain_width is None:
+    if getattr(leaves[0],'domain_width',None) is None:
         domain_width = right_edge - left_edge
         for leaf in leaves:
             leaf.domain_width = domain_width
     # Determine if leaves are on periodic boundaries
-    if leaves[0].periodic_left is None:
+    if getattr(leaves[0],'periodic_left',None) is None:
         if periodic:
             for leaf in leaves:
                 leaf.periodic_left = np.isclose(leaf.left_edge, left_edge)
@@ -165,15 +193,14 @@ def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
                 leaf.periodic_left = np.zeros(leaf.ndim, 'bool')
                 leaf.periodic_right = np.zeros(leaf.ndim, 'bool')
     # Add neighbors
-    if leaves[0].neighbors is None:
-        for leaf in leaves:
-            leaf.neighbors = [
-                {'left':[],'left_periodic':[],
-                 'right':[],'right_periodic':[]} for i in range(leaf.ndim)]
-            for prev in leaves[:(leaf.id+1)]:
-                matches = [None for _ in range(m)]
+    if getattr(leaves[0],'left_neighbors',None) is None:
+        for j,leaf in enumerate(leaves):
+            leaf.left_neighbors = [[] for _ in range(ndim)]
+            leaf.right_neighbors = [[] for _ in range(ndim)]
+            for prev in leaves[:(j+1)]:
+                matches = [None for _ in range(ndim)]
                 match = True
-                for i in range(m):
+                for i in range(ndim):
                     if leaf.left_edge[i] > prev.right_edge[i]:
                         if not (leaf.periodic_right[i] and prev.periodic_left[i]):
                             match = False
@@ -183,22 +210,23 @@ def leaves(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
                             match = False
                             break
                 if match:
-                    for i in range(m):
+                    for i in range(ndim):
                         if np.isclose(leaf.left_edge[i], prev.right_edge[i]):
-                            leaf.neighbors[i]['left'].append(prev.id)
-                            prev.neighbors[i]['right'].append(leaf.id)
+                            leaf.left_neighbors[i].append(prev.id)
+                            prev.right_neighbors[i].append(leaf.id)
                         elif np.isclose(leaf.right_edge[i], prev.left_edge[i]):
-                            leaf.neighbors[i]['right'].append(prev.id)
-                            prev.neighbors[i]['left'].append(leaf.id)
+                            leaf.right_neighbors[i].append(prev.id)
+                            prev.left_neighbors[i].append(leaf.id)
                         if periodic:
                             if leaf.periodic_right[i] and prev.periodic_left[i]:
-                                leaf.neighbors[i]['right_periodic'].append(prev.id)
-                                prev.neighbors[i]['left_periodic'].append(leaf.id)
+                                leaf.right_neighbors[i].append(prev.id)
+                                prev.left_neighbors[i].append(leaf.id)
                             if prev.periodic_right[i] and leaf.periodic_left[i]:
-                                leaf.neighbors[i]['left_periodic'].append(prev.id)
-                                prev.neighbors[i]['right_periodic'].append(leaf.id)
+                                leaf.left_neighbors[i].append(prev.id)
+                                prev.right_neighbors[i].append(leaf.id)
     # Return leaves
     return leaves
 
-__all__ = ["Leaf", "kdtree", "tree"]
+
+__all__ = ["tree", "cykdtree", "GenericLeaf", "GenericTree", "process_leaves"]
 
