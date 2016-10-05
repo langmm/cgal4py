@@ -164,6 +164,7 @@ cdef extern from "c_delaunay2.hpp":
 
         void circumcenter(Cell x, double* out)
         double dual_area(const Vertex v)
+        void dual_areas(double* vols) const
         double length(const Edge e)
 
         bool flip(Cell x, int i)

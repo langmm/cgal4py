@@ -1,7 +1,7 @@
 import numpy as np
 from nose import with_setup
 from nose.tools import assert_equal, assert_raises, nottest
-from cgal4py import triangulate, domain_decomp
+from cgal4py import triangulate, voronoi_volumes, domain_decomp
 from test_delaunay2 import pts as pts2
 from test_delaunay2 import left_edge as left_edge2
 from test_delaunay2 import right_edge as right_edge2
@@ -46,7 +46,7 @@ def make_test(npts, ndim, distrib='uniform', periodic=False, leafsize=None):
                               periodic=periodic, leafsize=leafsize)
     return pts, tree
 
-def test_Delaunay():
+def test_triangulate():
     T2 = triangulate(pts2)
     T3 = triangulate(pts3)
     assert_raises(NotImplementedError, triangulate, pts2, periodic=True)
@@ -56,3 +56,14 @@ def test_Delaunay():
     assert_raises(ValueError, triangulate, pts2, left_edge=np.zeros((2,2,2)))
     assert_raises(ValueError, triangulate, pts2, right_edge=np.zeros((2,2,2)))
     assert_raises(NotImplementedError, triangulate, pts2, limit_mem=True)
+
+def test_voronoi_volumes():
+    v2 = voronoi_volumes(pts2)
+    v3 = voronoi_volumes(pts3)
+    assert_raises(NotImplementedError, voronoi_volumes, pts2, periodic=True)
+    assert_raises(ValueError, voronoi_volumes, np.zeros((3,3,3)))
+    assert_raises(ValueError, voronoi_volumes, pts2, left_edge=np.zeros(3))
+    assert_raises(ValueError, voronoi_volumes, pts2, right_edge=np.zeros(3))
+    assert_raises(ValueError, voronoi_volumes, pts2, left_edge=np.zeros((2,2,2)))
+    assert_raises(ValueError, voronoi_volumes, pts2, right_edge=np.zeros((2,2,2)))
+    assert_raises(NotImplementedError, voronoi_volumes, pts2, limit_mem=True)

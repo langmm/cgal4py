@@ -37,7 +37,7 @@ cdef extern from "c_tools.hpp":
     cdef cppclass ConsolidatedLeaves[I,leafI]:
         ConsolidatedLeaves() except +
         ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
-                           I *_verts, I *_neigh, 
+                           int64_t _max_ncells, I *_verts, I *_neigh, 
                            vector[SerializedLeaf[leafI]] _leaves) except +
         int64_t ncells
         

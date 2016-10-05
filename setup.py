@@ -4,7 +4,14 @@ from distutils.extension import Extension
 from Cython.Build import cythonize
 from Cython.Compiler.Options import directive_defaults
 import numpy
-import os
+import os, copy
+
+# Stop obnoxious -Wstrict-prototypes warning with c++
+import distutils.sysconfig
+cfg_vars = distutils.sysconfig.get_config_vars()
+for key, value in cfg_vars.items():
+    if type(value) == str:
+        cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 def make_64bit():
     # Create 64bit version from 32bit version (because cython fusedtypes...)
@@ -55,44 +62,41 @@ ext_modules = [ ]
 
 ext_options = dict(language="c++",
                        include_dirs=[numpy.get_include()],
-                       libraries=['gmp','CGAL'],
-                       extra_link_args=["-lgmp"],
                        extra_compile_args=["-std=c++11"],# "-std=gnu++11",
                        # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
-                       define_macros=[('CYTHON_TRACE', '1')])
+                       define_macros=[('CYTHON_TRACE', '1'),
+                                      ("NPY_NO_DEPRECATED_API", None)])
+
 if RTDFLAG:
-    ext_options['libraries'] = []
-    ext_options['extra_link_args'] = []
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
+    ext_options_cgal = copy.deepcopy(ext_options)
+else:
+    ext_options_cgal = copy.deepcopy(ext_options)
+    ext_options_cgal['libraries'] = ['gmp','CGAL']
+    ext_options_cgal['extra_link_args'] = ["-lgmp"]
 
 if use_cython:
     ext_modules += cythonize(Extension("cgal4py/delaunay/tools",
                                        sources=["cgal4py/delaunay/tools.pyx"],
-                                       language="c++",
-                                       include_dirs=[numpy.get_include()],
-                                       extra_compile_args=["-std=gnu++11"]))
+                                       **ext_options))
     ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay2",
                                        sources=["cgal4py/delaunay/delaunay2.pyx","cgal4py/delaunay/c_delaunay2.cpp"],
-                                       **ext_options))
+                                       **ext_options_cgal))
     ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay3",
                                        sources=["cgal4py/delaunay/delaunay3.pyx","cgal4py/delaunay/c_delaunay3.cpp"],
-                                       **ext_options))
+                                       **ext_options_cgal))
     ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay2_64bit",
                                        sources=["cgal4py/delaunay/delaunay2_64bit.pyx","cgal4py/delaunay/c_delaunay2.cpp"],
-                                       **ext_options))
+                                       **ext_options_cgal))
     ext_modules += cythonize(Extension("cgal4py/delaunay/delaunay3_64bit",
                                        sources=["cgal4py/delaunay/delaunay3_64bit.pyx","cgal4py/delaunay/c_delaunay3.cpp"],
-                                       **ext_options))
+                                       **ext_options_cgal))
     ext_modules += cythonize(Extension("cgal4py/domain_decomp/kdtree",
                                        sources=["cgal4py/domain_decomp/kdtree.pyx","cgal4py/domain_decomp/c_kdtree.cpp","cgal4py/c_utils.cpp"],
-                                       language="c++",
-                                       include_dirs=[numpy.get_include()],
-                                       extra_compile_args=["-std=gnu++11"]))
+                                       **ext_options))
     ext_modules += cythonize(Extension("cgal4py/utils",
                                        sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
-                                       language="c++",
-                                       include_dirs=[numpy.get_include()],
-                                       extra_compile_args=["-std=gnu++11"]))
+                                       **ext_options))
     cmdclass.update({ 'build_ext': build_ext })
 else:
     ext_modules += [

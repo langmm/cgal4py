@@ -131,6 +131,8 @@ public:
 
   void insert(double *pts, Info *val, uint32_t n)
   {
+    if (n == 0) 
+      return;
     updated = true;
     uint32_t i, j;
     std::vector< std::pair<Point,Info> > points;
@@ -517,6 +519,13 @@ public:
     return vol;
   }
 
+  void dual_areas(double* vols) const {
+    Finite_vertices_iterator it = T.finite_vertices_begin();
+    for ( ; it != T.finite_vertices_end(); it++) {
+      vols[it->info()] = dual_area(Vertex(it));
+    }
+  }
+
   double length(const Edge e) const {
     if (is_infinite(e))
       return -1.0;
@@ -786,13 +795,11 @@ public:
     V[v] = -1;
 
     // vertices
-    for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
-      if ( v != vit ) {
-	vert_pos[d*inum + 0] = static_cast<double>(vit->point().x());
-	vert_pos[d*inum + 1] = static_cast<double>(vit->point().y());
-	vert_info[inum] = vit->info();
-	V[vit] = inum++;
-      }
+    for (Finite_vertices_iterator vit = T.finite_vertices_begin(); vit != T.finite_vertices_end(); vit++) {
+      vert_pos[d*inum + 0] = static_cast<double>(vit->point().x());
+      vert_pos[d*inum + 1] = static_cast<double>(vit->point().y());
+      vert_info[inum] = vit->info();
+      V[vit] = inum++;
     }
       
     // vertices of the faces

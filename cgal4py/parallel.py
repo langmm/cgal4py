@@ -5,13 +5,65 @@ import sys, os, time, copy
 
 import multiprocessing as mp
 
+def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
+    r"""Return the voronoi cell volumes after constructing triangulation in 
+    parallel.
+
+    Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
+        tree (object): Domain decomposition tree for splitting points among the 
+            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        nproc (int): Number of processors that should be used.
+        use_double (bool, optional): If True, the triangulation is forced to use 
+            64bit integers reguardless of if there are too many points for 32bit. 
+            Otherwise 32bit integers are used so long as the number of points is 
+            <=4294967295. Defaults to False.
+
+    Returns:
+        np.ndarray of float64: (n,) array of n voronoi volumes for the provided 
+            points.
+
+    """
+    pts = pts[tree.idx, :]
+    # Split leaves
+    task2leaves = [[] for _ in xrange(nproc)]
+    for leaf in tree.leaves:
+        task = leaf.id % nproc
+        task2leaves[task].append(leaf)
+    # Create & execute processes
+    queues = [mp.Queue() for _ in xrange(nproc+1)]
+    processes = [DelaunayProcess('volumes',task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
+    for p in processes:
+        p.start()
+    # Get leaves with tessellation
+    serial = [None for _ in xrange(tree.num_leaves)]
+    count = 0
+    while count < nproc:
+        ileaves = queues[-1].get()
+        for iid, s in ileaves:
+            assert(tree.leaves[iid].id == iid)
+            serial[iid] = s
+        count += 1
+        time.sleep(0.01)
+    # Consolidate volumes
+    vol = np.empty(pts.shape[0], pts.dtype)
+    for i,leaf in enumerate(tree.leaves):
+        vol[tree.idx[leaf.slice]] = serial[i]
+    # Close queues and processes
+    for q in queues:
+        q.close()
+    for p in processes:
+        p.join()
+        p.terminate()
+    return vol
+
 def ParallelDelaunay(pts, tree, nproc, use_double=False):
     r"""Return a triangulation that is constructed in parallel.
 
     Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
         tree (object): Domain decomposition tree for splitting points among the 
             processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
         nproc (int): Number of processors that should be used.
         use_double (bool, optional): If True, the triangulation is forced to use 
             64bit integers reguardless of if there are too many points for 32bit. 
@@ -31,7 +83,7 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
         task2leaves[task].append(leaf)
     # Create & execute processes
     queues = [mp.Queue() for _ in xrange(nproc+1)]
-    processes = [DelaunayProcess(task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
+    processes = [DelaunayProcess('triangulate',task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
     for p in processes:
         p.start()
     # Get leaves with tessellation
@@ -118,6 +170,10 @@ class DelaunayProcess(mp.Process):
     single process during a parallel Delaunay triangulation.
 
     Args:
+        task (str): Key for the task that should be parallelized. Options are:
+              'triangulate': Perform triangulation and put serialized info in 
+                  the output queue.
+              'volumes': Perform triangulation and put volumes in output queue.
         leaves (list of leaf objects): Leaves that should be triangulated on 
             this process. The leaves are created by :meth:`cgal4py.domain_decomp.tree`.
         pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates. 
@@ -127,10 +183,14 @@ class DelaunayProcess(mp.Process):
             process being used in the triangulation.
         **kwargs: Variable keyword arguments are passed to `multiprocessing.Process`.
 
+    Raises:
+        ValueError: if `task` is not one of the accepted values listed above.
+
     """
 
-    def __init__(self, leaves, pts, queues, proc_idx, **kwargs):
+    def __init__(self, task, leaves, pts, queues, proc_idx, **kwargs):
         super(DelaunayProcess, self).__init__(**kwargs)
+        self._task = task
         self._leaves = [ParallelLeaf(leaf) for leaf in leaves]
         self._pts = pts
         self._queues = queues
@@ -142,6 +202,8 @@ class DelaunayProcess(mp.Process):
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
         self._done = False
+        if task not in ['triangulate','volumes']:
+            raise ValueError('{} is not a valid task.'.format(task))
 
     # def plot_leaves(self, plotbase=None):
     #     r"""Plots the tessellation for each leaf on this process.
@@ -187,19 +249,29 @@ class DelaunayProcess(mp.Process):
             # Add points to leaves
             leaf.incoming_points(j, arr, self._pts[arr,:])
 
-    def finalize_process(self):
+    def enqueue_triangulation(self):
         r"""Enqueue resulting tessellation."""
         out = [(leaf.id,leaf.serialize()) for leaf in self._leaves]
-        # self._queues[self._proc_idx].put(out)
         self._queues[-1].put(out)
-        self._done = True
-        
+
+    def enqueue_volumes(self):
+        r"""Enqueue resulting voronoi volumes."""
+        out = [(leaf.id,leaf.voronoi_volumes()) for leaf in self._leaves]
+        self._queues[-1].put(out)
+
     def run(self):
         r"""Performs tessellation and communication for each leaf on this process."""
-        self.tessellate_leaves()
-        self.outgoing_points()
-        self.incoming_points()
-        self.finalize_process()
+        if self._task == 'triangulate':
+            self.tessellate_leaves()
+            self.outgoing_points()
+            self.incoming_points()
+            self.enqueue_triangulation()
+        elif self._task == 'volumes':
+            self.tessellate_leaves()
+            self.outgoing_points()
+            self.incoming_points()
+            self.enqueue_volumes()
+        self._done = True
 
 class ParallelLeaf(object):
     r"""Wraps triangulation of a single leaf in a domain decomposition. 
@@ -352,5 +424,13 @@ class ParallelLeaf(object):
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
         return cells, neigh, idx_inf, idx_verts, idx_cells
 
+    def voronoi_volumes(self):
+        r"""Get the voronoi cell volumes for the original vertices on this leaf.
 
+        Returns:
+            np.ndarray of float64: Voronoi cell volumes. -1 indicates an 
+                infinite cell.
+
+        """
+        return self.T.voronoi_volumes()[:self.norig]
 

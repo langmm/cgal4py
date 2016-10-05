@@ -386,6 +386,7 @@ class ConsolidatedLeaves
 public:
   uint32_t ndim;
   int64_t ncells;
+  int64_t max_ncells;
   uint64_t num_leaves;
   I *allverts;
   I *allneigh;
@@ -397,9 +398,10 @@ public:
   uint32_t *matches2;
   ConsolidatedLeaves() {}
   ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
-		     I *_verts, I *_neigh, 
+		     int64_t _max_ncells, I *_verts, I *_neigh,
 		     std::vector<SerializedLeaf<leafI>> _leaves) {
     ncells = 0;
+    max_ncells = _max_ncells;
     ndim = _ndim;
     num_leaves = _num_leaves;
     allverts = _verts;
@@ -530,6 +532,19 @@ public:
       } else {
 	// New neighbor does not match existing one
 	printf("There are conflicting neighbors.\n");
+	// int i;
+	// printf("    this (%d): ", c_total);
+	// for (i = 0; i < (ndim+1); i++) 
+	//   printf("%d ", allverts[c_total*(ndim+1)+i]);
+	// printf("\n");
+	// printf("    old (%d): ", c_exist);
+	// for (i = 0; i < (ndim+1); i++) 
+	//   printf("%d ", allverts[c_exist*(ndim+1)+i]);
+	// printf("\n");
+	// printf("    new (%d): ", c_other);
+	// for (i = 0; i < (ndim+1); i++) 
+	//   printf("%d ", allverts[c_other*(ndim+1)+i]);
+	// printf("\n");
 	// throw std::logic_error;
       }
     }

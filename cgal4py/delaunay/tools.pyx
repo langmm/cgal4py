@@ -173,26 +173,46 @@ def py_sortCellVerts(cells, neigh):
     else:
         raise TypeError("Type {} not supported.".format(cells.dtype))
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def _sortSerializedTess_int32(np.ndarray[np.int32_t, ndim=2] cells, 
                               np.ndarray[np.int32_t, ndim=2] neigh): 
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    sortSerializedTess[int32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+    if ncells == 0:
+        return
+    with nogil:
+        sortSerializedTess[int32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def _sortSerializedTess_uint32(np.ndarray[np.uint32_t, ndim=2] cells, 
                                np.ndarray[np.uint32_t, ndim=2] neigh): 
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    sortSerializedTess[uint32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+    if ncells == 0:
+        return
+    with nogil:
+        sortSerializedTess[uint32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def _sortSerializedTess_int64(np.ndarray[np.int64_t, ndim=2] cells, 
                               np.ndarray[np.int64_t, ndim=2] neigh): 
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    sortSerializedTess[int64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+    if ncells == 0:
+        return
+    with nogil:
+        sortSerializedTess[int64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def _sortSerializedTess_uint64(np.ndarray[np.uint64_t, ndim=2] cells, 
                                np.ndarray[np.uint64_t, ndim=2] neigh): 
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    sortSerializedTess[uint64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
+    if ncells == 0:
+        return
+    with nogil:
+        sortSerializedTess[uint64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 
 def py_sortSerializedTess(cells, neigh):
     r"""Sort serialized triangulation such that the verts for each cell are in 
@@ -507,8 +527,9 @@ cdef np.int64_t _consolidate_uint32_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t, ndim=2] cells):
     cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef int64_t max_ncells = <int64_t>verts.shape[0]
     cdef ConsolidatedLeaves[uint64_t,uint32_t] obj
-    obj = ConsolidatedLeaves[uint64_t,uint32_t](ndim, num_leaves, idx_inf, 
+    obj = ConsolidatedLeaves[uint64_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
                                                 &verts[0,0], &cells[0,0], leaves)
     cdef np.int64_t ncells = obj.ncells
     return ncells
@@ -521,8 +542,9 @@ cdef np.int64_t _consolidate_uint32_uint32(np.uint32_t ndim, np.uint32_t idx_inf
                                            np.ndarray[np.uint32_t, ndim=2] cells):
     cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef int64_t max_ncells = <int64_t>verts.shape[0]
     cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
-    obj = ConsolidatedLeaves[uint32_t,uint32_t](ndim, num_leaves, idx_inf, 
+    obj = ConsolidatedLeaves[uint32_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
                                                 &verts[0,0], &cells[0,0], leaves)
     cdef np.int64_t ncells = obj.ncells
     return ncells
@@ -535,8 +557,9 @@ cdef np.int64_t _consolidate_uint64_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t, ndim=2] cells):
     cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
+    cdef int64_t max_ncells = <int64_t>verts.shape[0]
     cdef ConsolidatedLeaves[uint64_t,uint64_t] obj
-    obj = ConsolidatedLeaves[uint64_t,uint64_t](ndim, num_leaves, idx_inf, 
+    obj = ConsolidatedLeaves[uint64_t,uint64_t](ndim, num_leaves, idx_inf, max_ncells,
                                                 &verts[0,0], &cells[0,0], leaves)
     cdef np.int64_t ncells = obj.ncells
     return ncells

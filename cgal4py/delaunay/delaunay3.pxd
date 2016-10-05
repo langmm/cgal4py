@@ -6,7 +6,7 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 cdef extern from "c_delaunay3.hpp":
-    cdef cppclass Delaunay_with_info_3[Info]:
+    cdef cppclass Delaunay_with_info_3[Info] nogil:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +
         bool updated
@@ -198,9 +198,10 @@ cdef extern from "c_delaunay3.hpp":
         int mirror_index(Cell x, int i) const
         Vertex mirror_vertex(Cell x, int i) const
 
-        void circumcenter(Cell x, double* out)
-        double dual_volume(const Vertex v)
-        double length(const Edge e)
+        void circumcenter(Cell x, double* out) const
+        double dual_volume(const Vertex v) const
+        void dual_volumes(double* vols) const
+        double length(const Edge e) const
 
         bool flip(Cell x, int i, int j)
         bool flip(Edge x)

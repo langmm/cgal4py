@@ -1,5 +1,5 @@
 import numpy as np
-import cykdtree #as kdtree
+import cykdtree as kdtree
 
 def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     r"""Get tree for a given domain decomposition schema.
@@ -29,7 +29,7 @@ def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     """
     # Get leaves
     if method.lower() == 'kdtree':
-        tree = cykdtree.PyKDTree(pts, left_edge, right_edge, *args, **kwargs)
+        tree = kdtree.PyKDTree(pts, left_edge, right_edge, *args, **kwargs)
     else:
         raise ValueError("'{}' is not a supported domain decomposition.".format(method))
     # Return tree
@@ -228,5 +228,5 @@ def process_leaves(leaves, left_edge, right_edge, periodic):
     return leaves
 
 
-__all__ = ["tree", "cykdtree", "GenericLeaf", "GenericTree", "process_leaves"]
+__all__ = ["tree", "kdtree", "GenericLeaf", "GenericTree", "process_leaves"]
 

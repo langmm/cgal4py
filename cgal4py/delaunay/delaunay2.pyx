@@ -1192,12 +1192,11 @@ cdef class Delaunay2:
 
     """
 
-    _cache_to_clear_on_update = {}
-
     cdef Delaunay_with_info_2[info_t] *T
     cdef readonly int n
     cdef public object n_per_insert
-    # cdef pybool _locked
+    cdef readonly pybool _locked
+    cdef public object _cache_to_clear_on_update
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1206,7 +1205,8 @@ cdef class Delaunay2:
             self.T = new Delaunay_with_info_2[info_t]()
         self.n = 0
         self.n_per_insert = []
-        # self._locked = False
+        self._locked = False
+        self._cache_to_clear_on_update = {}
 
     def is_equivalent(Delaunay2 self, Delaunay2 solf):
         r"""Determine if two triangulations are equivalent. Currently only 
@@ -1242,6 +1242,15 @@ cdef class Delaunay2:
         T.deserialize(*args)
         return T
 
+    def _lock(self):
+        self._locked = True
+    def _unlock(self):
+        self._locked = False
+    def _set_updated(self):
+        self.T.updated = <cbool>True
+    def _unset_updated(self):
+        self.T.updated = <cbool>False
+
     def _update_tess(self):
         if self.T.updated:
             self._cache_to_clear_on_update.clear()
@@ -1250,9 +1259,10 @@ cdef class Delaunay2:
     @staticmethod
     def _update_to_tess(func):
         def wrapped_func(solf, *args, **kwargs):
-            # self.T.updated = <cbool>True
-            # solf._locked = True
+            solf._lock()
             out = func(solf, *args, **kwargs)
+            solf._unlock()
+            solf._set_updated()
             solf._update_tess()
             return out
         return wrapped_func
@@ -1261,6 +1271,8 @@ cdef class Delaunay2:
     def _dependent_property(fget):
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
+            if solf._locked:
+                raise RuntimeError("Cannot get dependent property '{}' while triangulation is locked.".format(attr))
             solf._update_tess()
             if attr not in solf._cache_to_clear_on_update:
                 solf._cache_to_clear_on_update[attr] = fget(solf)
@@ -1303,7 +1315,7 @@ cdef class Delaunay2:
         cdef char* cfname = fname
         with nogil:
             self.T.read_from_file(cfname)
-        self.n = self.num_finite_verts
+        self.n = self.T.num_finite_verts()
         self.n_per_insert.append(self.n)
 
     @cython.boundscheck(False)
@@ -1325,15 +1337,17 @@ cdef class Delaunay2:
                     the m neighbors to each of the n cells.
         
         """
-        cdef info_t n, m
-        cdef int32_t d
+        cdef info_t n, m, i
+        cdef int32_t d, j
         cdef np.ndarray[np.float64_t, ndim=2] vert_pos
         cdef np.ndarray[np_info_t, ndim=1] vert_info
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
         # Initialize arrays based on properties
-        n = self.num_finite_verts
-        m = self.num_cells
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(n == self.num_finite_verts)
+        assert(m == self.num_cells)
         d = 2
         vert_pos = np.zeros((n,d), np.float64)
         vert_info = np.zeros(n, np_info)
@@ -1345,7 +1359,10 @@ cdef class Delaunay2:
             idx_inf = self.T.serialize[info_t]( 
                 n, m, d, &vert_pos[0,0], &vert_info[0], 
                 &cells[0,0], &neighbors[0,0])
-        cells[cells != idx_inf] = vert_info[cells[cells != idx_inf]]
+        for i in xrange(m):
+            for j in range(d+1):
+                if cells[i,j] != idx_inf:
+                    cells[i,j] = vert_info[cells[i,j]]
         # Sort if desired
         if sort:
             with nogil:
@@ -1459,8 +1476,8 @@ cdef class Delaunay2:
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
-        if self.n != self.num_finite_verts:
-            print("There were {} duplicates".format(self.n-self.num_finite_verts))
+        if self.n != <int64_t>self.T.num_finite_verts():
+            print("There were {} duplicates".format(self.n-self.T.num_finite_verts()))
 
     @_update_to_tess
     def clear(self):
@@ -1493,6 +1510,20 @@ cdef class Delaunay2:
             return out
         with nogil:
             self.T.edge_info(&out[0,0])
+        return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def voronoi_volumes(self):
+        r"""np.ndarray of float64: Array of voronoi cell volumes for vertices in 
+        the triangulation. The volumes are in the order in which the vertices 
+        were added to the triangulation."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_verts, 'float64')
+        if self.n == 0:
+            return out
+        with nogil:
+            self.T.dual_areas(&out[0])
         return out
         
     @_update_to_tess

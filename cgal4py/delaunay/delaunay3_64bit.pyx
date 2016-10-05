@@ -1726,18 +1726,21 @@ cdef class Delaunay3:
 
     """
 
-    _cache_to_clear_on_update = {}
-
     cdef Delaunay_with_info_3[info_t] *T
     cdef readonly int n
     cdef public object n_per_insert
+    cdef readonly pybool _locked
+    cdef public object _cache_to_clear_on_update
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__(self):
-        self.T = new Delaunay_with_info_3[info_t]()
+        with nogil:
+            self.T = new Delaunay_with_info_3[info_t]()
         self.n = 0
         self.n_per_insert = []
+        self._locked = False
+        self._cache_to_clear_on_update = {}
 
     def is_equivalent(Delaunay3 self, Delaunay3 solf):
         r"""Determine if two triangulations are equivalent. Currently only 
@@ -1752,7 +1755,10 @@ cdef class Delaunay3:
             bool: True if the two triangulations are equivalent.
 
         """
-        return <pybool>(self.T.is_equal(dereference(solf.T)))
+        cdef cbool out
+        with nogil:
+            out = self.T.is_equal(dereference(solf.T))
+        return <pybool>(out)
 
     @classmethod
     def from_serial(*args):
@@ -1770,6 +1776,13 @@ cdef class Delaunay3:
         T.deserialize(*args)
         return T
 
+    def _lock(self):
+        self._locked = True
+    def _unlock(self):
+        self._locked = False
+    def _set_updated(self):
+        self.T.updated = <cbool>True
+
     def _update_tess(self):
         if self.T.updated:
             self._cache_to_clear_on_update.clear()
@@ -1778,14 +1791,20 @@ cdef class Delaunay3:
     @staticmethod
     def _update_to_tess(func):
         def wrapped_func(solf, *args, **kwargs):
+            solf._lock()
+            out = func(solf, *args, **kwargs)
+            solf._unlock()
+            solf._set_updated()
             solf._update_tess()
-            return func(solf, *args, **kwargs)
+            return out
         return wrapped_func
 
     @staticmethod
     def _dependent_property(fget):
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
+            if solf._locked:
+                raise RuntimeError("Cannot get dependent property '{}' while triangulation is locked.".format(attr))
             solf._update_tess()
             if attr not in solf._cache_to_clear_on_update:
                 solf._cache_to_clear_on_update[attr] = fget(solf)
@@ -1799,8 +1818,10 @@ cdef class Delaunay3:
             bool: True if the triangulation is valid, False otherwise. 
 
         """
-
-        return <pybool>self.T.is_valid()
+        cdef cbool out
+        with nogil:
+            out = self.T.is_valid()
+        return <pybool>out
 
     def write_to_file(self, fname):
         r"""Write the serialized tessellation information to a file. 
@@ -1811,7 +1832,8 @@ cdef class Delaunay3:
 
         """
         cdef char* cfname = fname
-        self.T.write_to_file(cfname)
+        with nogil:
+            self.T.write_to_file(cfname)
 
     @_update_to_tess
     def read_from_file(self, fname):
@@ -1823,10 +1845,13 @@ cdef class Delaunay3:
 
         """
         cdef char* cfname = fname
-        self.T.read_from_file(cfname)
-        self.n = self.num_finite_verts
+        with nogil:
+            self.T.read_from_file(cfname)
+        self.n = self.T.num_finite_verts()
         self.n_per_insert.append(self.n)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def serialize(self, pybool sort = False):
         r"""Serialize triangulation. 
 
@@ -1844,15 +1869,17 @@ cdef class Delaunay3:
                     the m neighbors to each of the n cells. 
 
         """
-        cdef info_t n, m
-        cdef int32_t d
+        cdef info_t n, m, i
+        cdef int32_t d, j
         cdef np.ndarray[np.float64_t, ndim=2] vert_pos
         cdef np.ndarray[np_info_t, ndim=1] vert_info
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
         # Initialize arrays based on properties
-        n = self.num_finite_verts
-        m = self.num_cells
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(n == self.num_finite_verts)
+        assert(m == self.num_cells)
         d = 3
         vert_pos = np.zeros((n,d), np.float64)
         vert_info = np.zeros(n, np_info)
@@ -1860,16 +1887,23 @@ cdef class Delaunay3:
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
-        idx_inf = self.T.serialize[info_t](
-            n, m, d, &vert_pos[0,0], &vert_info[0],
-            &cells[0,0], &neighbors[0,0])
-        cells[cells != idx_inf] = vert_info[cells[cells != idx_inf]]
+        with nogil:
+            idx_inf = self.T.serialize[info_t](
+                n, m, d, &vert_pos[0,0], &vert_info[0],
+                &cells[0,0], &neighbors[0,0])
+        for i in xrange(m):
+            for j in range(d+1):
+                if cells[i,j] != idx_inf:
+                    cells[i,j] = vert_info[cells[i,j]]
         # Sort if desired
         if sort:
-            sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
+            with nogil:
+                sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def deserialize(self, np.ndarray[np.float64_t, ndim=2] pos,
                     np.ndarray[np_info_t, ndim=2] cells,
                     np.ndarray[np_info_t, ndim=2] neighbors,
@@ -1889,9 +1923,12 @@ cdef class Delaunay3:
         cdef info_t n = pos.shape[0]
         cdef info_t m = cells.shape[0]
         cdef int32_t d = neighbors.shape[1]-1
+        if (n == 0) or (m == 0):
+            return
         cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
-        self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0],
-                                   &cells[0,0], &neighbors[0,0], idx_inf)
+        with nogil:
+            self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0],
+                                       &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)
 
@@ -1959,6 +1996,8 @@ cdef class Delaunay3:
         return self.T.num_cells()
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def insert(self, np.ndarray[double, ndim=2, mode="c"] pts not None):
         r"""Insert points into the triangulation.
 
@@ -1967,41 +2006,69 @@ cdef class Delaunay3:
                 points to insert into the triangulation. 
 
         """
+        global np_info, np_info_t
         if pts.shape[0] == 0:
             return
-        global np_info, np_info_t
         cdef int Nold, Nnew, m
         Nold = self.n
         Nnew, m = pts.shape[0], pts.shape[1]
+        if Nnew == 0:
+            return
+        assert(m == 3)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
-        assert(m == 3)
-        self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
+        with nogil:
+            self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
-        if self.n != self.num_finite_verts:
-            print "There were {} duplicates".format(self.n-self.num_finite_verts)
-        # assert(self.n == self.num_finite_verts)
+        if self.n != <int64_t>self.T.num_finite_verts():
+            print "There were {} duplicates".format(self.n-self.T.num_finite_verts())
+        # assert(self.n == self.T.num_finite_verts())
 
     @_update_to_tess
     def clear(self):
         r"""Removes all vertices and cells from the triangulation."""
-        self.T.clear()
+        with nogil:
+            self.T.clear()
 
     @_dependent_property
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def vertices(self):
         r"""ndarray: The x,y,z coordinates of the vertices"""
         cdef np.ndarray[np.float64_t, ndim=2] out
         out = np.zeros([self.n, 3], 'float64')
-        self.T.info_ordered_vertices(&out[0,0])
+        if self.n == 0:
+            return out
+        with nogil:
+            self.T.info_ordered_vertices(&out[0,0])
         return out
 
     @_dependent_property
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def edges(self):
         r""":obj:`ndarray` of info_t: Vertex index pairs for edges."""
         cdef np.ndarray[np_info_t, ndim=2] out
         out = np.zeros([self.num_finite_edges, 2], np_info)
-        self.T.edge_info(&out[0,0])
+        if out.shape[0] == 0:
+            return out
+        with nogil:
+            self.T.edge_info(&out[0,0])
+        return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def voronoi_volumes(self):
+        r"""np.ndarray of float64: Array of voronoi cell volumes for vertices in 
+        the triangulation. The volumes are in the order in which the vertices 
+        were added to the triangulation."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_verts, 'float64')
+        if self.n == 0:
+            return out
+        with nogil:
+            self.T.dual_volumes(&out[0])
         return out
 
     @_update_to_tess
@@ -2012,9 +2079,12 @@ cdef class Delaunay3:
             x (Delaunay3_vertex): Vertex that should be removed. 
 
         """
-        self.T.remove(x.x)
+        with nogil:
+            self.T.remove(x.x)
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def move(self, Delaunay3_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 
@@ -2031,12 +2101,15 @@ cdef class Delaunay3:
         """
         assert(len(pos) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex v
-        v = self.T.move(x.x, &pos[0])
+        with nogil:
+            v = self.T.move(x.x, &pos[0])
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
         return out
 
     @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def move_if_no_collision(self, Delaunay3_vertex x,
                              np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location only if there is not already a 
@@ -2054,7 +2127,8 @@ cdef class Delaunay3:
         """
         assert(len(pos) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex v
-        v = self.T.move_if_no_collision(x.x, &pos[0])
+        with nogil:
+            v = self.T.move_if_no_collision(x.x, &pos[0])
         cdef Delaunay3_vertex out = Delaunay3_vertex()
         out.assign(self.T, v)
         return out
@@ -2073,7 +2147,10 @@ cdef class Delaunay3:
             bool: True if facet was flipped, False otherwise.
 
         """
-        return <pybool>self.T.flip(x.x, i)
+        cdef cbool out
+        with nogil:
+            out = self.T.flip(x.x, i)
+        return <pybool>out
 
     @_update_to_tess
     def flip_flippable(self, Delaunay3_cell x, int i):
@@ -2085,7 +2162,26 @@ cdef class Delaunay3:
             i (int): Integer specifying neighbor that is also incident to the 
                 cell that should be flipped.
         """
-        self.T.flip_flippable(x.x, i)
+        with nogil:
+            self.T.flip_flippable(x.x, i)
+
+    def get_vertex(self, np_info_t index):
+        r"""Get the vertex object corresponding to the given index. 
+
+        Args: 
+            index (np_info_t): Index of vertex that should be found. 
+
+        Returns: 
+            Delaunay3_vertex: Vertex corresponding to the given index. If the 
+                index is not found, the infinite vertex is returned. 
+
+        """
+        cdef Delaunay_with_info_3[info_t].Vertex v
+        with nogil:
+            v = self.T.get_vertex(index)
+        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        out.assign(self.T, v)
+        return out
 
     def locate(self, np.ndarray[np.float64_t, ndim=1] pos,
                Delaunay3_cell start = None):
@@ -2126,22 +2222,6 @@ cdef class Delaunay3:
             return 0
         else:
             raise RuntimeError("Value of {} not expected from CGAL locate.".format(lt))
-
-    def get_vertex(self, np_info_t index):
-        r"""Get the vertex object corresponding to the given index. 
-
-        Args: 
-            index (np_info_t): Index of vertex that should be found. 
-
-        Returns: 
-            Delaunay3_vertex: Vertex corresponding to the given index. If the 
-                index is not found, the infinite vertex is returned. 
-
-        """
-        cdef Delaunay_with_info_3[info_t].Vertex v = self.T.get_vertex(index)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
-        out.assign(self.T, v)
-        return out
 
     @property
     def all_verts_begin(self):
@@ -2251,7 +2331,10 @@ cdef class Delaunay3:
             bool: True if v1 and v2 form an edge, False otherwise. 
 
         """
-        return <pybool>self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
+        cdef cbool out
+        with nogil:
+            out = self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
+        return <pybool>out
 
     def is_facet(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
                  Delaunay3_vertex v3, Delaunay3_cell c = Delaunay3_cell(),
@@ -2275,7 +2358,10 @@ cdef class Delaunay3:
             bool: True if v1, v2, and v3 form a facet, False otherwise. 
 
         """
-        return <pybool>self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
+        cdef cbool out
+        with nogil:
+            out = self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
+        return <pybool>out
 
     def is_cell(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
                 Delaunay3_vertex v3, Delaunay3_vertex v4, 
@@ -2303,9 +2389,14 @@ cdef class Delaunay3:
             bool: True if v1, v2, v3, and v4 form a cell, False otherwise. 
 
         """
-        return <pybool>self.T.is_cell(v1.x, v2.x, v3.x, v4.x,
-                                          c.x, i1, i2, i3, i4)
+        cdef cbool out
+        with nogil:
+            out = self.T.is_cell(v1.x, v2.x, v3.x, v4.x,
+                                 c.x, i1, i2, i3, i4)
+        return <pybool>out
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def nearest_vertex(self, np.ndarray[np.float64_t, ndim=1] x):
         r"""Determine which vertex is closes to a given set of x,y coordinates.
 
@@ -2316,8 +2407,10 @@ cdef class Delaunay3:
             Delaunay3_vertex: Vertex closest to x. 
 
         """
+        assert(len(x) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex vc
-        vc = self.T.nearest_vertex(&x[0])
+        with nogil:
+            vc = self.T.nearest_vertex(&x[0])
         cdef Delaunay3_vertex v = Delaunay3_vertex()
         v.assign(self.T, vc)
         return v
@@ -2364,6 +2457,8 @@ cdef class Delaunay3:
         """
         return x.mirror_vertex(i)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                                   Delaunay3_cell start):
         r"""Get the facets bounding the zone in conflict with a given point. 
@@ -2377,9 +2472,11 @@ cdef class Delaunay3:
                  with pos. 
 
         """
+        assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        cv = self.T.find_conflicts(&pos[0], start.x)
+        with nogil:
+            cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef np.uint32_t i
         cdef Delaunay3_facet f
@@ -2389,6 +2486,8 @@ cdef class Delaunay3:
             out_facets.append(f)
         return out_facets
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
                       Delaunay3_cell start):
         r"""Get the cells in conflict with a given point.
@@ -2401,9 +2500,11 @@ cdef class Delaunay3:
             :obj:`list` of Delaunay3_cell: Cells in conflict with pos. 
 
         """
+        assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        cv = self.T.find_conflicts(&pos[0], start.x)
+        with nogil:
+            cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_cells = []
         cdef np.uint32_t i
         cdef Delaunay3_cell c
@@ -2413,6 +2514,8 @@ cdef class Delaunay3:
             out_cells.append(c)
         return out_cells
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
                                    Delaunay3_cell start):
         r"""Get the cells in conflict with a given point and the facets bounding 
@@ -2427,9 +2530,11 @@ cdef class Delaunay3:
                 :obj:`list` of `Delaunay3_facet`s bounding the zone in conflict.
 
         """
+        assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        cv = self.T.find_conflicts(&pos[0], start.x)
+        with nogil:
+            cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef object out_cells = []
         cdef np.uint32_t i
@@ -2445,6 +2550,8 @@ cdef class Delaunay3:
             out_facets.append(f)
         return out_cells, out_facets
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def boundary_points(self,
                         np.ndarray[np.float64_t, ndim=1] left_edge,
                         np.ndarray[np.float64_t, ndim=1] right_edge,
@@ -2468,11 +2575,15 @@ cdef class Delaunay3:
                     empty if `periodic == True`. 
 
         """
+        assert(len(left_edge)==3)
+        assert(len(right_edge)==3)
         global np_info
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
-        self.T.boundary_points(&left_edge[0], &right_edge[0], periodic,
-                               lx, ly, lz, rx, ry, lz, alln)
+        cdef cbool cperiodic = <cbool>periodic
+        with nogil:
+            self.T.boundary_points(&left_edge[0], &right_edge[0], cperiodic,
+                                   lx, ly, lz, rx, ry, lz, alln)
         # Get counts to preallocate 
         cdef object lind = [None, None, None]
         cdef object rind = [None, None, None]

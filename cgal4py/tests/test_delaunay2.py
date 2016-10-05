@@ -586,3 +586,9 @@ def test_edges():
     assert(e.shape[0] == T.num_finite_edges)
     assert(e.shape[1] == 2)
 
+def test_voronoi_volumes():
+    T = Delaunay2()
+    T.insert(pts)
+    v = T.voronoi_volumes()
+    assert(v.shape[0] == T.num_finite_verts)
+    # TODO: answer testing

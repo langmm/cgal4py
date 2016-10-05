@@ -620,6 +620,12 @@ class Delaunay_with_info_3
     return vol;
   }
 
+  void dual_volumes(double *vols) const {
+    for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
+      vols[it->info()] = dual_volume(Vertex(it));
+    }    
+  }
+
   double length(const Edge e) const {
     if (is_infinite(e))
       return -1.0;
