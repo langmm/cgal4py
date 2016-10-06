@@ -24,8 +24,8 @@ def test_ParallelLeaf_2D():
         pleaf.tessellate(pts2)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
-    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
-    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1][0], out[1][2][0], pts[out[1][0][0],:])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1][0], out[0][2][0], pts[out[0][0][0],:])
 
 def test_ParallelLeaf_3D():
     pts, tree = make_test(0, 3)
@@ -37,8 +37,10 @@ def test_ParallelLeaf_3D():
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
-    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
-    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1][0], out[1][2][0], pts[out[1][0][0],:])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1][0], out[0][2][0], pts[out[0][0][0],:])
+    # pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
+    # pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
 
 def test_ParallelLeaf_periodic_2D():
     pts, tree = make_test(0, 2, periodic=True)
@@ -50,8 +52,8 @@ def test_ParallelLeaf_periodic_2D():
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
-    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
-    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1][0], out[1][2][0], pts[out[1][0][0],:])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1][0], out[0][2][0], pts[out[0][0][0],:])
 
 def test_ParallelLeaf_periodic_3D():
     pts, tree = make_test(0, 3, periodic=True)
@@ -63,8 +65,8 @@ def test_ParallelLeaf_periodic_3D():
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
-    pleaves[0].incoming_points(1, out[1][0], pts[out[1][0],:])
-    pleaves[0].incoming_points(0, out[0][0], pts[out[0][0],:])
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1][0], out[1][2][0], pts[out[1][0][0],:])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1][0], out[0][2][0], pts[out[0][0][0],:])
 
 def test_ParallelDelaunay_2D():
     # Small test with known solution
@@ -77,7 +79,8 @@ def test_ParallelDelaunay_2D():
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
     # Larger random test on 2 processors
-    pts, tree = make_test(1000, 2)
+    pts, tree = make_test(1000, 2, nleaves=2)
+    assert(tree.num_leaves == 2)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
     T_seri = delaunay.Delaunay(pts)
     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
@@ -86,10 +89,18 @@ def test_ParallelDelaunay_2D():
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
     # Medium test on 4 processors
-    # pts, tree = make_test(4*4*2, 2, leafsize=8, periodic=True)
-    # print tree.num_leaves
-    # # T_seri = delaunay.Delaunay(pts)
-    # T_para = parallel.ParallelDelaunay(pts, tree, 4)
+    pts, tree = make_test(4*4*2, 2, leafsize=8)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 4)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    # Large test on 10 processors
+    # pts, tree = make_test(1e4, 2, nleaves=10)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
     # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
     # c_para, n_para, inf_para = T_para.serialize(sort=True)
     # assert(np.all(c_seri == c_para))
@@ -102,6 +113,7 @@ def test_ParallelDelaunay_2D():
     #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
 
 def test_ParallelDelaunay_3D():
+    # Small test with known solution
     pts, tree = make_test(0, 3)
     T_seri = delaunay.Delaunay(pts)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
@@ -110,6 +122,7 @@ def test_ParallelDelaunay_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Larger random test on 2 processors 
     pts, tree = make_test(1000, 3)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
     T_seri = delaunay.Delaunay(pts)
@@ -118,6 +131,24 @@ def test_ParallelDelaunay_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 3, leafsize=8)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 4)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    # # Large test on 10 processors
+    # pts, tree = make_test(1e3, 3, nleaves=10)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -126,6 +157,7 @@ def test_ParallelDelaunay_3D():
     #     print '    facets', T.num_facets, T.num_finite_facets, T.num_infinite_facets
 
 def test_ParallelDelaunay_periodic_2D():
+    # Small test with known solution
     pts, tree = make_test(0, 2, periodic=True)
     T_seri = delaunay.Delaunay(pts)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
@@ -134,6 +166,7 @@ def test_ParallelDelaunay_periodic_2D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Larger random test on 2 processors 
     pts, tree = make_test(1000, 2, periodic=True)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
     T_seri = delaunay.Delaunay(pts)
@@ -142,6 +175,24 @@ def test_ParallelDelaunay_periodic_2D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 2, leafsize=8, periodic=True)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 4)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    # Large test on 10 processors
+    # pts, tree = make_test(1e4, 2, nleaves=10, periodic=True)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -149,6 +200,7 @@ def test_ParallelDelaunay_periodic_2D():
     #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
 
 def test_ParallelDelaunay_periodic_3D():
+    # Small test with known solution
     pts, tree = make_test(0, 3, periodic=True)
     T_seri = delaunay.Delaunay(pts)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
@@ -157,6 +209,7 @@ def test_ParallelDelaunay_periodic_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Larger random test on 2 processors 
     pts, tree = make_test(1000, 3, periodic=True)
     T_para = parallel.ParallelDelaunay(pts, tree, 2)
     T_seri = delaunay.Delaunay(pts)
@@ -165,6 +218,15 @@ def test_ParallelDelaunay_periodic_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
+    # Large test on 10 processors
+    # pts, tree = make_test(1e4, 3, nleaves=10, periodic=True)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -176,6 +238,8 @@ def test_DelaunayProcess2():
     pts, tree = make_test(0, 2)
     leaves = tree.leaves
     nproc = 2 # len(leaves)
+    count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
+    lock = mp.Condition()
     queues = [mp.Queue() for _ in xrange(nproc+1)]
     # Split leaves 
     task2leaves = [[] for _ in xrange(nproc)]
@@ -185,7 +249,8 @@ def test_DelaunayProcess2():
     # Create processes & tessellate
     processes = []
     for i in xrange(nproc):
-        P = parallel.DelaunayProcess('triangulate',task2leaves[i], pts, queues, i)
+        P = parallel.DelaunayProcess('triangulate',task2leaves[i], pts, queues, 
+                                     lock, count, i)
         processes.append(P)
     # Split
     P1, P2 = processes[0], processes[1]
@@ -195,8 +260,8 @@ def test_DelaunayProcess2():
     # Full run on 2
     P2.run()
     # Finish on 1
-    i,j,arr = queues[0].get()
-    queues[0].put((i,j,np.array([])))
+    i,j,arr,ln,rn = queues[0].get()
+    queues[0].put((i,j,np.array([]),ln,rn))
     P1.incoming_points()
     P1.enqueue_triangulation()
     time.sleep(0.01)

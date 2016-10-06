@@ -10,7 +10,9 @@ from test_delaunay3 import left_edge as left_edge3
 from test_delaunay3 import right_edge as right_edge3
 
 @nottest
-def make_test(npts, ndim, distrib='uniform', periodic=False, leafsize=None):
+def make_test(npts, ndim, distrib='uniform', periodic=False, 
+              leafsize=None, nleaves=0):
+    npts = int(npts)
     # Points
     if npts <= 0:
         if ndim == 2:
@@ -43,7 +45,8 @@ def make_test(npts, ndim, distrib='uniform', periodic=False, leafsize=None):
     if leafsize is None:
         leafsize = npts/2 + 2
     tree = domain_decomp.tree("kdtree", pts, left_edge, right_edge,
-                              periodic=periodic, leafsize=leafsize)
+                              periodic=periodic, leafsize=leafsize,
+                              nleaves=nleaves)
     return pts, tree
 
 def test_triangulate():

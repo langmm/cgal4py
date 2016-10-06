@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <exception>
 
+
 template<typename I>
 bool arg_tLT(I *cells, uint32_t *idx_verts, uint32_t ndim, uint64_t i1, uint64_t i2)
 {
@@ -414,13 +415,14 @@ public:
     matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
     for (uint64_t i = 0; i < num_leaves; i++)
       add_leaf(leaves[i]);
+    // for (uint64_t i = 0; i < num_leaves; i++)
+    //   add_leaf_neigh(leaves[i]);
     add_inf();
     free(matches1);
     free(matches2);
   }
 
   void add_leaf(SerializedLeaf<leafI> leaf) {
-
     leafI i;
     int64_t idx;
     for (i = 0; i < (leafI)leaf.ncells; i++) {
@@ -429,6 +431,19 @@ public:
       	add_neigh(leaf, i, idx);
     }
   }
+
+  // void add_leaf_neigh(SerializedLeaf<leafI> leaf) {
+  //   leafI i;
+  //   int64_t idx;
+  //   for (i = 0; i < (leafI)leaf.ncells; i++) {
+  //     idx = leaf.visited[i];
+  //     if (idx >= 0)
+  // 	add_neigh(leaf, i, idx);
+  //     else if (idx == -777)
+  // 	return;
+
+  //   }
+  // }
 
   int64_t new_cell(leafI *verts) {
     uint32_t j;
@@ -481,16 +496,60 @@ public:
 	    idx = new_cell(verts);
 	    leaf.visited[icell] = idx;
 	    oth_leaf.visited[oth_cell] = idx;
+	  } else {
+	    leaf.visited[icell] = idx;
 	  }
 	} else
 	  idx = -1;
       }
     } else {
-      idx = split_map.insert(verts, sort_verts, ncells);
-      leaf.visited[icell] = idx;
-      if (idx == ncells) 
-	idx = new_cell(verts);
+      // idx = split_map.insert(verts, sort_verts, ncells);
+      // leaf.visited[icell] = idx;
+      // if (idx == ncells) 
+      // 	idx = new_cell(verts);
+      bool leaf_contributes = false;
+      int i;
+      for (i = 0; i < src_leaves.size(); i++) {
+      	if (src_leaves[i] == leaf.id) {
+      	  leaf_contributes = true;
+      	  break;
+      	}
+      }
+      if (leaf_contributes) {
+	// this leaf contributes to this cell, do split map
+      	idx = split_map.insert(verts, sort_verts, ncells);
+      	leaf.visited[icell] = idx;
+      	if (idx == ncells) 
+      	  idx = new_cell(verts);
+      } else {
+	// this leaf dosn't contribute to this cell, but may provide neighbors.
+	// check to see if any of the other contributing leaves also have it.
+	int64_t oth_cell;
+	SerializedLeaf<leafI> oth_leaf;
+	bool cell_found = false;
+	for (i = 0; i < src_leaves.size(); i++) {
+	  oth_leaf = leaves[src_leaves[i]];
+	  oth_cell = oth_leaf.find_cell(verts, sort_verts);
+	  if (oth_cell >= 0) {
+	    if (cell_found) {
+	      idx = leaf.visited[icell];
+	      oth_leaf.visited[oth_cell] = idx;
+	    } else {
+	      idx = oth_leaf.visited[oth_cell];
+	      if (idx < 0) {
+		idx = split_map.insert(verts, sort_verts, ncells);
+		if (idx == ncells) 
+		  idx = new_cell(verts);
+		oth_leaf.visited[oth_cell] = idx;
+	      }
+	      leaf.visited[icell] = idx;
+	      cell_found = true;
+	    }
+	  }
+	}
+      }
     }
+
     return idx;
   }
 
@@ -531,30 +590,55 @@ public:
 	// New neighbor matches existing one
       } else {
 	// New neighbor does not match existing one
-	printf("There are conflicting neighbors.\n");
+	printf("There are conflicting neighbors for cell %ld on leaf %ld.\n",
+	       (int64_t)(icell), (int64_t)(leaf.id));
 	// int i;
+	// uint32_t *sort_verts = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+	// std::vector<int> src_leaves;
+	// // This leaf
+	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
+	// arg_sortCellVerts(allverts+c_total*(ndim+1), sort_verts, 1, ndim+1);
+	// src_leaves = find_leaves(allverts+c_total*(ndim+1), sort_verts);
 	// printf("    this (%d): ", c_total);
 	// for (i = 0; i < (ndim+1); i++) 
 	//   printf("%d ", allverts[c_total*(ndim+1)+i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < src_leaves.size(); i++)
+	//   printf("%d ", src_leaves[i]);
 	// printf("\n");
+	// // The existing neighbor
+	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
+	// arg_sortCellVerts(allverts+c_exist*(ndim+1), sort_verts, 1, ndim+1);
+	// src_leaves = find_leaves(allverts+c_exist*(ndim+1), sort_verts);
 	// printf("    old (%d): ", c_exist);
 	// for (i = 0; i < (ndim+1); i++) 
 	//   printf("%d ", allverts[c_exist*(ndim+1)+i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < src_leaves.size(); i++)
+	//   printf("%d ", src_leaves[i]);
 	// printf("\n");
+	// // The new neighbor
+	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
+	// arg_sortCellVerts(allverts+c_other*(ndim+1), sort_verts, 1, ndim+1);
+	// src_leaves = find_leaves(allverts+c_other*(ndim+1), sort_verts);
 	// printf("    new (%d): ", c_other);
 	// for (i = 0; i < (ndim+1); i++) 
 	//   printf("%d ", allverts[c_other*(ndim+1)+i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < src_leaves.size(); i++)
+	//   printf("%d ", src_leaves[i]);
 	// printf("\n");
-	// throw std::logic_error;
+	// // throw std::logic_error;
       }
     }
   }
 
-  std::vector<int> find_leaves(leafI *verts, uint32_t *sort_verts) {
+  template<typename I2>
+  std::vector<int> find_leaves(I2 *verts, uint32_t *sort_verts) {
     std::vector<int> out;
     int ic_final = 0, il_final = num_leaves;
     int ic = ndim, il = 0;
-    leafI x, sidx;
+    I2 x, sidx;
     while ((ic >= ic_final) and (il < il_final)) {
       sidx = leaves[il].start_idx;
       while ((ic >= ic_final) and (verts[sort_verts[ic]] < sidx)) 

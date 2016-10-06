@@ -31,8 +31,11 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
         task = leaf.id % nproc
         task2leaves[task].append(leaf)
     # Create & execute processes
+    count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i')]
+    lock = mp.Condition()
     queues = [mp.Queue() for _ in xrange(nproc+1)]
-    processes = [DelaunayProcess('volumes',task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
+    processes = [DelaunayProcess('volumes',task2leaves[_], pts, queues, 
+                                 lock, count, _) for _ in xrange(nproc)]
     for p in processes:
         p.start()
     # Get leaves with tessellation
@@ -82,8 +85,11 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
         task = leaf.id % nproc
         task2leaves[task].append(leaf)
     # Create & execute processes
+    count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
+    lock = mp.Condition()
     queues = [mp.Queue() for _ in xrange(nproc+1)]
-    processes = [DelaunayProcess('triangulate',task2leaves[_], pts, queues, _) for _ in xrange(nproc)]
+    processes = [DelaunayProcess('triangulate',task2leaves[_], pts, queues, 
+                                 lock, count, _) for _ in xrange(nproc)]
     for p in processes:
         p.start()
     # Get leaves with tessellation
@@ -146,12 +152,12 @@ def consolidate_tess(tree, serial, pts, use_double=False):
     # Consolidate leaves
     cells, neigh = tools.consolidate_leaves(ndim, idx_inf, serial,
                                             leaf_vidx_start, leaf_vidx_stop)
-    if np.sum(neigh == idx_inf) != 0:
-        for i in xrange(cells.shape[0]):
-            print i,cells[i,:], neigh[i,:]
+    ncells = cells.shape[0]
+    # if np.sum(neigh == idx_inf) != 0:
+    #     for i in xrange(ncells):
+    #         print i,cells[i,:], neigh[i,:]
     assert(np.sum(neigh == idx_inf) == 0)
     # Translate vertices to original values in tree (move to cython?)
-    ncells = cells.shape[0]
     for i in xrange(ncells):
         for j in range(ndim+1):
             if cells[i,j] != idx_inf:
@@ -180,7 +186,12 @@ class DelaunayProcess(mp.Process):
             Each leaf has a set of indices identifying coordinates within `pts` 
             that belong to that leaf.
         queues (list of `multiprocessing.Queue`): List of queues for every 
-            process being used in the triangulation.
+            process being used in the triangulation plus one for the main 
+            process.
+        lock (multiprocessing.Lock): Lock for processes.
+        count (multiprocessing.Value): Shared integer for tracking exchanged 
+            points.
+        proc_idx (int): Index of this process.
         **kwargs: Variable keyword arguments are passed to `multiprocessing.Process`.
 
     Raises:
@@ -188,12 +199,16 @@ class DelaunayProcess(mp.Process):
 
     """
 
-    def __init__(self, task, leaves, pts, queues, proc_idx, **kwargs):
+    def __init__(self, task, leaves, pts, queues, lock, count, proc_idx, **kwargs):
+        if task not in ['tessellate','exchange','enqueue_tess','enqueue_vols','triangulate','volumes']:
+            raise ValueError('{} is not a valid task.'.format(task))
         super(DelaunayProcess, self).__init__(**kwargs)
         self._task = task
         self._leaves = [ParallelLeaf(leaf) for leaf in leaves]
         self._pts = pts
+        self._lock = lock
         self._queues = queues
+        self._count = count
         self._num_proc = len(queues)-1
         self._local_leaves = len(leaves)
         if self._local_leaves == 0:
@@ -202,8 +217,7 @@ class DelaunayProcess(mp.Process):
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
         self._done = False
-        if task not in ['triangulate','volumes']:
-            raise ValueError('{} is not a valid task.'.format(task))
+        self._nrecv = 1
 
     # def plot_leaves(self, plotbase=None):
     #     r"""Plots the tessellation for each leaf on this process.
@@ -227,19 +241,20 @@ class DelaunayProcess(mp.Process):
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
         for leaf in self._leaves:
-            hvall = leaf.outgoing_points()
+            hvall, ln, rn = leaf.outgoing_points()
             for i in xrange(self._total_leaves):
                 task = i % self._num_proc
-                self._queues[task].put((i,leaf.id,hvall[i]))
+                self._queues[task].put((i,leaf.id,hvall[i],ln[i],rn[i]))
                 time.sleep(0.01)
 
     def incoming_points(self):
         r"""Takes points from the queue and adds them to the triangulation."""
         queue = self._queues[self._proc_idx]
         count = 0
+        nrecv = 0
         while count < (self._local_leaves*self._total_leaves):
             count += 1
-            i,j,arr = queue.get()
+            i,j,arr,ln,rn = queue.get()
             if len(arr) == 0:
                 continue
             # Find leaf this should go to
@@ -247,7 +262,13 @@ class DelaunayProcess(mp.Process):
                 if leaf.id == i:
                     break
             # Add points to leaves
-            leaf.incoming_points(j, arr, self._pts[arr,:])
+            leaf.incoming_points(j, arr, ln, rn, self._pts[arr,:])
+            nrecv += len(arr)
+        self._nrecv = nrecv
+        with self._count[0].get_lock():
+            self._count[0].value += 1
+        with self._count[1].get_lock():
+            self._count[1].value += nrecv
 
     def enqueue_triangulation(self):
         r"""Enqueue resulting tessellation."""
@@ -261,10 +282,38 @@ class DelaunayProcess(mp.Process):
 
     def run(self):
         r"""Performs tessellation and communication for each leaf on this process."""
-        if self._task == 'triangulate':
+        if self._task == 'tessellate':
+            self.tessellate_leaves()
+        elif self._task == 'exchange':
+            self.outgoing_points()
+            self.incoming_points()
+        elif self._task == 'enqueue_tess':
+            self.enqueue_triangulation()
+        elif self._task == 'enqueue_vols':
+            self.enqueue_volumes()
+        elif self._task == 'triangulate':
             self.tessellate_leaves()
             self.outgoing_points()
             self.incoming_points()
+            # while self._count[2].value == 0:
+            #     # print 'Begin',self._proc_idx, self._count[0].value, self._count[1].value, self._count[2].value
+            #     self.outgoing_points()
+            #     self.incoming_points()
+            #     self._lock.acquire()
+            #     # print 'Lock acquired: {}/{}'.format(self._count[0].value,self._num_proc), self._count[1].value
+            #     if self._count[0].value < self._num_proc:
+            #         self._lock.wait()
+            #         self._lock.release()
+            #     else:
+            #         if self._count[1].value > 0:
+            #             self._count[0].value = 0
+            #             self._count[1].value = 0
+            #             # self._count[2].value = 1
+            #         else:
+            #             self._count[2].value = 1
+            #         self._lock.notify_all()
+            #         self._lock.release()
+            #     # print 'Lock released', self._proc_idx,self._count[2].value
             self.enqueue_triangulation()
         elif self._task == 'volumes':
             self.tessellate_leaves()
@@ -296,6 +345,8 @@ class ParallelLeaf(object):
         self.norig = leaf.npts
         self.T = None
         self.idx = np.arange(leaf.start_idx, leaf.stop_idx)
+        self.left_neighbors = copy.deepcopy(leaf.left_neighbors)
+        self.right_neighbors = copy.deepcopy(leaf.right_neighbors)
         # self.wrapped = np.zeros(leaf.npts, 'bool')
 
     def __getattr__(self, name):
@@ -334,6 +385,12 @@ class ParallelLeaf(object):
         lind, rind, iind = self.T.boundary_points(self.left_edge,
                                                   self.right_edge,
                                                   True)
+        # Remove points that are not local
+        for i in range(self.ndim):
+            ridx = (rind[i] < self.norig)
+            lidx = (lind[i] < self.norig)
+            rind[i] = rind[i][ridx]
+            lind[i] = lind[i][lidx]
         # Count for preallocation
         all_leaves = range(0,self.id)+range(self.id+1,self.num_leaves)
         Nind = np.zeros(self.num_leaves, 'uint32')
@@ -347,7 +404,9 @@ class ParallelLeaf(object):
             Nind[np.array(l_neighbors,'uint32')] += len(lind[i])
             Nind[np.array(r_neighbors,'uint32')] += len(rind[i])
         # Add points 
-        hvall = [np.zeros(Nind[k], iind.dtype) for k in xrange(self.num_leaves)]
+        ln_out = [[[] for _ in range(self.ndim)] for k in xrange(self.num_leaves)]
+        rn_out = [[[] for _ in range(self.ndim)] for k in xrange(self.num_leaves)]
+        hvall = [np.zeros(Nind[k], rind[0].dtype) for k in xrange(self.num_leaves)]
         Cind = np.zeros(self.num_leaves, 'uint32')
         for i in range(self.ndim):
             l_neighbors = self.left_neighbors[i]
@@ -361,20 +420,36 @@ class ParallelLeaf(object):
             for k in l_neighbors:
                 hvall[k][Cind[k]:(Cind[k]+ilN)] = lind[i]
                 Cind[k] += ilN
+                for j in range(0,i)+range(i+1,self.ndim):
+                    rn_out[k][i] += self._leaf.left_neighbors[j]
+                for j in range(self.ndim):
+                    rn_out[k][i] += self._leaf.right_neighbors[j]
             for k in r_neighbors:
                 hvall[k][Cind[k]:(Cind[k]+irN)] = rind[i]
                 Cind[k] += irN
+                for j in range(0,i)+range(i+1,self.ndim):
+                    ln_out[k][i] += self._leaf.right_neighbors[j]
+                for j in range(self.ndim):
+                    ln_out[k][i] += self._leaf.left_neighbors[j]
         # Ensure unique values (overlap can happen if a point is at a corner) 
         for k in xrange(self.num_leaves):
             hvall[k] = self.idx[np.unique(hvall[k])]
-        return hvall
+            for i in range(self.ndim):
+                ln_out[k][i] = list(set(ln_out[k][i]))
+                rn_out[k][i] = list(set(rn_out[k][i]))
+        return hvall, ln_out, rn_out
+        # return [[hvall[k], ln_out[k], rn_out[k]] for k in xrange(self.num_leaves)]
 
-    def incoming_points(self, leafid, idx, pos):
+    def incoming_points(self, leafid, idx, ln, rn, pos):
         r"""Add incoming points from other leaves. 
 
         Args: 
             leafid (int): ID for the leaf that points came from. 
             idx (np.ndarray of int): Indices of points being recieved. 
+            rn (list of lists): Right neighbors that should be added in each 
+                dimension.
+            ln (list of lists): Left neighbors that should be added in each 
+                dimension.
             pos (np.ndarray of float): Positions of points being recieved. 
 
         """
@@ -406,6 +481,14 @@ class ParallelLeaf(object):
         # self.wrapped = np.concatenate([self.wrapped, wrapped])
         # Insert points 
         self.T.insert(pos)
+        # Add neighbors
+        for i in range(self.ndim):
+            if self.id in ln[i]:
+                ln[i].remove(self.id)
+            if self.id in rn[i]:
+                rn[i].remove(self.id)
+            self.left_neighbors[i] = list(set(self.left_neighbors[i]+ln[i]))
+            self.right_neighbors[i] = list(set(self.right_neighbors[i]+rn[i]))
 
     def serialize(self):
         r"""Get the serialized tessellation for this leaf.
@@ -419,8 +502,6 @@ class ParallelLeaf(object):
             for j in xrange(cells.shape[1]):
                 if cells[i,j] != idx_inf:
                     cells[i,j] = self.idx[cells[i,j]]
-        # fin = (cells != idx_inf)
-        # cells[fin] = self.idx[cells[fin]]
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
         return cells, neigh, idx_inf, idx_verts, idx_cells
 
