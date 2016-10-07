@@ -10,6 +10,31 @@ import copy
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+def py_intersect_sph_box(np.ndarray[np.float64_t, ndim=1] c, np.float64_t r, 
+                         np.ndarray[np.float64_t, ndim=1] le,
+                         np.ndarray[np.float64_t, ndim=1] re):
+    r"""Determine if a sphere and a coordinate alligned box intersect.
+
+    Args:
+        c (np.ndarray of float64): nD coordinates of sphere center.
+        r (float64): Sphere radius.
+        le (np.ndarray of float64): nD coordinates of box minimums.
+        re (np.ndarray of float64): nD coordinates of box maximums.
+
+    Returns:
+        bool: True if the box and sphere intersect. False otherwise.
+
+    """
+    assert(le.shape[0] == c.shape[0])
+    assert(re.shape[0] == c.shape[0])
+    cdef uint32_t ndim = <uint32_t>len(c)
+    cdef cbool out
+    with nogil:
+        out = intersect_sph_box(ndim, &c[0], r, &le[0], &re[0])
+    return <pybool>out
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def py_arg_tLT(np.ndarray[np.int64_t, ndim=2] cells, 
                np.ndarray[np.uint32_t, ndim=2] idx_verts, int i1, int i2):
     r"""Determine if one cell is less than the other by comparing 

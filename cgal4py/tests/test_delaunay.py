@@ -24,6 +24,34 @@ def test_Delaunay_double():
     assert_raises(ValueError, Delaunay, np.zeros((3,3,3)), True)
 
 # Tools
+def test_intersect_sph_box():
+    for ndim in [2,3]:
+        c = np.zeros(ndim, 'float64')
+        r = np.float64(1)
+        # Sphere inside box
+        le = -1*np.ones(ndim, 'float64')
+        re = 1*np.ones(ndim, 'float64')
+        print c.shape
+        print le.shape
+        print c.shape == le.shape
+        assert(tools.py_intersect_sph_box(c, r, le, re) == True)
+        # Box inside sphere
+        le = -np.sqrt(2.0)*np.ones(ndim, 'float64')
+        re = np.sqrt(2.0)*np.ones(ndim, 'float64')
+        assert(tools.py_intersect_sph_box(c, r, le, re) == True)
+        # Box half inside sphere
+        le = np.zeros(ndim, 'float64')
+        re = 2*np.ones(ndim, 'float64')
+        assert(tools.py_intersect_sph_box(c, r, le, re) == True)
+        # Box touching sphere
+        le = np.ones(ndim, 'float64')
+        re = 2*np.ones(ndim, 'float64')
+        assert(tools.py_intersect_sph_box(c, r, le, re) == True)
+        # Box outside sphere
+        le = 2*np.ones(ndim, 'float64')
+        re = 3*np.ones(ndim, 'float64')
+        assert(tools.py_intersect_sph_box(c, r, le, re) == False)
+
 def test_arg_tLT():
     cells = np.array([[2,1,0],
                       [3,1,0],

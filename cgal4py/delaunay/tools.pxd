@@ -5,6 +5,7 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int64_t, int32_t
 
 cdef extern from "c_tools.hpp":
+    bool intersect_sph_box(uint32_t ndim, double *c, double r, double *le, double *re) nogil
     bool arg_tLT[I](I *cells, uint32_t *idx_verts, uint32_t ndim, uint64_t i1, uint64_t i2) nogil
     bool tEQ[I](I *cells, uint32_t ndim, int64_t i1, int64_t i2) nogil
     bool tGT[I](I *cells, uint32_t ndim, int64_t i1, int64_t i2) nogil

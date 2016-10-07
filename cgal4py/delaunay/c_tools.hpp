@@ -8,6 +8,19 @@
 #include <stdint.h>
 #include <exception>
 
+bool intersect_sph_box(uint32_t ndim, double *c, double r, double *le, double *re) {
+  uint32_t i;
+  for (i = 0; i < ndim; i++) {
+    if (c[i] < le[i]) {
+      if ((c[i] + r) < le[i])
+	return false;
+    } else if (c[i] > re[i]) {
+      if ((c[i] - r) > re[i]) 
+	return false;
+    } 
+  }
+  return true;
+}
 
 template<typename I>
 bool arg_tLT(I *cells, uint32_t *idx_verts, uint32_t ndim, uint64_t i1, uint64_t i2)
@@ -509,7 +522,7 @@ public:
       // 	idx = new_cell(verts);
       bool leaf_contributes = false;
       int i;
-      for (i = 0; i < src_leaves.size(); i++) {
+      for (i = 0; i < (int)(src_leaves.size()); i++) {
       	if (src_leaves[i] == leaf.id) {
       	  leaf_contributes = true;
       	  break;
@@ -527,7 +540,7 @@ public:
 	int64_t oth_cell;
 	SerializedLeaf<leafI> oth_leaf;
 	bool cell_found = false;
-	for (i = 0; i < src_leaves.size(); i++) {
+	for (i = 0; i < (int)(src_leaves.size()); i++) {
 	  oth_leaf = leaves[src_leaves[i]];
 	  oth_cell = oth_leaf.find_cell(verts, sort_verts);
 	  if (oth_cell >= 0) {
