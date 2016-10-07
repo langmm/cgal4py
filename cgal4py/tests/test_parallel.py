@@ -111,6 +111,11 @@ def test_ParallelDelaunay_2D():
     T_para = parallel.ParallelDelaunay(pts, tree, 10)
     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
     c_para, n_para, inf_para = T_para.serialize(sort=True)
+    for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+        print name
+        print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
+        print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
+        print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))

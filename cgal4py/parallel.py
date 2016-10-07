@@ -228,7 +228,6 @@ class DelaunayProcess(mp.Process):
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
         self._done = False
-        self._nrecv = 1
 
     def tessellate_leaves(self):
         r"""Performs the tessellation for each leaf on this process."""
@@ -241,7 +240,10 @@ class DelaunayProcess(mp.Process):
             hvall, n, le, re = leaf.outgoing_points()
             for i in xrange(self._total_leaves):
                 task = i % self._num_proc
-                self._queues[task].put((i,leaf.id,hvall[i],n,le,re))
+                if hvall[i] is None:
+                    self._queues[task].put(None)
+                else:
+                    self._queues[task].put((i,leaf.id,hvall[i],n,le,re))
                 time.sleep(0.01)
 
     def incoming_points(self):
@@ -249,14 +251,13 @@ class DelaunayProcess(mp.Process):
         queue = self._queues[self._proc_idx]
         count = 0
         nrecv = 0
-        for leaf in self._leaves:
-            leaf.neighbors = []
-            leaf.left_edges = np.zeros((0,leaf.ndim), 'float64')
-            leaf.right_edges = np.zeros((0,leaf.ndim), 'float64')
         while count < (self._local_leaves*self._total_leaves):
             count += 1
-            i,j,arr,n,le,re = queue.get()
-            # i,j,arr,ln,rn = queue.get()
+            time.sleep(0.01)
+            out = queue.get()
+            if out is None:
+                continue
+            i,j,arr,n,le,re = out
             if (arr is None) or (len(arr) == 0):
                 continue
             # Find leaf this should go to
@@ -266,9 +267,6 @@ class DelaunayProcess(mp.Process):
             # Add points to leaves
             leaf.incoming_points(j, arr, n, le, re, self._pts[arr,:])
             nrecv += len(arr)
-        self._nrecv = nrecv
-        with self._count[0].get_lock():
-            self._count[0].value += 1
         with self._count[1].get_lock():
             self._count[1].value += nrecv
 
@@ -301,6 +299,8 @@ class DelaunayProcess(mp.Process):
                 # print 'Begin',self._proc_idx, self._count[0].value, self._count[1].value, self._count[2].value
                 self.outgoing_points()
                 self.incoming_points()
+                with self._count[0].get_lock():
+                    self._count[0].value += 1
                 self._lock.acquire()
                 print 'Lock acquired: {}/{}'.format(self._count[0].value,self._num_proc), self._count[1].value
                 if self._count[0].value < self._num_proc:
@@ -380,17 +380,6 @@ class ParallelLeaf(object):
         else:
             raise AttributeError
 
-    # def plot(self, plotbase=''):
-    #     r"""Plots the tessellation for this leaf.
-
-    #     Args:
-    #         plotbase (str, optional): Base path to which leaf ID should be 
-    #             appended to create plot filenames. Defaults to empty string.
-
-    #     """
-    #     plotfile = plotbase+'leaf{}of{}'.format(self.id,self.num_leaves)
-    #     self.T.plot(plotfile=plotfile)
-
     def tessellate(self, pts):
         r"""Perform tessellation on leaf.
 
@@ -411,11 +400,14 @@ class ParallelLeaf(object):
             ridx = (idx_enq[i] < self.norig)
             idx_enq[i] = idx_enq[i][ridx]
         # Translate and add entries for non-neighbors
-        n_out = [[] for k in xrange(self.num_leaves)]
         hvall = [None for k in xrange(self.num_leaves)]
         for i,k in enumerate(n):
-            n_out[k] = copy.deepcopy(n)
             hvall[k] = self.idx[idx_enq[i]]
+        # Reset neighbors for incoming
+        self.all_neighbors.update(self.neighbors)
+        self.neighbors = []
+        self.left_edges = np.zeros((0,self.ndim), 'float64')
+        self.right_edges = np.zeros((0,self.ndim), 'float64')
         return hvall, n, le, re
 
     def outgoing_points_boundary(self):
@@ -518,14 +510,12 @@ class ParallelLeaf(object):
         # Insert points 
         self.T.insert(pos)
         # Add neighbors
-        if self.id in n:
-            id_index = n.index(self.id)
-            n.remove(self.id)
-            np.delete(le, id_index, 0)
-            np.delete(re, id_index, 0)
-        self.neighbors += n
-        self.left_edges = np.concatenate([self.left_edges, le])
-        self.right_edges = np.concatenate([self.right_edges, re])
+        for i in range(len(n)):
+            if (n[i] != self.id) and (n[i] not in self.all_neighbors):
+                self.neighbors.append(n[i])
+                self.left_edges = np.vstack([self.left_edges, le[i,:]])
+                self.right_edges = np.vstack([self.right_edges, re[i,:]])
+
 
     def incoming_points_boundary(self, leafid, idx, ln, rn, pos):
         r"""Add incoming points from other leaves. 
