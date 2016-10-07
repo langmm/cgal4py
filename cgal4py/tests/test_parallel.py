@@ -16,11 +16,13 @@ np.random.seed(10)
 
 def test_ParallelLeaf_2D():
     pts, tree = make_test(0, 2)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     out = []
     pleaves = []
     for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
         pleaf.tessellate(pts2)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
@@ -29,11 +31,13 @@ def test_ParallelLeaf_2D():
 
 def test_ParallelLeaf_3D():
     pts, tree = make_test(0, 3)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     out = []
     pleaves = []
     for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
@@ -44,11 +48,13 @@ def test_ParallelLeaf_3D():
 
 def test_ParallelLeaf_periodic_2D():
     pts, tree = make_test(0, 2, periodic=True)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     out = []
     pleaves = []
     for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
@@ -57,11 +63,13 @@ def test_ParallelLeaf_periodic_2D():
 
 def test_ParallelLeaf_periodic_3D():
     pts, tree = make_test(0, 3, periodic=True)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     out = []
     pleaves = []
     for i,leaf in enumerate(tree.leaves):
         assert(leaf.id == i)
-        pleaf = parallel.ParallelLeaf(leaf)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
         pleaf.tessellate(pts)
         pleaves.append(pleaf)
         out.append(pleaf.outgoing_points())
@@ -98,14 +106,14 @@ def test_ParallelDelaunay_2D():
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
     # Large test on 10 processors
-    # pts, tree = make_test(1e4, 2, nleaves=10)
-    # T_seri = delaunay.Delaunay(pts)
-    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
-    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    # c_para, n_para, inf_para = T_para.serialize(sort=True)
-    # assert(np.all(c_seri == c_para))
-    # assert(np.all(n_seri == n_para))
-    # assert(T_para.is_equivalent(T_seri))
+    pts, tree = make_test(1e4, 2, nleaves=10)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 10)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -236,6 +244,8 @@ def test_ParallelDelaunay_periodic_3D():
 
 def test_DelaunayProcess2():
     pts, tree = make_test(0, 2)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     leaves = tree.leaves
     nproc = 2 # len(leaves)
     count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
@@ -249,8 +259,9 @@ def test_DelaunayProcess2():
     # Create processes & tessellate
     processes = []
     for i in xrange(nproc):
-        P = parallel.DelaunayProcess('triangulate',task2leaves[i], pts, queues, 
-                                     lock, count, i)
+        P = parallel.DelaunayProcess('triangulate',task2leaves[i], pts, 
+                                     left_edges, right_edges,
+                                     queues, lock, count, i)
         processes.append(P)
     # Split
     P1, P2 = processes[0], processes[1]

@@ -1478,8 +1478,8 @@ cdef class Delaunay2:
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
-        if self.n != <int64_t>self.T.num_finite_verts():
-            print("There were {} duplicates".format(self.n-self.T.num_finite_verts()))
+        # if self.n != <int64_t>self.T.num_finite_verts():
+        #     print("There were {} duplicates".format(self.n-self.T.num_finite_verts()))
 
     @_update_to_tess
     def clear(self):
@@ -2016,20 +2016,19 @@ cdef class Delaunay2:
         Returns:
         
         """
+        assert(left_edges.shape[1] == 2)
         assert(left_edges.shape[0] == right_edges.shape[0])
         assert(left_edges.shape[1] == right_edges.shape[1])
         cdef uint64_t nbox = <uint64_t>left_edges.shape[0]
-        cdef uint32_t ndim = <uint32_t>left_edges.shape[1]
-        assert(ndim == 2)
         cdef vector[vector[info_t]] vout
         if (nbox > 0):
             with nogil:
-                vout = self.T.outgoing_points(ndim, nbox,
+                vout = self.T.outgoing_points(nbox,
                                               &left_edges[0,0], 
                                               &right_edges[0,0])
         assert(vout.size() == nbox)
         # Transfer values to array
-        cdef int i, j
+        cdef uint64_t i, j
         cdef object out = [None for i in xrange(vout.size())]
         for i in xrange(vout.size()):
             out[i] = np.empty(vout[i].size(), np_info)

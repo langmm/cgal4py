@@ -941,13 +941,65 @@ public:
     }
   }
 
-  std::vector<std::vector<Info>> outgoing_points(uint32_t ndim, uint64_t nbox,
+  bool intersect_sph_box(Point *c, double r, double *le, double *re) const {
+    // x 
+    if (c->x() < le[0]) {
+      if ((c->x() + r) < le[0])
+	return false;
+    } else if (c->x() > re[0]) {
+      if ((c->x() - r) > re[0])
+	return false;
+    }
+    // y
+    if (c->y() < le[1]) {
+      if ((c->y() + r) < le[1])
+	return false;
+    } else if (c->y() > re[1]) {
+      if ((c->y() - r) > re[1])
+	return false;
+    }
+    return true;
+  }
+
+  std::vector<std::vector<Info>> outgoing_points(uint64_t nbox,
 						 double *left_edges, 
 						 double *right_edges) const {
     std::vector<std::vector<Info>> out;
     uint64_t b;
     for (b = 0; b < nbox; b++) 
       out.push_back(std::vector<Info>());
+
+    Vertex_handle v;
+    Point cc, p1;
+    double cr;
+    int i, iinf = 0;
+
+    for (All_faces_iterator it = T.all_faces_begin(); it != T.all_faces_end(); it++) {
+      if (T.is_infinite(it) == true) {
+	// Find index of infinite vertex
+	for (i = 0; i < 3; i++) {
+	  v = it->vertex(i);
+	  if (T.is_infinite(v)) {
+	    iinf = i;
+	    break;
+	  }
+	}
+	for (b = 0; b < nbox; b++)
+	  for (i = 1; i < 3; i++) out[b].push_back((it->vertex((iinf+i)%3))->info());
+      } else {
+        p1 = it->vertex(0)->point();
+        cc = T.circumcenter(it);
+        cr = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, cc)));
+	for (b = 0; b < nbox; b++) {
+	  if (intersect_sph_box(&cc, cr, left_edges + 2*b, right_edges + 2*b))
+	    for (i = 0; i < 3; i++) out[b].push_back((it->vertex(i))->info());
+	}
+      }
+    }
+    for (b = 0; b < nbox; b++) {
+      std::sort( out[b].begin(), out[b].end() ); 
+      out[b].erase( std::unique( out[b].begin(), out[b].end() ), out[b].end() );
+    }
 
     return out;
   }
@@ -958,7 +1010,7 @@ public:
                        std::vector<Info>& alln) const
   {
     Vertex_handle v;
-    Info hv;
+    // Info hv;
     Point cc, p1;
     double cr;
     int i, iinf;
