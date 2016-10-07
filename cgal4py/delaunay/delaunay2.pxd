@@ -181,6 +181,8 @@ cdef extern from "c_delaunay2.hpp":
         int oriented_side(Cell f, const double* pos) const
         int side_of_oriented_circle(Cell f, const double* pos) const
 
+        vector[vector[Info]] outgoing_points(uint32_t ndim, uint64_t nbox,
+                                             double *left_edges, double *right_edges)
         void boundary_points(double *left_edge, double *right_edge, bool periodic,
                              vector[Info]& lx, vector[Info]& ly,
                              vector[Info]& rx, vector[Info]& ry,

@@ -586,6 +586,25 @@ def test_edges():
     assert(e.shape[0] == T.num_finite_edges)
     assert(e.shape[1] == 2)
 
+def test_boundary_points():
+    T = Delaunay2()
+    T.insert(pts)
+    out = T.boundary_points(left_edge, right_edge, False)
+
+def test_outgoing_points():
+    T = Delaunay2()
+    T.insert(pts)
+    le = np.array([[-2,-2],
+                   [-1,-1],
+                   [ 0, 0],
+                   [ 1, 1]], 'float64')
+    re = np.array([[-1,-1],
+                   [ 0, 0],
+                   [ 1, 1],
+                   [ 2, 2]], 'float64')
+    out = T.outgoing_points(le, re)
+    assert(len(out) == le.shape[0])
+
 def test_voronoi_volumes():
     T = Delaunay2()
     T.insert(pts)

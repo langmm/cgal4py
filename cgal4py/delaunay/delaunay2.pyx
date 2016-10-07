@@ -2000,6 +2000,43 @@ cdef class Delaunay2:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
+    def outgoing_points(self, 
+                        np.ndarray[np.float64_t, ndim=2] left_edges,
+                        np.ndarray[np.float64_t, ndim=2] right_edges): 
+        r"""Get the indices of points in tets that intersect a set of boxes.
+
+        Args:
+            left_edges (np.ndarray of float64): (m, n) array of m box mins in n 
+                dimensions.
+            right_edges (np.ndarray of float64): (m, n) array of m box maxs in n 
+                dimensions.
+
+        Returns:
+        
+        """
+        assert(left_edges.shape[0] == right_edges.shape[0])
+        assert(left_edges.shape[1] == right_edges.shape[1])
+        cdef uint64_t nbox = <uint64_t>left_edges.shape[0]
+        cdef uint32_t ndim = <uint32_t>left_edges.shape[1]
+        assert(ndim == 2)
+        cdef vector[vector[info_t]] vout
+        if (nbox > 0):
+            with nogil:
+                vout = self.T.outgoing_points(ndim, nbox,
+                                              &left_edges[0,0], 
+                                              &right_edges[0,0])
+        assert(vout.size() == nbox)
+        # Transfer values to array
+        cdef int i, j
+        cdef object out = [None for i in xrange(vout.size())]
+        for i in xrange(vout.size()):
+            out[i] = np.empty(vout[i].size(), np_info)
+            for j in xrange(vout[i].size()):
+                out[i][j] = vout[i][j]
+        return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def boundary_points(self, 
                         np.ndarray[np.float64_t, ndim=1] left_edge,
                         np.ndarray[np.float64_t, ndim=1] right_edge, 

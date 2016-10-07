@@ -941,6 +941,17 @@ public:
     }
   }
 
+  std::vector<std::vector<Info>> outgoing_points(uint32_t ndim, uint64_t nbox,
+						 double *left_edges, 
+						 double *right_edges) const {
+    std::vector<std::vector<Info>> out;
+    uint64_t b;
+    for (b = 0; b < nbox; b++) 
+      out.push_back(std::vector<Info>());
+
+    return out;
+  }
+
   void boundary_points(double *left_edge, double *right_edge, bool periodic,
                        std::vector<Info>& lx, std::vector<Info>& ly,
                        std::vector<Info>& rx, std::vector<Info>& ry,
