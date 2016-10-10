@@ -1356,13 +1356,8 @@ cdef class Delaunay2:
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
         with nogil:
-            idx_inf = self.T.serialize[info_t]( 
-                n, m, d, &vert_pos[0,0], &vert_info[0], 
-                &cells[0,0], &neighbors[0,0])
-        for i in xrange(m):
-            for j in range(d+1):
-                if cells[i,j] != idx_inf:
-                    cells[i,j] = vert_info[cells[i,j]]
+            idx_inf = self.T.serialize_idxinfo[info_t](
+                n, m, d, &cells[0,0], &neighbors[0,0])
         # Sort if desired
         if sort:
             with nogil:
@@ -1393,9 +1388,40 @@ cdef class Delaunay2:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
         with nogil:
-            self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0], 
+            self.T.deserialize_idxinfo[info_t](n, m, d, &pos[0,0],
+                                               &cells[0,0], &neighbors[0,0], idx_inf)
+        self.n = n
+        self.n_per_insert.append(n)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @_update_to_tess
+    def deserialize_with_info(self, np.ndarray[np.float64_t, ndim=2] pos,
+                              np.ndarray[np_info_t, ndim=1] info,
+                              np.ndarray[np_info_t, ndim=2] cells,
+                              np.ndarray[np_info_t, ndim=2] neighbors,
+                              info_t idx_inf):
+        r"""Deserialize triangulation.
+
+        Args:
+            pos (np.ndarray of float64): Coordinates of points.
+            info (np.ndarray of info_t): Info for points.
+            cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
+                of the n cells. A value of np.iinfo(np_info).max A value of 
+                np.iinfo(np_info).max indicates the infinite vertex.
+            neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m
+                neighbors to each of the n cells.
+            idx_inf (info_t): Index indicating a vertex is infinite.
+
+        """
+        cdef info_t n = pos.shape[0]
+        cdef info_t m = cells.shape[0]
+        cdef int32_t d = neighbors.shape[1]-1
+        if (n == 0) or (m == 0):
+            return
+        with nogil:
+            self.T.deserialize[info_t](n, m, d, &pos[0,0], &info[0],
                                        &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)
@@ -1554,7 +1580,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex at the new position.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move(x.x, &pos[0])
@@ -1580,7 +1606,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex at the new position.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move_if_no_collision(x.x, &pos[0])
@@ -1827,7 +1853,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex closest to x.
 
         """
-        assert(len(x) == 2)
+        assert(x.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex vc
         with nogil:
             vc = self.T.nearest_vertex(&x[0])
@@ -1892,7 +1918,7 @@ cdef class Delaunay2:
                  pos.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef vector[Delaunay_with_info_2[info_t].Edge] ev
         with nogil:
             ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
@@ -1919,7 +1945,7 @@ cdef class Delaunay2:
             :obj:`list` of Delaunay2_cell: Cells in conflict with pos.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
         with nogil:
             cv = self.T.get_conflicts(&pos[0], start.x)
@@ -1949,7 +1975,7 @@ cdef class Delaunay2:
                 conflicting cells.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef pair[vector[Delaunay_with_info_2[info_t].Cell],
                   vector[Delaunay_with_info_2[info_t].Edge]] cv
         with nogil:
@@ -1984,8 +2010,8 @@ cdef class Delaunay2:
                 pos2.
 
         """
-        assert(len(pos1)==2)
-        assert(len(pos2)==2)
+        assert(pos1.shape[0]==2)
+        assert(pos2.shape[0]==2)
         cdef object out = []
         cdef np.uint32_t i
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
@@ -2059,8 +2085,8 @@ cdef class Delaunay2:
                     empty if `periodic == True`.
 
         """
-        assert(len(left_edge)==2)
-        assert(len(right_edge)==2)
+        assert(left_edge.shape[0]==2)
+        assert(right_edge.shape[0]==2)
         global np_info
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln

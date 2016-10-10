@@ -35,12 +35,16 @@ cdef extern from "c_delaunay2.hpp":
 
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +
+        Info serialize_idxinfo[I](I &n, I &m, int32_t &d,
+                                  Info* faces, I* neighbors) const
         I serialize[I](I &n, I &m, int32_t &d,
                        double* vert_pos, Info* vert_info,
-                       I* faces, I* neighbors)
+                       I* faces, I* neighbors) const
+        void deserialize_idxinfo[I](I n, I m, int32_t d, double* vert_pos,
+                                    I* faces, I* neighbors, I idx_inf)
         void deserialize[I](I n, I m, int32_t d,
-                         double* vert_pos, Info* vert_info,
-                         I* faces, I* neighbors, I idx_inf) const
+                            double* vert_pos, Info* vert_info,
+                            I* faces, I* neighbors, I idx_inf) 
 
         Vertex get_vertex(Info index) except +
         Cell locate(double* pos, int& lt, int& li)

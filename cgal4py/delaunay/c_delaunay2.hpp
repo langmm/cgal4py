@@ -829,6 +829,54 @@ public:
   }
 
   template <typename I>
+  Info serialize_idxinfo(I &n, I &m, int32_t &d,
+			 Info* faces, I* neighbors) const
+  {
+    Info idx_inf = std::numeric_limits<Info>::max();
+
+    // Header
+    n = static_cast<I>(T.number_of_vertices());
+    m = static_cast<I>(T.tds().number_of_full_dim_faces());
+    d = static_cast<I>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
+
+    Face_hash F;
+
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+
+    // vertices of the faces
+    inum = 0;
+    for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+	 ib != T.tds().face_iterator_base_end(); ++ib) {
+      for (int j = 0; j < dim ; ++j) {
+	vit = ib->vertex(j);
+	if ( v == vit )
+	  faces[dim*inum + j] = idx_inf;
+	else
+	  faces[dim*inum + j] = vit->info();
+      }
+      F[ib] = inum++;
+    }
+  
+    // neighbor pointers of the faces
+    inum = 0;
+    for (All_faces_iterator it = T.tds().face_iterator_base_begin();
+	 it != T.tds().face_iterator_base_end(); ++it) {
+      for (int j = 0; j < d+1; ++j){
+	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+      }
+      inum++;
+    }
+    return idx_inf;
+  }
+
+  template <typename I>
   void deserialize(I n, I m, int32_t d,
 		   double* vert_pos, Info* vert_info, 
 		   I* faces, I* neighbors, I idx_inf)
@@ -865,6 +913,87 @@ public:
       V[i] = T.tds().create_vertex();
       V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1]);
       V[i]->info() = vert_info[i];
+    }
+
+    // First face
+    i = 0;
+    F[i] = to_delete;
+    for (j = 0; j < dim; ++j) {
+      index = faces[dim*i + j];
+      if (index == idx_inf)
+	v = V[n];
+      else
+	v = V[index];
+      F[i]->set_vertex(j, v);
+      v->set_face(F[i]);
+    }
+    i++;
+
+    // Creation of the faces
+    for( ; i < m; ++i) {
+      F[i] = T.tds().create_face() ;
+      for(j = 0; j < dim ; ++j){
+	index = faces[dim*i + j];
+	if (index == idx_inf)
+	  v = V[n];
+	else
+	  v = V[index];
+	F[i]->set_vertex(j, v);
+	// The face pointer of vertices is set too often,
+	// but otherwise we had to use a further map 
+	v->set_face(F[i]);
+      }
+    }
+
+    // Setting the neighbor pointers
+    for(i = 0; i < m; ++i) {
+      for(int j = 0; j < d+1; ++j){
+	index = neighbors[(d+1)*i + j];
+	F[i]->set_neighbor(j, F[index]);
+      }
+    }
+
+    // Remove flat face
+    // T.tds().delete_face(to_delete);
+    T.set_infinite_vertex(V[n]);
+  }
+
+  template <typename I>
+  void deserialize_idxinfo(I n, I m, int32_t d, double* vert_pos,
+			   I* faces, I* neighbors, I idx_inf)
+  {
+    updated = true;
+
+    T.clear();
+    if (T.number_of_vertices() != 0) 
+      T.clear();
+  
+    if (n==0) {
+      T.set_infinite_vertex(Vertex_handle());
+      return;
+    }
+
+    T.tds().set_dimension(d);
+
+    All_faces_iterator to_delete = T.tds().face_iterator_base_begin();
+
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Face_handle> F(m);
+    Vertex_handle v;
+    I index;
+    int dim = (d == -1 ? 1 : d + 1);
+    I i;
+    int j;
+
+    // infinite vertex
+    // V[n] = T.tds().create_vertex();
+    V[n] = T.infinite_vertex();
+
+    // Create vertices
+    for(i = 0; i < n; ++i) {
+      V[i] = T.tds().create_vertex();
+      V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1]);
+      V[i]->info() = (Info)(i);
     }
 
     // First face

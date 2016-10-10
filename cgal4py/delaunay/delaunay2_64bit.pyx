@@ -1358,13 +1358,8 @@ cdef class Delaunay2:
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
         with nogil:
-            idx_inf = self.T.serialize[info_t]( 
-                n, m, d, &vert_pos[0,0], &vert_info[0], 
-                &cells[0,0], &neighbors[0,0])
-        for i in xrange(m):
-            for j in range(d+1):
-                if cells[i,j] != idx_inf:
-                    cells[i,j] = vert_info[cells[i,j]]
+            idx_inf = self.T.serialize_idxinfo[info_t](
+                n, m, d, &cells[0,0], &neighbors[0,0])
         # Sort if desired
         if sort:
             with nogil:
@@ -1395,9 +1390,39 @@ cdef class Delaunay2:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
         with nogil:
-            self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0], 
+            self.T.deserialize_idxinfo[info_t](n, m, d, &pos[0,0],
+                                               &cells[0,0], &neighbors[0,0], idx_inf)
+        self.n = n
+        self.n_per_insert.append(n)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @_update_to_tess
+    def deserialize_with_info(self, np.ndarray[np.float64_t, ndim=2] pos,
+                              np.ndarray[np_info_t, ndim=1] info,
+                              np.ndarray[np_info_t, ndim=2] cells,
+                              np.ndarray[np_info_t, ndim=2] neighbors,
+                              info_t idx_inf):
+        r"""Deserialize triangulation.
+
+        Args:
+            pos (np.ndarray of float64): Coordinates of points.
+            cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
+                of the n cells. A value of np.iinfo(np_info).max A value of 
+                np.iinfo(np_info).max indicates the infinite vertex.
+            neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m
+                neighbors to each of the n cells.
+            idx_inf (info_t): Index indicating a vertex is infinite.
+
+        """
+        cdef info_t n = pos.shape[0]
+        cdef info_t m = cells.shape[0]
+        cdef int32_t d = neighbors.shape[1]-1
+        if (n == 0) or (m == 0):
+            return
+        with nogil:
+            self.T.deserialize[info_t](n, m, d, &pos[0,0], &info[0],
                                        &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)

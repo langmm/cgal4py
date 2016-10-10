@@ -28,14 +28,14 @@ cdef extern from "c_tools.hpp":
     void arg_sortCellVerts[I](I *cells, uint32_t *idx_verts, uint64_t ncells, uint32_t ndim) nogil
     void arg_sortSerializedTess[I](I *cells, uint64_t ncells, uint32_t ndim,
                                    uint32_t *idx_verts, uint64_t *idx_cells) nogil
-    cdef cppclass SerializedLeaf[I]:
+    cdef cppclass SerializedLeaf[I] nogil:
         SerializedLeaf() except +
         SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells,
                        I _start_idx, I _stop_idx, I _idx_inf,
                        I *_verts, I *_neigh,
                        uint32_t *_sort_verts, uint64_t *_sort_cells) except +
         # ~SerializedLeaf() except +
-    cdef cppclass ConsolidatedLeaves[I,leafI]:
+    cdef cppclass ConsolidatedLeaves[I,leafI] nogil:
         ConsolidatedLeaves() except +
         ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
                            int64_t _max_ncells, I *_verts, I *_neigh, 

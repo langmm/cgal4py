@@ -483,6 +483,8 @@ public:
     int64_t idx = -1;
     leafI *verts = leaf.verts + icell*(ndim+1);
     uint32_t *sort_verts = leaf.sort_verts + icell*(ndim+1);
+    if (leaf.visited[icell] != -1)
+      return leaf.visited[icell];
     // Infinite cell, skip for now
     if (verts[sort_verts[0]] == leaf.idx_inf) {
       leaf.visited[icell] = -777;
@@ -605,42 +607,42 @@ public:
 	// New neighbor does not match existing one
 	printf("There are conflicting neighbors for cell %ld on leaf %ld.\n",
 	       (int64_t)(icell), (int64_t)(leaf.id));
-	// int i;
-	// uint32_t *sort_verts = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
-	// std::vector<int> src_leaves;
-	// // This leaf
-	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
-	// arg_sortCellVerts(allverts+c_total*(ndim+1), sort_verts, 1, ndim+1);
-	// src_leaves = find_leaves(allverts+c_total*(ndim+1), sort_verts);
-	// printf("    this (%d): ", c_total);
-	// for (i = 0; i < (ndim+1); i++) 
-	//   printf("%d ", allverts[c_total*(ndim+1)+i]);
-	// printf(", leaves = ");
-	// for (i = 0; i < src_leaves.size(); i++)
-	//   printf("%d ", src_leaves[i]);
-	// printf("\n");
-	// // The existing neighbor
-	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
-	// arg_sortCellVerts(allverts+c_exist*(ndim+1), sort_verts, 1, ndim+1);
-	// src_leaves = find_leaves(allverts+c_exist*(ndim+1), sort_verts);
-	// printf("    old (%d): ", c_exist);
-	// for (i = 0; i < (ndim+1); i++) 
-	//   printf("%d ", allverts[c_exist*(ndim+1)+i]);
-	// printf(", leaves = ");
-	// for (i = 0; i < src_leaves.size(); i++)
-	//   printf("%d ", src_leaves[i]);
-	// printf("\n");
-	// // The new neighbor
-	// for (i = 0; i < (ndim+1); i++) sort_verts[i] = i;
-	// arg_sortCellVerts(allverts+c_other*(ndim+1), sort_verts, 1, ndim+1);
-	// src_leaves = find_leaves(allverts+c_other*(ndim+1), sort_verts);
-	// printf("    new (%d): ", c_other);
-	// for (i = 0; i < (ndim+1); i++) 
-	//   printf("%d ", allverts[c_other*(ndim+1)+i]);
-	// printf(", leaves = ");
-	// for (i = 0; i < src_leaves.size(); i++)
-	//   printf("%d ", src_leaves[i]);
-	// printf("\n");
+	int i;
+	uint32_t *sort_verts = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+	std::vector<int> src_leaves;
+	// This leaf
+	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
+	arg_sortCellVerts(allverts+c_total*(ndim+1), sort_verts, 1, ndim+1);
+	src_leaves = find_leaves(allverts+c_total*(ndim+1), sort_verts);
+	printf("    this (%ld): ", c_total);
+	for (i = 0; i < (int)(ndim+1); i++) 
+	  printf("%ld ", (int64_t)(allverts[c_total*(ndim+1)+i]));
+	printf(", leaves = ");
+	for (i = 0; i < (int)(src_leaves.size()); i++)
+	  printf("%d ", src_leaves[i]);
+	printf("\n");
+	// The existing neighbor
+	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
+	arg_sortCellVerts(allverts+c_exist*(ndim+1), sort_verts, 1, ndim+1);
+	src_leaves = find_leaves(allverts+c_exist*(ndim+1), sort_verts);
+	printf("    old (%ld): ", (int64_t)(c_exist));
+	for (i = 0; i < (int)(ndim+1); i++) 
+	  printf("%ld ", (int64_t)(allverts[c_exist*(ndim+1)+i]));
+	printf(", leaves = ");
+	for (i = 0; i < (int)(src_leaves.size()); i++)
+	  printf("%d ", src_leaves[i]);
+	printf("\n");
+	// The new neighbor
+	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
+	arg_sortCellVerts(allverts+c_other*(ndim+1), sort_verts, 1, ndim+1);
+	src_leaves = find_leaves(allverts+c_other*(ndim+1), sort_verts);
+	printf("    new (%ld): ", c_other);
+	for (i = 0; i < (int)(ndim+1); i++) 
+	  printf("%ld ", (int64_t)(allverts[c_other*(ndim+1)+i]));
+	printf(", leaves = ");
+	for (i = 0; i < (int)(src_leaves.size()); i++)
+	  printf("%d ", src_leaves[i]);
+	printf("\n");
 	// // throw std::logic_error;
       }
     }
