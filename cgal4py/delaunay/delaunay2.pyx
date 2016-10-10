@@ -1339,8 +1339,6 @@ cdef class Delaunay2:
         """
         cdef info_t n, m, i
         cdef int32_t d, j
-        cdef np.ndarray[np.float64_t, ndim=2] vert_pos
-        cdef np.ndarray[np_info_t, ndim=1] vert_info
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
         # Initialize arrays based on properties
@@ -1349,8 +1347,6 @@ cdef class Delaunay2:
         assert(n == self.num_finite_verts)
         assert(m == self.num_cells)
         d = 2
-        vert_pos = np.zeros((n,d), np.float64)
-        vert_info = np.zeros(n, np_info)
         cells = np.zeros((m, d+1), np_info)
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order

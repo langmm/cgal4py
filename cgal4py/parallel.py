@@ -218,8 +218,10 @@ def consolidate_tess(tree, serial, pts, use_double=False):
     # assert(np.sum(neigh == idx_inf) == 0)
     # Do tessellation
     T = Delaunay(np.zeros([0,ndim]), use_double=use_double)
-    T.deserialize(pts, cells, neigh, idx_inf)
-    # T.deserialize_with_info(pts, tree.idx.astype(cells.dtype), cells, neigh, idx_inf)
+    # T.deserialize(pts, cells, neigh, idx_inf)
+    # T.deserialize(pts[tree.idx,:], cells, neigh, idx_inf)
+    T.deserialize_with_info(pts, tree.idx.astype(cells.dtype), cells, neigh, idx_inf)
+    # T.deserialize_with_info(pts, np.argsort(tree.idx).astype(cells.dtype), cells, neigh, idx_inf)
     return T
 
 
@@ -290,7 +292,6 @@ class DelaunayProcess(mp.Process):
         for leaf in self._leaves:
             new_pts = np.copy(self._pts[self._idx[leaf.slice],:])
             leaf.tessellate(new_pts)
-            # leaf.tessellate(self._pts, self._idx)
 
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
@@ -474,14 +475,14 @@ class ParallelLeaf(object):
         else:
             raise AttributeError
 
-    def tessellate(self, pts):#, idx):
+    def tessellate(self, pts):
         r"""Perform tessellation on leaf.
 
         Args:
             pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
 
         """
-        self.T = Delaunay(pts)#[idx[self.slice],:])
+        self.T = Delaunay(pts)
 
     def outgoing_points(self):
         r"""Get indices of points that should be sent to each neighbor."""
@@ -582,7 +583,7 @@ class ParallelLeaf(object):
             pos (np.ndarray of float): Positions of points being recieved. 
 
         """
-        if idx.shape[0] == 0: return
+        if idx is None or idx.shape[0] == 0: return
         # Wrap points
         if self.id == leafid:
             for i in range(self.ndim):

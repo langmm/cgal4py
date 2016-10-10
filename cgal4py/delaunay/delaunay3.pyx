@@ -1869,8 +1869,6 @@ cdef class Delaunay3:
         """
         cdef info_t n, m, i
         cdef int32_t d, j
-        cdef np.ndarray[np.float64_t, ndim=2] vert_pos
-        cdef np.ndarray[np_info_t, ndim=1] vert_info
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
         # Initialize arrays based on properties
@@ -1879,20 +1877,13 @@ cdef class Delaunay3:
         assert(n == self.num_finite_verts)
         assert(m == self.num_cells)
         d = 3
-        vert_pos = np.zeros((n,d), np.float64)
-        vert_info = np.zeros(n, np_info)
         cells = np.zeros((m, d+1), np_info)
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
         with nogil:
-            idx_inf = self.T.serialize[info_t](
-                n, m, d, &vert_pos[0,0], &vert_info[0],
-                &cells[0,0], &neighbors[0,0])
-        for i in xrange(m):
-            for j in range(d+1):
-                if cells[i,j] != idx_inf:
-                    cells[i,j] = vert_info[cells[i,j]]
+            idx_inf = self.T.serialize_idxinfo[info_t](
+                n, m, d, &cells[0,0], &neighbors[0,0])
         # Sort if desired
         if sort:
             with nogil:
@@ -1923,9 +1914,40 @@ cdef class Delaunay3:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        cdef np.ndarray[info_t, ndim=1] vert_info = np.arange(n).astype(np_info)
         with nogil:
-            self.T.deserialize[info_t](n, m, d, &pos[0,0], &vert_info[0],
+            self.T.deserialize_idxinfo[info_t](n, m, d, &pos[0,0], 
+                                               &cells[0,0], &neighbors[0,0], idx_inf)
+        self.n = n
+        self.n_per_insert.append(n)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @_update_to_tess
+    def deserialize_with_info(self, np.ndarray[np.float64_t, ndim=2] pos,
+                              np.ndarray[np_info_t, ndim=1] info,
+                              np.ndarray[np_info_t, ndim=2] cells,
+                              np.ndarray[np_info_t, ndim=2] neighbors,
+                              info_t idx_inf):
+        r"""Deserialize triangulation. 
+
+        Args: 
+            pos (np.ndarray of float64): Coordinates of points. 
+            info (np.ndarray of info_t): Info for points. 
+            cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
+                of the n cells. A value of np.iinfo(np_info).max A value of 
+                np.iinfo(np_info).max indicates the infinite vertex. 
+            neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m 
+                neighbors to each of the n cells. 
+            idx_inf (info_t): Index indicating a vertex is infinite. 
+
+        """
+        cdef info_t n = pos.shape[0]
+        cdef info_t m = cells.shape[0]
+        cdef int32_t d = neighbors.shape[1]-1
+        if (n == 0) or (m == 0):
+            return
+        with nogil:
+            self.T.deserialize[info_t](n, m, d, &pos[0,0], &info[0],
                                        &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)
@@ -2019,8 +2041,8 @@ cdef class Delaunay3:
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
-        if self.n != <int64_t>self.T.num_finite_verts():
-            print "There were {} duplicates".format(self.n-self.T.num_finite_verts())
+        # if self.n != <int64_t>self.T.num_finite_verts():
+        #     print "There were {} duplicates".format(self.n-self.T.num_finite_verts())
         # assert(self.n == self.T.num_finite_verts())
 
     @_update_to_tess
@@ -2547,6 +2569,42 @@ cdef class Delaunay3:
             f.assign(self.T, cv.second[i])
             out_facets.append(f)
         return out_cells, out_facets
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def outgoing_points(self,
+                        np.ndarray[np.float64_t, ndim=2] left_edges,
+                        np.ndarray[np.float64_t, ndim=2] right_edges):
+        r"""Get the indices of points in tets that intersect a set of boxes.
+
+        Args: 
+            left_edges (np.ndarray of float64): (m, n) array of m box mins in n 
+                dimensions. 
+            right_edges (np.ndarray of float64): (m, n) array of m box maxs in n 
+                dimensions. 
+
+        Returns: 
+
+        """
+        assert(left_edges.shape[1] == 3)
+        assert(left_edges.shape[0] == right_edges.shape[0])
+        assert(left_edges.shape[1] == right_edges.shape[1])
+        cdef uint64_t nbox = <uint64_t>left_edges.shape[0]
+        cdef vector[vector[info_t]] vout
+        if (nbox > 0):
+            with nogil:
+                vout = self.T.outgoing_points(nbox,
+                                              &left_edges[0,0],
+                                              &right_edges[0,0])
+        assert(vout.size() == nbox)
+        # Transfer values to array
+        cdef uint64_t i, j
+        cdef object out = [None for i in xrange(vout.size())]
+        for i in xrange(vout.size()):
+            out[i] = np.empty(vout[i].size(), np_info)
+            for j in xrange(vout[i].size()):
+                out[i][j] = vout[i][j]
+        return out
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

@@ -502,20 +502,20 @@ public:
 	  leaf.visited[icell] = idx;
 	}
       } else {
-	// Another leaf
-	SerializedLeaf<leafI> oth_leaf = leaves[src_leaves[0]];
-	int64_t oth_cell = oth_leaf.find_cell(verts, sort_verts);
-	if (oth_cell >= 0) {
-	  idx = oth_leaf.visited[oth_cell];
-	  if (idx < 0) {
-	    idx = new_cell(verts);
-	    leaf.visited[icell] = idx;
-	    oth_leaf.visited[oth_cell] = idx;
-	  } else {
-	    leaf.visited[icell] = idx;
-	  }
-	} else
-	  idx = -1;
+	// // Another leaf
+	// SerializedLeaf<leafI> oth_leaf = leaves[src_leaves[0]];
+	// int64_t oth_cell = oth_leaf.find_cell(verts, sort_verts);
+	// if (oth_cell >= 0) {
+	//   idx = oth_leaf.visited[oth_cell];
+	//   if (idx < 0) {
+	//     idx = new_cell(verts);
+	//     leaf.visited[icell] = idx;
+	//     oth_leaf.visited[oth_cell] = idx;
+	//   } else {
+	//     leaf.visited[icell] = idx;
+	//   }
+	// } else
+	//   idx = -1;
       }
     } else {
       // idx = split_map.insert(verts, sort_verts, ncells);
@@ -539,29 +539,29 @@ public:
       } else {
 	// this leaf dosn't contribute to this cell, but may provide neighbors.
 	// check to see if any of the other contributing leaves also have it.
-	int64_t oth_cell;
-	SerializedLeaf<leafI> oth_leaf;
-	bool cell_found = false;
-	for (i = 0; i < (int)(src_leaves.size()); i++) {
-	  oth_leaf = leaves[src_leaves[i]];
-	  oth_cell = oth_leaf.find_cell(verts, sort_verts);
-	  if (oth_cell >= 0) {
-	    if (cell_found) {
-	      idx = leaf.visited[icell];
-	      oth_leaf.visited[oth_cell] = idx;
-	    } else {
-	      idx = oth_leaf.visited[oth_cell];
-	      if (idx < 0) {
-		idx = split_map.insert(verts, sort_verts, ncells);
-		if (idx == ncells) 
-		  idx = new_cell(verts);
-		oth_leaf.visited[oth_cell] = idx;
-	      }
-	      leaf.visited[icell] = idx;
-	      cell_found = true;
-	    }
-	  }
-	}
+	// int64_t oth_cell;
+	// SerializedLeaf<leafI> oth_leaf;
+	// bool cell_found = false;
+	// for (i = 0; i < (int)(src_leaves.size()); i++) {
+	//   oth_leaf = leaves[src_leaves[i]];
+	//   oth_cell = oth_leaf.find_cell(verts, sort_verts);
+	//   if (oth_cell >= 0) {
+	//     if (cell_found) {
+	//       idx = leaf.visited[icell];
+	//       oth_leaf.visited[oth_cell] = idx;
+	//     } else {
+	//       idx = oth_leaf.visited[oth_cell];
+	//       if (idx < 0) {
+	// 	idx = split_map.insert(verts, sort_verts, ncells);
+	// 	if (idx == ncells) 
+	// 	  idx = new_cell(verts);
+	// 	oth_leaf.visited[oth_cell] = idx;
+	//       }
+	//       leaf.visited[icell] = idx;
+	//       cell_found = true;
+	//     }
+	//   }
+	// }
       }
     }
 

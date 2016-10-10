@@ -39,12 +39,16 @@ cdef extern from "c_delaunay3.hpp":
 
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +
+        Info serialize_idxinfo[I](I &n, I &m, int32_t &d,
+                                  Info* cells, I* neighbors) const
         I serialize[I](I &n, I &m, int32_t &d,
                        double* vert_pos, Info* vert_info,
                        I* cells, I* neighbors) const
+        void deserialize_idxinfo[I](I n, I m, int32_t d, double* vert_pos,
+                                    I* cells, I* neighbors, I idx_inf)
         void deserialize[I](I n, I m, int32_t d,
                          double* vert_pos, Info* vert_info,
-                         I* cells, I* neighbors, I idx_inf) const
+                         I* cells, I* neighbors, I idx_inf)
 
         Vertex get_vertex(Info index) except +
         Cell locate(double* pos, int& lt, int& li, int& lj)
@@ -222,6 +226,8 @@ cdef extern from "c_delaunay3.hpp":
         bool is_Gabriel(const Edge e)
         bool is_Gabriel(const Facet f)
 
+        vector[vector[Info]] outgoing_points(uint64_t nbox,
+                                             double *left_edges, double *right_edges)
         void boundary_points(double *left_edge, double *right_edge, bool periodic,
                              vector[Info]& lx, vector[Info]& ly, vector[Info]& lz,
                              vector[Info]& rx, vector[Info]& ry, vector[Info]& rz,

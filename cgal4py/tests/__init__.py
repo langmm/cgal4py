@@ -3,4 +3,4 @@ import test_delaunay3
 import test_plot
 
 __all__ = ["test_delaunay2", "test_delaunay3", "test_plot", 
-               "test_utils"]
+               "test_utils", "scaling"]

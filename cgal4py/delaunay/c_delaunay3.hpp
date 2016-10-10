@@ -934,10 +934,60 @@ class Delaunay_with_info_3
   }
 
   template <typename I>
+  Info serialize_idxinfo(I &n, I &m, int32_t &d,
+			 Info* cells, I* neighbors) const
+  {
+    Info idx_inf = std::numeric_limits<Info>::max();
+
+    // Header
+    n = static_cast<int>(T.number_of_vertices());
+    m = static_cast<int>(T.tds().number_of_cells());
+    d = static_cast<int>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
+
+    Cell_hash C;
+      
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+    
+    // vertices of the cells
+    inum = 0;
+    for( Cell_iterator ib = T.tds().cells_begin(); 
+	 ib != T.tds().cells_end(); ++ib) {
+      for (int j = 0; j < dim ; ++j) {
+	vit = ib->vertex(j);
+	if ( v == vit )
+	  cells[dim*inum + j] = idx_inf;
+	else
+	  cells[dim*inum + j] = vit->info();
+      }
+      C[ib] = inum++;
+    }
+  
+    // neighbor pointers of the cells
+    inum = 0;
+    for( Cell_iterator it = T.tds().cells_begin();
+	 it != T.tds().cells_end(); ++it) {
+      for (int j = 0; j < d+1; ++j){
+	neighbors[(d+1)*inum + j] = C[it->neighbor(j)];
+      }
+      inum++;
+    }
+    return idx_inf;
+  }
+
+  template <typename I>
   void deserialize(I n, I m, int32_t d,
                    double* vert_pos, Info* vert_info,
                    I* cells, I* neighbors, I idx_inf)
   {
+    updated = true;
+
     if (T.number_of_vertices() != 0)  
       T.clear();
  
@@ -961,6 +1011,67 @@ class Delaunay_with_info_3
       V[i] = T.tds().create_vertex();
       V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1], vert_pos[d*i + 2]);
       V[i]->info() = vert_info[i];
+    }
+
+    // Creation of the cells
+    Vertex_handle v;
+    I index;
+    int dim = (d == -1 ? 1 : d + 1);
+    for(i = 0; i < m; ++i) {
+      C[i] = T.tds().create_cell() ;
+      for(int j = 0; j < dim ; ++j){
+        index = cells[dim*i + j];
+        if (index == idx_inf)
+          v = V[n];
+        else
+          v = V[index];
+        C[i]->set_vertex(j, v);
+        v->set_cell(C[i]);
+      }
+    }
+
+    // Setting the neighbor pointers
+    for(i = 0; i < m; ++i) {
+      for(int j = 0; j < d+1; ++j){
+        index = neighbors[(d+1)*i + j];
+        C[i]->set_neighbor(j, C[index]);
+      }
+    }
+
+    // delete flat cell
+    T.tds().delete_cell(to_delete);
+
+  }
+
+  template <typename I>
+  void deserialize_idxinfo(I n, I m, int32_t d, double* vert_pos, 
+			   I* cells, I* neighbors, I idx_inf)
+  {
+    updated = true;
+
+    if (T.number_of_vertices() != 0)  
+      T.clear();
+ 
+    if (n==0) {
+      return;
+    }
+
+    T.tds().set_dimension(d);
+
+    All_cells_iterator to_delete = T.tds().cells_begin();
+
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Cell_handle> C(m);
+
+    // infinite vertex
+    V[n] = T.infinite_vertex();
+
+    // read vertices
+    I i;
+    for(i = 0; i < n; ++i) {
+      V[i] = T.tds().create_vertex();
+      V[i]->point() = Point(vert_pos[d*i], vert_pos[d*i + 1], vert_pos[d*i + 2]);
+      V[i]->info() = (Info)(i);
     }
 
     // Creation of the cells
@@ -1023,6 +1134,77 @@ class Delaunay_with_info_3
       edges[2*i + 1] = i2;
       i++;
     }
+  }
+
+  bool intersect_sph_box(Point *c, double r, double *le, double *re) const {
+    // x
+    if (c->x() < le[0]) {
+      if ((c->x() + r) < le[0])
+        return false;
+    } else if (c->x() > re[0]) {
+      if ((c->x() - r) > re[0])
+        return false;
+    }
+    // y
+    if (c->y() < le[1]) {
+      if ((c->y() + r) < le[1])
+        return false;
+    } else if (c->y() > re[1]) {
+      if ((c->y() - r) > re[1])
+        return false;
+    }
+    // z
+    if (c->z() < le[2]) {
+      if ((c->z() + r) < le[2])
+        return false;
+    } else if (c->z() > re[2]) {
+      if ((c->z() - r) > re[2])
+        return false;
+    }
+    return true;
+  }
+
+  std::vector<std::vector<Info>> outgoing_points(uint64_t nbox,
+                                                 double *left_edges,
+                                                 double *right_edges) const {
+    std::vector<std::vector<Info>> out;
+    uint64_t b;
+    for (b = 0; b < nbox; b++)
+      out.push_back(std::vector<Info>());
+
+    Vertex_handle v;
+    Point cc, p1;
+    double cr;
+    int i, iinf = 0;
+
+    for (All_cells_iterator it = T.all_cells_begin(); it != T.all_cells_end(); it++) {
+      if (T.is_infinite(it) == true) {
+        // Find index of infinite vertex
+        for (i = 0; i < 4; i++) {
+          v = it->vertex(i);
+          if (T.is_infinite(v)) {
+            iinf = i;
+            break;
+          }
+        }
+        for (b = 0; b < nbox; b++)
+          for (i = 1; i < 4; i++) out[b].push_back((it->vertex((iinf+i)%4))->info());
+      } else {
+        p1 = it->vertex(0)->point();
+	cc = it->circumcenter();
+        cr = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, cc)));
+        for (b = 0; b < nbox; b++) {
+          if (intersect_sph_box(&cc, cr, left_edges + 3*b, right_edges + 3*b))
+            for (i = 0; i < 4; i++) out[b].push_back((it->vertex(i))->info());
+        }
+      }
+    }
+    for (b = 0; b < nbox; b++) {
+      std::sort( out[b].begin(), out[b].end() );
+      out[b].erase( std::unique( out[b].begin(), out[b].end() ), out[b].end() );
+    }
+
+    return out;
   }
 
   void boundary_points(double *left_edge, double *right_edge, bool periodic,

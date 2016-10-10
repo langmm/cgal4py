@@ -1341,8 +1341,6 @@ cdef class Delaunay2:
         """
         cdef info_t n, m, i
         cdef int32_t d, j
-        cdef np.ndarray[np.float64_t, ndim=2] vert_pos
-        cdef np.ndarray[np_info_t, ndim=1] vert_info
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
         # Initialize arrays based on properties
@@ -1351,8 +1349,6 @@ cdef class Delaunay2:
         assert(n == self.num_finite_verts)
         assert(m == self.num_cells)
         d = 2
-        vert_pos = np.zeros((n,d), np.float64)
-        vert_info = np.zeros(n, np_info)
         cells = np.zeros((m, d+1), np_info)
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order
@@ -1408,6 +1404,7 @@ cdef class Delaunay2:
 
         Args:
             pos (np.ndarray of float64): Coordinates of points.
+            info (np.ndarray of info_t): Info for points.
             cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
                 of the n cells. A value of np.iinfo(np_info).max A value of 
                 np.iinfo(np_info).max indicates the infinite vertex.
@@ -1581,7 +1578,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex at the new position.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move(x.x, &pos[0])
@@ -1607,7 +1604,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex at the new position.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move_if_no_collision(x.x, &pos[0])
@@ -1854,7 +1851,7 @@ cdef class Delaunay2:
             Delaunay2_vertex: Vertex closest to x.
 
         """
-        assert(len(x) == 2)
+        assert(x.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex vc
         with nogil:
             vc = self.T.nearest_vertex(&x[0])
@@ -1919,7 +1916,7 @@ cdef class Delaunay2:
                  pos.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef vector[Delaunay_with_info_2[info_t].Edge] ev
         with nogil:
             ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
@@ -1946,7 +1943,7 @@ cdef class Delaunay2:
             :obj:`list` of Delaunay2_cell: Cells in conflict with pos.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
         with nogil:
             cv = self.T.get_conflicts(&pos[0], start.x)
@@ -1976,7 +1973,7 @@ cdef class Delaunay2:
                 conflicting cells.
 
         """
-        assert(len(pos) == 2)
+        assert(pos.shape[0] == 2)
         cdef pair[vector[Delaunay_with_info_2[info_t].Cell],
                   vector[Delaunay_with_info_2[info_t].Edge]] cv
         with nogil:
@@ -2011,8 +2008,8 @@ cdef class Delaunay2:
                 pos2.
 
         """
-        assert(len(pos1)==2)
-        assert(len(pos2)==2)
+        assert(pos1.shape[0]==2)
+        assert(pos2.shape[0]==2)
         cdef object out = []
         cdef np.uint32_t i
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
@@ -2086,8 +2083,8 @@ cdef class Delaunay2:
                     empty if `periodic == True`.
 
         """
-        assert(len(left_edge)==2)
-        assert(len(right_edge)==2)
+        assert(left_edge.shape[0]==2)
+        assert(right_edge.shape[0]==2)
         global np_info
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
