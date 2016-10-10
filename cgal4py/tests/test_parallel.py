@@ -107,24 +107,24 @@ def test_ParallelDelaunay_2D():
     # assert(T_para.is_equivalent(T_seri))
     # Large test on 10 processors
     pts, tree = make_test(1e7, 2, nleaves=8)
-    # t0 = time.time()
-    # T_seri = delaunay.Delaunay(pts)
-    # t1 = time.time()
-    # print "{} s for serial".format(t1-t0)
+    t0 = time.time()
+    T_seri = delaunay.Delaunay(pts)
+    t1 = time.time()
+    print "{} s for serial".format(t1-t0)
     t0 = time.time()
     T_para = parallel.ParallelDelaunay(pts, tree, 8)
     t1 = time.time()
     print "{} s for parallel".format(t1-t0)
-    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
     #     print '    cells', T.num_cells, T.num_finite_cells, T.num_infinite_cells
     #     print '    edges', T.num_edges, T.num_finite_edges, T.num_infinite_edges
-    # assert(np.all(c_seri == c_para))
-    # assert(np.all(n_seri == n_para))
-    # assert(T_para.is_equivalent(T_seri))
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts

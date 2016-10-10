@@ -4,6 +4,7 @@ import numpy as np
 import sys, os, time, copy, struct
 
 import multiprocessing as mp
+import ctypes
 
 def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     r"""Return the voronoi cell volumes after constructing triangulation in 
@@ -24,7 +25,11 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
             points.
 
     """
-    pts = pts[tree.idx, :]
+    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+    ptsArray = mp.RawArray('d',pts.size)
+    memoryview(idxArray)[:] = tree.idx
+    memoryview(ptsArray)[:] = pts
+    # pts = pts[tree.idx, :]
     # Split leaves
     task2leaves = [[] for _ in xrange(nproc)]
     for leaf in tree.leaves:
@@ -40,7 +45,7 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     out_pipes = [None for _ in xrange(nproc)]
     for i in range(nproc):
         out_pipes[i],in_pipes[i] = mp.Pipe(True)
-    processes = [DelaunayProcess('volumes', _, task2leaves[_], pts, 
+    processes = [DelaunayProcess('volumes', _, task2leaves[_], ptsArray, idxArray,
                                  left_edges, right_edges,
                                  queues, lock, count, in_pipes[_]) for _ in xrange(nproc)]
     for p in processes:
@@ -98,7 +103,11 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
             consolidated 2D or 3D triangulation object.
 
     """
-    pts = pts[tree.idx, :]
+    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+    ptsArray = mp.RawArray('d',pts.size)
+    memoryview(idxArray)[:] = tree.idx
+    memoryview(ptsArray)[:] = pts
+    # pts = pts[tree.idx, :]
     # Split leaves
     task2leaves = [[] for _ in xrange(nproc)]
     for leaf in tree.leaves:
@@ -114,27 +123,25 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     out_pipes = [None for _ in xrange(nproc)]
     for i in range(nproc):
         out_pipes[i],in_pipes[i] = mp.Pipe(True)
-    processes = [DelaunayProcess('triangulate', _, task2leaves[_], pts, 
+    processes = [DelaunayProcess('triangulate', _, task2leaves[_], ptsArray, idxArray, 
                                  left_edges, right_edges,
                                  queues, lock, count, in_pipes[_]) for _ in xrange(nproc)]
     for p in processes:
         p.start()
+    # Synchronize to ensure rapid receipt
+    lock.acquire()
+    lock.wait()
+    lock.release()
     # Get leaves with tessellation
     serial = [None for _ in xrange(tree.num_leaves)]
+    # dt2dtype = {'I':np.uint32,'L':np.uint64}
+    dt2dtype = {0:np.uint32,1:np.uint64}
+    dummy_head = np.empty(4,'uint64')
     def recv_leaf(p):
-        iid,ncell,dt,idx_inf = struct.unpack('QQcQ',out_pipes[p].recv_bytes())
-        if dt == 'I':
-            dtype = np.uint32
-        elif dt == 'L':
-            dtype = np.uint64
-        else:
-            raise Exception("No dtype for {}".format(dt))
-        # s = [None, None, None, None, None]
-        # s[0] = np.reshape(np.frombuffer(out_pipes[p].recv_bytes(), dtype=dtype), (ncell, tree.ndim+1))
-        # s[1] = np.reshape(np.frombuffer(out_pipes[p].recv_bytes(), dtype=dtype), (ncell, tree.ndim+1))
-        # s[2] = dtype(idx_inf)
-        # s[3] = np.reshape(np.frombuffer(out_pipes[p].recv_bytes(), dtype='uint32'), (ncell, tree.ndim+1))
-        # s[4] = np.frombuffer(out_pipes[p].recv_bytes(), dtype='uint64')
+        out_pipes[p].recv_bytes_into(dummy_head)
+        iid,ncell,dt,idx_inf = dummy_head
+        # iid,ncell,dt,idx_inf = struct.unpack('QQcQ',out_pipes[p].recv_bytes())
+        dtype = dt2dtype[dt]
         s = [np.empty((ncell,tree.ndim+1),dtype),
              np.empty((ncell,tree.ndim+1),dtype),
              dtype(idx_inf),
@@ -145,32 +152,19 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
         s = tuple(s)
         assert(tree.leaves[iid].id == iid)
         serial[iid] = s
-        
-    counts = [0 for _ in xrange(nproc)]
-    max_counts = [len(task2leaves[_]) for _ in xrange(nproc)]
+
     total_count = 0
     max_total_count = tree.num_leaves
     proc_list = range(nproc)
     t0 = time.time()
     while total_count != max_total_count:
         for i in proc_list:
-            # if counts[i] < max_counts[i]:
-                # if out_pipes[i].poll():
-                #     recv_leaf(i)
             while out_pipes[i].poll():
                 recv_leaf(i)
-                counts[i] += 1
                 total_count += 1
     # for i in range(nproc):
     #     for _ in range(len(task2leaves[i])):
     #         recv_leaf(i)
-    # count = 0
-    # while count < nproc:
-    #     ileaves = queues[-1].get()
-    #     for iid, s in ileaves:
-    #         assert(tree.leaves[iid].id == iid)
-    #         serial[iid] = s
-    #     count += 1
     t1 = time.time()
     print("Recieving took {} s".format(t1-t0))
     # Consolidate tessellation
@@ -224,8 +218,8 @@ def consolidate_tess(tree, serial, pts, use_double=False):
     # assert(np.sum(neigh == idx_inf) == 0)
     # Do tessellation
     T = Delaunay(np.zeros([0,ndim]), use_double=use_double)
-    # T.deserialize(pts, cells, neigh, idx_inf)
-    T.deserialize_with_info(pts, tree.idx.astype(cells.dtype), cells, neigh, idx_inf)
+    T.deserialize(pts, cells, neigh, idx_inf)
+    # T.deserialize_with_info(pts, tree.idx.astype(cells.dtype), cells, neigh, idx_inf)
     return T
 
 
@@ -263,14 +257,21 @@ class DelaunayProcess(mp.Process):
 
     """
 
-    def __init__(self, task, proc_idx, leaves, pts, left_edges, right_edges,
+    def __init__(self, task, proc_idx, leaves, pts, idx, left_edges, right_edges,
                  queues, lock, count, pipe, **kwargs):
         if task not in ['tessellate','exchange','enqueue_tess','enqueue_vols','triangulate','volumes']:
             raise ValueError('{} is not a valid task.'.format(task))
         super(DelaunayProcess, self).__init__(**kwargs)
         self._task = task
         self._leaves = [ParallelLeaf(leaf, left_edges, right_edges) for leaf in leaves]
-        self._pts = pts
+        # self._ptsArr = pts
+        # self._idxArr = idx
+        self._idx = np.frombuffer(idx,dtype='uint64')
+        self._ptsFlt = np.frombuffer(pts,dtype='float64')
+        ndim = left_edges.shape[1]
+        npts = len(self._ptsFlt)/ndim
+        self._pts = self._ptsFlt.reshape(npts, ndim)
+        # self._pts = pts
         self._queues = queues
         self._lock = lock
         self._pipe = pipe
@@ -287,7 +288,9 @@ class DelaunayProcess(mp.Process):
     def tessellate_leaves(self):
         r"""Performs the tessellation for each leaf on this process."""
         for leaf in self._leaves:
-            leaf.tessellate(self._pts)
+            new_pts = np.copy(self._pts[self._idx[leaf.slice],:])
+            leaf.tessellate(new_pts)
+            # leaf.tessellate(self._pts, self._idx)
 
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
@@ -320,7 +323,8 @@ class DelaunayProcess(mp.Process):
                 if leaf.id == i:
                     break
             # Add points to leaves
-            leaf.incoming_points(j, arr, n, le, re, self._pts[arr,:])
+            new_pts = np.copy(self._pts[self._idx[arr],:])
+            leaf.incoming_points(j, arr, n, le, re, new_pts)
             nrecv += arr.shape[0]
         with self._count[1].get_lock():
             self._count[1].value += nrecv
@@ -330,23 +334,17 @@ class DelaunayProcess(mp.Process):
         for leaf in self._leaves:
             s = leaf.serialize()
             if s[0].dtype == np.uint32:
-                dt = 'I'
+                dt = 0
+                # dt = 'I'
             elif s[0].dtype == np.uint64:
-                dt = 'L'
+                dt = 1
+                # dt = 'L'
             else:
                 raise Exception("No type found for {}".format(s[0].dtype))
-            self._pipe.send_bytes(struct.pack('QQcQ',leaf.id,s[0].shape[0],dt,s[2]))
+            self._pipe.send_bytes(struct.pack('QQQQ',leaf.id,s[0].shape[0],dt,s[2]))
+            # self._pipe.send_bytes(struct.pack('QQcQ',leaf.id,s[0].shape[0],dt,s[2]))
             for _ in range(2) + range(3,5):
                 self._pipe.send_bytes(s[_])
-        # Synchronize to ensure rapid receipt
-        self._lock.acquire()
-        with self._count[0].get_lock():
-            self._count[0].value += 1
-        if self._count[0].value < self._num_proc:
-            self._lock.wait()
-        else:
-            self._lock.notify_all()
-        self._lock.release()
         # out = [(leaf.id,leaf.serialize()) for leaf in self._leaves]
         # self._pipe.send(out)
         # self._queues[-1].put(out)
@@ -408,6 +406,15 @@ class DelaunayProcess(mp.Process):
             self.outgoing_points()
             self.incoming_points()
             self.enqueue_volumes()
+        # Synchronize to ensure rapid receipt
+        self._lock.acquire()
+        with self._count[0].get_lock():
+            self._count[0].value += 1
+        if self._count[0].value < self._num_proc:
+            self._lock.wait()
+        else:
+            self._lock.notify_all()
+        self._lock.release()
         self._done = True
 
 class ParallelLeaf(object):
@@ -467,14 +474,14 @@ class ParallelLeaf(object):
         else:
             raise AttributeError
 
-    def tessellate(self, pts):
+    def tessellate(self, pts):#, idx):
         r"""Perform tessellation on leaf.
 
         Args:
             pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
 
         """
-        self.T = Delaunay(pts[self.slice,:])
+        self.T = Delaunay(pts)#[idx[self.slice],:])
 
     def outgoing_points(self):
         r"""Get indices of points that should be sent to each neighbor."""
