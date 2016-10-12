@@ -113,6 +113,15 @@ def test_ParallelDelaunay_2D():
     assert(T_para.is_equivalent(T_seri))
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
+    # Large test on 8 processors
+    # pts, tree = make_test(1e7, 2, nleaves=10)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(T_para.is_equivalent(T_seri))
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -147,15 +156,15 @@ def test_ParallelDelaunay_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
-    # # Large test on 10 processors
-    # pts, tree = make_test(1e3, 3, nleaves=10)
-    # T_seri = delaunay.Delaunay(pts)
-    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
-    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    # c_para, n_para, inf_para = T_para.serialize(sort=True)
-    # assert(np.all(c_seri == c_para))
-    # assert(np.all(n_seri == n_para))
-    # assert(T_para.is_equivalent(T_seri))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 3, nleaves=8)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 8)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -191,15 +200,15 @@ def test_ParallelDelaunay_periodic_2D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
-    # Large test on 10 processors
-    # pts, tree = make_test(1e4, 2, nleaves=10, periodic=True)
-    # T_seri = delaunay.Delaunay(pts)
-    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
-    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    # c_para, n_para, inf_para = T_para.serialize(sort=True)
-    # assert(np.all(c_seri == c_para))
-    # assert(np.all(n_seri == n_para))
-    # assert(T_para.is_equivalent(T_seri))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 2, nleaves=8, periodic=True)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 8)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
@@ -225,15 +234,15 @@ def test_ParallelDelaunay_periodic_3D():
     assert(np.all(c_seri == c_para))
     assert(np.all(n_seri == n_para))
     assert(T_para.is_equivalent(T_seri))
-    # Large test on 10 processors
-    # pts, tree = make_test(1e4, 3, nleaves=10, periodic=True)
-    # T_seri = delaunay.Delaunay(pts)
-    # T_para = parallel.ParallelDelaunay(pts, tree, 10)
-    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    # c_para, n_para, inf_para = T_para.serialize(sort=True)
-    # assert(np.all(c_seri == c_para))
-    # assert(np.all(n_seri == n_para))
-    # assert(T_para.is_equivalent(T_seri))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 3, nleaves=8, periodic=True)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunay(pts, tree, 8)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
     #     print name
     #     print '    verts', T.num_verts, T.num_finite_verts, T.num_infinite_verts
