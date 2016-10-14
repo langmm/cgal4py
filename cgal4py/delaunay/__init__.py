@@ -63,7 +63,26 @@ def Delaunay(pts, use_double=False):
     return T
 
             
-__all__ = ["tools", "Delaunay", "Delaunay2", "Delaunay3"]        
+def VoronoiVolumes(pts, use_double=False):
+    r"""Get the volumes of the voronoi cells associated with a set of points.
+
+    Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
+        use_double (bool, optional): If True, the triangulation is forced to use 
+            64bit integers reguardless of if there are too many points for 32bit.
+            Otherwise 32bit integers are used so long as the number of points is 
+            <=4294967295. Defaults to False.
+
+    Returns:
+        np.ndarray of float64: Volumes of voronoi cells. Negative values 
+            indicate infinite cells.
+
+    """
+    T = Delaunay(pts, use_double=use_double)
+    return T.voronoi_volumes()
+
+            
+__all__ = ["tools", "Delaunay", "VoronoiVolumes", "Delaunay2", "Delaunay3"]
 
 if FLAG_DOUBLE_AVAIL:
     __all__ += ["Delaunay2_64bit", "Delaunay3_64bit"]

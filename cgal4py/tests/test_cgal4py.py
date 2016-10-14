@@ -10,10 +10,8 @@ from test_delaunay3 import left_edge as left_edge3
 from test_delaunay3 import right_edge as right_edge3
 
 @nottest
-def make_test(npts, ndim, distrib='uniform', periodic=False, 
-              leafsize=None, nleaves=0):
+def make_points(npts, ndim, distrib='uniform'):
     npts = int(npts)
-    # Points
     if npts <= 0:
         if ndim == 2:
             pts = pts2
@@ -41,6 +39,14 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
             pts = pts3
         else:
             raise ValueError("Invalid 'distrib': {}".format(distrib))
+    return pts, left_edge, right_edge
+
+@nottest
+def make_test(npts, ndim, distrib='uniform', periodic=False, 
+              leafsize=None, nleaves=0):
+    # Points
+    pts, left_edge, right_edge = make_points(npts, ndim, distrib=distrib)
+    npts = pts.shape[0]
     # Tree
     if leafsize is None:
         leafsize = npts/2 + 2

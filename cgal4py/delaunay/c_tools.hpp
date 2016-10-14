@@ -299,29 +299,74 @@ void arg_sortSerializedTess(I *cells, uint64_t ncells, uint32_t ndim,
 }
 
 template <typename I>
+void swap_cells(I *verts, I *neigh, uint32_t ndim, uint64_t i1, uint64_t i2) {
+  I t;
+  uint32_t d;
+  for (d = 0; d < ndim; d++) {
+    t = verts[i1*ndim + d];
+    verts[i1*ndim + d] = verts[i2*ndim + d];
+    verts[i2*ndim + d] = t;
+    t = neigh[i1*ndim + d];
+    neigh[i1*ndim + d] = neigh[i2*ndim + d];
+    neigh[i2*ndim + d] = t;
+  }
+}
+
+template <typename I>
 class CellMap
 {
 public:
-  std::map<std::vector<I>, int64_t> _m;
+  std::map<std::vector<I>, uint64_t> _m;
   uint32_t ndim;
+  typename std::map<std::vector<I>, uint64_t> map_type;
   CellMap() {}
   CellMap(uint32_t _ndim) {
     ndim = _ndim;
   }
+  CellMap(uint32_t _ndim, uint64_t ninit, I *v, uint64_t *idx) {
+    ndim = _ndim;
+    uint64_t i;
+    uint32_t j;
+    std::vector<I> key;
+    for (j = 0; j < (ndim+1); j++)
+      key.push_back(0);
+    for (i = 0; i < ninit; i++) {
+      for (j = 0; j < ndim+1; j++)
+	key[j] = v[i*(ndim+1)+j];
+      _m.insert(std::make_pair(key, idx[i]));
+    }
+  }
   ~CellMap() {}
-  int64_t insert(I *v, uint32_t *sort_v, int64_t new_idx) {
+  uint64_t size() {
+    return (uint64_t)(_m.size());
+  }
+  uint64_t insert(I *v, uint32_t *sort_v, uint64_t new_idx) {
     std::vector<I> key;
     for (uint32_t i = 0; i < (ndim+1); i++)
       key.push_back(v[sort_v[i]]);
-    int64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
+    uint64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
     return idx;
   }
-  int64_t insert_long(I *v, I *sort_v, int64_t new_idx) {
+  uint64_t insert_long(I *v, I *sort_v, uint64_t new_idx) {
     std::vector<I> key;
     for (uint32_t i = 0; i < (ndim+1); i++)
       key.push_back(v[sort_v[i]]);
-    int64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
+    uint64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
     return idx;
+  }
+  void put_in_arrays(I *keys, uint64_t *vals) {
+    typename std::map<std::vector<I>, uint64_t>::iterator it;
+    std::vector<I> ikey;
+    uint64_t i;
+    uint32_t j;
+    i = 0;
+    for (it = _m.begin(); it != _m.end(); it++) {
+      ikey = it->first;
+      for (j = 0; j < (ndim+1); j++)
+	keys[i*(ndim+1)+j] = ikey[j];
+      vals[i] = it->second;
+      i++;
+    }
   }
 };
 
@@ -341,15 +386,12 @@ public:
   uint64_t *sort_cells;
   int64_t *visited;
   SerializedLeaf() {}
-  SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells, 
-		 I _start_idx, I _stop_idx, I _idx_inf,
+  SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells, I _idx_inf,
 		 I *_verts, I *_neigh,
 		 uint32_t *_sort_verts, uint64_t *_sort_cells) {
     id = _id;
     ndim = _ndim;
     ncells = _ncells;
-    start_idx = _start_idx;
-    stop_idx = _stop_idx;
     idx_inf = _idx_inf;
     verts = _verts;
     neigh = _neigh;
@@ -405,7 +447,8 @@ public:
   I *allverts;
   I *allneigh;
   I idx_inf;
-  std::vector<SerializedLeaf<leafI>> leaves;
+  uint64_t *leaf_start_idx;
+  uint64_t *leaf_stop_idx;
   CellMap<leafI> split_map;
   CellMap<I> inf_map;
   uint32_t *matches1;
@@ -413,7 +456,7 @@ public:
   ConsolidatedLeaves() {}
   ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
 		     int64_t _max_ncells, I *_verts, I *_neigh,
-		     std::vector<SerializedLeaf<leafI>> _leaves) {
+		     uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx) {
     ncells = 0;
     max_ncells = _max_ncells;
     ndim = _ndim;
@@ -421,16 +464,48 @@ public:
     allverts = _verts;
     allneigh = _neigh;
     idx_inf = _idx_inf;
-    leaves = _leaves;
+    leaf_start_idx = _leaf_start_idx;
+    leaf_stop_idx = _leaf_stop_idx;
     split_map = CellMap<leafI>(ndim);
     inf_map = CellMap<I>(ndim);
     matches1 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
     matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
-    for (uint64_t i = 0; i < num_leaves; i++)
-      add_leaf(leaves[i]);
-    // for (uint64_t i = 0; i < num_leaves; i++)
-    //   add_leaf_neigh(leaves[i]);
-    add_inf();
+  }
+  ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, uint64_t _num_leaves, I _idx_inf,
+		     int64_t _max_ncells, I *_verts, I *_neigh,
+		     uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx, 
+		     uint64_t n_split_map, leafI *key_split_map, uint64_t *val_split_map,
+		     uint64_t n_inf_map, I *key_inf_map, uint64_t *val_inf_map) {
+    // This version allows use of pre-existing information
+    ncells = _ncells;
+    max_ncells = _max_ncells;
+    ndim = _ndim;
+    num_leaves = _num_leaves;
+    allverts = _verts;
+    allneigh = _neigh;
+    idx_inf = _idx_inf;
+    leaf_start_idx = _leaf_start_idx;
+    leaf_stop_idx = _leaf_stop_idx;
+    split_map = CellMap<leafI>(ndim, n_split_map, key_split_map, val_split_map);
+    inf_map = CellMap<I>(ndim, n_inf_map, key_inf_map, val_inf_map);
+    matches1 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+    matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+  }
+  uint64_t size_split_map() {
+    return split_map.size();
+  }
+  uint64_t size_inf_map() {
+    return inf_map.size(); 
+  }
+  void get_split_map(leafI *keys, uint64_t *vals) {
+    split_map.put_in_arrays(keys, vals);
+  }
+  void get_inf_map(I *keys, uint64_t *vals) {
+    inf_map.put_in_arrays(keys, vals);
+  }
+
+  void cleanup() {
+    // printf("%lu cells in split_map, %lu cells in inf_map.\n",split_map.size(),inf_map.size());
     free(matches1);
     free(matches2);
   }
@@ -440,23 +515,11 @@ public:
     int64_t idx;
     for (i = 0; i < (leafI)leaf.ncells; i++) {
       idx = add_cell(leaf, i);
-      if (idx >= 0)
+      if (idx >= 0) {
       	add_neigh(leaf, i, idx);
+      }
     }
   }
-
-  // void add_leaf_neigh(SerializedLeaf<leafI> leaf) {
-  //   leafI i;
-  //   int64_t idx;
-  //   for (i = 0; i < (leafI)leaf.ncells; i++) {
-  //     idx = leaf.visited[i];
-  //     if (idx >= 0)
-  // 	add_neigh(leaf, i, idx);
-  //     else if (idx == -777)
-  // 	return;
-
-  //   }
-  // }
 
   int64_t new_cell(leafI *verts) {
     uint32_t j;
@@ -486,83 +549,28 @@ public:
     if (leaf.visited[icell] != -1)
       return leaf.visited[icell];
     // Infinite cell, skip for now
-    if (verts[sort_verts[0]] == leaf.idx_inf) {
-      leaf.visited[icell] = -777;
-      return idx;
-    }
+    // if (verts[sort_verts[0]] == leaf.idx_inf) {
+    //   leaf.visited[icell] = -777;
+    //   return idx;
+    // }
     // Finite
-    std::vector<int> src_leaves = find_leaves(verts, sort_verts);
-    if (src_leaves.size() == 1) {
-      // All points on a single leaf
-      if (src_leaves[0] == leaf.id) {
-	// This leaf
-	idx = leaf.visited[icell];
-	if (idx < 0) {
-	  idx = new_cell(verts);
-	  leaf.visited[icell] = idx;
-	}
-      } else {
-	// // Another leaf
-	// SerializedLeaf<leafI> oth_leaf = leaves[src_leaves[0]];
-	// int64_t oth_cell = oth_leaf.find_cell(verts, sort_verts);
-	// if (oth_cell >= 0) {
-	//   idx = oth_leaf.visited[oth_cell];
-	//   if (idx < 0) {
-	//     idx = new_cell(verts);
-	//     leaf.visited[icell] = idx;
-	//     oth_leaf.visited[oth_cell] = idx;
-	//   } else {
-	//     leaf.visited[icell] = idx;
-	//   }
-	// } else
-	//   idx = -1;
+    leafI vmax = verts[sort_verts[0]];
+    leafI vmin = verts[sort_verts[ndim]];
+    if (vmax == leaf.idx_inf)
+      vmax = verts[sort_verts[1]];
+    if ((vmin >= leaf_start_idx[leaf.id]) and (vmax < leaf_stop_idx[leaf.id])) {
+      // All points on this leaf
+      idx = leaf.visited[icell];
+      if (idx < 0) {
+	idx = new_cell(verts);
+	leaf.visited[icell] = idx;
       }
     } else {
-      // idx = split_map.insert(verts, sort_verts, ncells);
-      // leaf.visited[icell] = idx;
-      // if (idx == ncells) 
-      // 	idx = new_cell(verts);
-      bool leaf_contributes = false;
-      int i;
-      for (i = 0; i < (int)(src_leaves.size()); i++) {
-      	if (src_leaves[i] == leaf.id) {
-      	  leaf_contributes = true;
-      	  break;
-      	}
-      }
-      if (leaf_contributes) {
-	// this leaf contributes to this cell, do split map
-      	idx = split_map.insert(verts, sort_verts, ncells);
-      	leaf.visited[icell] = idx;
-      	if (idx == ncells) 
-      	  idx = new_cell(verts);
-      } else {
-	// this leaf dosn't contribute to this cell, but may provide neighbors.
-	// check to see if any of the other contributing leaves also have it.
-	// int64_t oth_cell;
-	// SerializedLeaf<leafI> oth_leaf;
-	// bool cell_found = false;
-	// for (i = 0; i < (int)(src_leaves.size()); i++) {
-	//   oth_leaf = leaves[src_leaves[i]];
-	//   oth_cell = oth_leaf.find_cell(verts, sort_verts);
-	//   if (oth_cell >= 0) {
-	//     if (cell_found) {
-	//       idx = leaf.visited[icell];
-	//       oth_leaf.visited[oth_cell] = idx;
-	//     } else {
-	//       idx = oth_leaf.visited[oth_cell];
-	//       if (idx < 0) {
-	// 	idx = split_map.insert(verts, sort_verts, ncells);
-	// 	if (idx == ncells) 
-	// 	  idx = new_cell(verts);
-	// 	oth_leaf.visited[oth_cell] = idx;
-	//       }
-	//       leaf.visited[icell] = idx;
-	//       cell_found = true;
-	//     }
-	//   }
-	// }
-      }
+      // Points split between leaves
+      idx = split_map.insert(verts, sort_verts, (uint64_t)(ncells));
+      leaf.visited[icell] = idx;
+      if (idx == ncells) 
+	idx = new_cell(verts);
     }
 
     return idx;
@@ -576,12 +584,21 @@ public:
     leafI *verts = leaf.verts + icell*(ndim+1);
     leafI *neigh = leaf.neigh + icell*(ndim+1);
     for (n_local = 0; n_local < (ndim+1); n_local++) {
+      if (neigh[n_local] == leaf.idx_inf)
+	continue;
       c_other = leaf.visited[neigh[n_local]];
       if (c_other < 0)
 	continue;
-      for (n_total = 0; n_total < (ndim+1); n_total++) {
-	if (allverts[c_total*(ndim+1)+n_total] == verts[n_local])
-	  break;
+      if (verts[n_local] == leaf.idx_inf) {
+	for (n_total = 0; n_total < (ndim+1); n_total++) {
+	  if (allverts[c_total*(ndim+1)+n_total] == idx_inf)
+	    break;
+	}
+      } else {
+	for (n_total = 0; n_total < (ndim+1); n_total++) {
+	  if (allverts[c_total*(ndim+1)+n_total] == verts[n_local])
+	    break;
+	}
       }
       // if (allverts[c_total*(ndim+1)+n_total] != verts[n_local])
       // 	printf("Error!!!\n");
@@ -601,9 +618,7 @@ public:
 	}
 	allneigh[c_total*(ndim+1)+n_total] = (I)c_other;
 	allneigh[c_other*(ndim+1)+n_other] = (I)c_total;
-      } else if (c_exist == (I)c_other) {
-	// New neighbor matches existing one
-      } else {
+      } else if (c_exist != (I)c_other) {
 	// New neighbor does not match existing one
 	printf("There are conflicting neighbors for cell %ld on leaf %ld.\n",
 	       (int64_t)(icell), (int64_t)(leaf.id));
@@ -655,13 +670,13 @@ public:
     int ic = ndim, il = 0;
     I2 x, sidx;
     while ((ic >= ic_final) and (il < il_final)) {
-      sidx = leaves[il].start_idx;
+      sidx = leaf_start_idx[il];
       while ((ic >= ic_final) and (verts[sort_verts[ic]] < sidx)) 
 	ic--;
       if (ic < ic_final)
 	break;
       x = verts[sort_verts[ic]];
-      while ((il < il_final) and (x >= leaves[il].stop_idx))
+      while ((il < il_final) and (x >= leaf_stop_idx[il]))
 	il++;
       if (il >= il_final)
 	break;
@@ -711,7 +726,22 @@ public:
     }
   }
 
+  int64_t count_inf() {
+    int64_t out = 0;
+    int64_t c;
+    for (c = 0; c < (ncells*(ndim+1)); c++) {
+      if (allneigh[c] == idx_inf)
+	out++;
+    }
+    return out;
+  }
+
   void add_inf() {
+    if ((ncells + count_inf()) > max_ncells) {
+      printf("Adding infinite cells (%ld) will exceed maximum (%ld).\n",
+	     count_inf(), max_ncells);
+      return;
+    }
     int i;
     uint32_t n, Nneigh, idx_miss;
     int64_t c, norig = ncells, idx;
@@ -747,14 +777,15 @@ public:
 	    new_verts[idx_fwd[n]] = verts[idx_fwd[ndim-(n+1)]];
 	  new_verts[idx_miss] = idx_inf;
 	  new_neigh[idx_miss] = c;
-	  // 
+	  // Add to map
 	  for (n = 0; n < (ndim+1); n++)
 	    sort_verts[n] = (I)(n);
 	  arg_quickSort(new_verts, sort_verts, 1, 0, ndim);
-	  idx = inf_map.insert_long(new_verts, sort_verts, ncells);
+	  idx = inf_map.insert_long(new_verts, sort_verts, (uint64_t)(ncells));
 	  neigh[idx_miss] = idx;
-	  if (idx == ncells)
+	  if (idx == ncells) {
 	    append_cell(new_verts, new_neigh, norig, ncells);
+	  }
 	}
       }
     }

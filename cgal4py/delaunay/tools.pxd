@@ -28,20 +28,34 @@ cdef extern from "c_tools.hpp":
     void arg_sortCellVerts[I](I *cells, uint32_t *idx_verts, uint64_t ncells, uint32_t ndim) nogil
     void arg_sortSerializedTess[I](I *cells, uint64_t ncells, uint32_t ndim,
                                    uint32_t *idx_verts, uint64_t *idx_cells) nogil
+    void swap_cells[I](I *verts, I *neigh, uint32_t ndim, uint64_t i1, uint64_t i2) nogil
     cdef cppclass SerializedLeaf[I] nogil:
         SerializedLeaf() except +
-        SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells,
-                       I _start_idx, I _stop_idx, I _idx_inf,
+        SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells, I _idx_inf,
                        I *_verts, I *_neigh,
                        uint32_t *_sort_verts, uint64_t *_sort_cells) except +
-        # ~SerializedLeaf() except +
     cdef cppclass ConsolidatedLeaves[I,leafI] nogil:
         ConsolidatedLeaves() except +
         ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
                            int64_t _max_ncells, I *_verts, I *_neigh, 
-                           vector[SerializedLeaf[leafI]] _leaves) except +
+                           uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx) except +
+        ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, uint64_t _num_leaves, I _idx_inf,
+                           int64_t _max_ncells, I *_verts, I *_neigh,
+                           uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx,
+                           uint64_t n_split_map, leafI *key_split_map, uint64_t *val_split_map,
+                           uint64_t n_inf_map, I *key_inf_map, uint64_t *val_inf_map) except +
         int64_t ncells
-        
+        int64_t max_ncells
+        I *allverts
+        I *allneigh
+        uint64_t size_split_map()
+        uint64_t size_inf_map()
+        void get_split_map(leafI *keys, uint64_t *vals) 
+        void get_inf_map(I *keys, uint64_t *vals)
+        void cleanup()
+        void add_leaf(SerializedLeaf[leafI] leaf)
+        int64_t count_inf()
+        void add_inf()
 
 ctypedef SerializedLeaf[uint32_t] sLeaf32
 ctypedef SerializedLeaf[uint64_t] sLeaf64

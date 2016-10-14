@@ -51,34 +51,30 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     for p in processes:
         p.start()
     # Get leaves with tessellation
-    serial = [None for _ in xrange(tree.num_leaves)]
-    counts = [0 for _ in xrange(nproc)]
-    max_counts = [len(task2leaves[_]) for _ in xrange(nproc)]
+    vol = np.empty(pts.shape[0], pts.dtype)
+    dummy_head = np.empty(1,'uint64')
+    def recv_leaf(p):
+        out_pipes[p].recv_bytes_into(dummy_head)
+        iid = dummy_head[0]
+        assert(tree.leaves[iid].id == iid)
+        ivol = np.empty(tree.leaves[iid].npts, 'float64')
+        out_pipes[p].recv_bytes_into(ivol)
+        vol[tree.idx[tree.leaves[iid].slice]] = ivol
+
     total_count = 0
     max_total_count = tree.num_leaves
+    proc_list = range(nproc)
+    t0 = time.time()
     while total_count != max_total_count:
-        for i in range(nproc):
-            if counts[i] < max_counts[i]:
-                while out_pipes[i].poll():
-                    iid,s = out_pipes[i].recv()
-                    assert(tree.leaves[iid].id == iid)
-                    serial[iid] = s
-                    counts[i] += 1
-                    total_count += 1
-    # count = 0
-    # t0 = time.time()
-    # while count < nproc:
-    #     ileaves = queues[-1].get()
-    #     for iid, s in ileaves:
-    #         assert(tree.leaves[iid].id == iid)
-    #         serial[iid] = s
-    #     count += 1
+        for i in proc_list:
+            while out_pipes[i].poll():
+                recv_leaf(i)
+                total_count += 1
+    # for i in range(nproc):
+    #     for _ in range(len(task2leaves[i])):
+    #         recv_leaf(i)
     t1 = time.time()
-    print "{}s for recieving"
-    # Consolidate volumes
-    vol = np.empty(pts.shape[0], pts.dtype)
-    for i,leaf in enumerate(tree.leaves):
-        vol[tree.idx[leaf.slice]] = serial[i]
+    print "{}s for recieving".format(t1-t0)
     # Cleanup
     for p in processes:
         p.join()
@@ -135,18 +131,18 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     # Get leaves with tessellation
     serial = [None for _ in xrange(tree.num_leaves)]
     # dt2dtype = {'I':np.uint32,'L':np.uint64}
-    dt2dtype = {0:np.uint32,1:np.uint64}
-    dummy_head = np.empty(4,'uint64')
+    dt2dtype = {0:np.uint32,1:np.uint64,2:np.int32,3:np.int64}
+    dummy_head = np.empty(5,'uint64')
     def recv_leaf(p):
         out_pipes[p].recv_bytes_into(dummy_head)
-        iid,ncell,dt,idx_inf = dummy_head
-        # iid,ncell,dt,idx_inf = struct.unpack('QQcQ',out_pipes[p].recv_bytes())
+        iid,ncell,dt,idx_inf,ncell_tot = dummy_head
         dtype = dt2dtype[dt]
         s = [np.empty((ncell,tree.ndim+1),dtype),
              np.empty((ncell,tree.ndim+1),dtype),
              dtype(idx_inf),
              np.empty((ncell,tree.ndim+1),'uint32'),
-             np.empty(ncell, 'uint64')]
+             np.empty(ncell, 'uint64'),
+             ncell_tot]
         for _ in range(2)+range(3,5):
             out_pipes[p].recv_bytes_into(s[_])
         s = tuple(s)
@@ -218,10 +214,7 @@ def consolidate_tess(tree, serial, pts, use_double=False):
     # assert(np.sum(neigh == idx_inf) == 0)
     # Do tessellation
     T = Delaunay(np.zeros([0,ndim]), use_double=use_double)
-    # T.deserialize(pts, cells, neigh, idx_inf)
-    # T.deserialize(pts[tree.idx,:], cells, neigh, idx_inf)
     T.deserialize_with_info(pts, tree.idx.astype(cells.dtype), cells, neigh, idx_inf)
-    # T.deserialize_with_info(pts, np.argsort(tree.idx).astype(cells.dtype), cells, neigh, idx_inf)
     return T
 
 
@@ -266,14 +259,11 @@ class DelaunayProcess(mp.Process):
         super(DelaunayProcess, self).__init__(**kwargs)
         self._task = task
         self._leaves = [ParallelLeaf(leaf, left_edges, right_edges) for leaf in leaves]
-        # self._ptsArr = pts
-        # self._idxArr = idx
         self._idx = np.frombuffer(idx,dtype='uint64')
         self._ptsFlt = np.frombuffer(pts,dtype='float64')
         ndim = left_edges.shape[1]
         npts = len(self._ptsFlt)/ndim
         self._pts = self._ptsFlt.reshape(npts, ndim)
-        # self._pts = pts
         self._queues = queues
         self._lock = lock
         self._pipe = pipe
@@ -336,14 +326,15 @@ class DelaunayProcess(mp.Process):
             s = leaf.serialize()
             if s[0].dtype == np.uint32:
                 dt = 0
-                # dt = 'I'
             elif s[0].dtype == np.uint64:
                 dt = 1
-                # dt = 'L'
+            elif s[0].dtype == np.int32:
+                dt = 2
+            elif s[0].dtype == np.int64:
+                dt = 3
             else:
                 raise Exception("No type found for {}".format(s[0].dtype))
-            self._pipe.send_bytes(struct.pack('QQQQ',leaf.id,s[0].shape[0],dt,s[2]))
-            # self._pipe.send_bytes(struct.pack('QQcQ',leaf.id,s[0].shape[0],dt,s[2]))
+            self._pipe.send_bytes(struct.pack('QQQQQ',leaf.id,s[0].shape[0],dt,s[2],s[5]))
             for _ in range(2) + range(3,5):
                 self._pipe.send_bytes(s[_])
         # out = [(leaf.id,leaf.serialize()) for leaf in self._leaves]
@@ -353,10 +344,19 @@ class DelaunayProcess(mp.Process):
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
         for leaf in self._leaves:
-            self._pipe.send((leaf.id, leaf.voronoi_volumes()))
+            self._pipe.send_bytes(struct.pack('Q',leaf.id))
+            self._pipe.send_bytes(leaf.voronoi_volumes())
+            # self._pipe.send((leaf.id, leaf.voronoi_volumes()))
         # out = [(leaf.id,leaf.voronoi_volumes()) for leaf in self._leaves]
         # self._pipe.send(out)
         # self._queues[-1].put(out)
+
+    def enqueue_number_of_cells(self):
+        r"""Enqueue resulting number of cells."""
+        ncells = 0
+        for leaf in self._leaves:
+            ncells += leaf.T.num_cells
+        self._pipe.send_bytes(struct.pack('Q',ncells))
 
     def run(self):
         r"""Performs tessellation and communication for each leaf on this process."""
@@ -369,7 +369,7 @@ class DelaunayProcess(mp.Process):
             self.enqueue_triangulation()
         elif self._task == 'enqueue_vols':
             self.enqueue_volumes()
-        elif self._task == 'triangulate':
+        elif self._task in ['triangulate','volumes']:
             self.tessellate_leaves()
             # Continue exchanges until there are not any particles that need to
             # be exchanged.
@@ -401,12 +401,10 @@ class DelaunayProcess(mp.Process):
                     self._lock.notify_all()
                 self._lock.release()
                 # print 'Lock released', self._proc_idx,self._count[2].value
-            self.enqueue_triangulation()
-        elif self._task == 'volumes':
-            self.tessellate_leaves()
-            self.outgoing_points()
-            self.incoming_points()
-            self.enqueue_volumes()
+            if self._task == 'triangulate':
+                self.enqueue_triangulation()
+            elif self._task == 'volumes':
+                self.enqueue_volumes()
         # Synchronize to ensure rapid receipt
         self._lock.acquire()
         with self._count[0].get_lock():
@@ -440,7 +438,10 @@ class ParallelLeaf(object):
         self._leaf = leaf
         self.norig = leaf.npts
         self.T = None
-        self.idx = np.arange(leaf.start_idx, leaf.stop_idx)
+        if 10*leaf.stop_idx >= np.iinfo('uint32').max:
+            self.idx = np.arange(leaf.start_idx, leaf.stop_idx).astype('uint64')
+        else:
+            self.idx = np.arange(leaf.start_idx, leaf.stop_idx).astype('uint32')
         self.all_neighbors = set([])
         self.neighbors = copy.deepcopy(leaf.neighbors)
         keep = False
@@ -662,11 +663,10 @@ class ParallelLeaf(object):
             tuple: Vertices and neighbors for cells in the triangulation.
 
         """
-        cells, neigh, idx_inf = self.T.serialize()
-        idx_trs = (cells != idx_inf)
-        cells[idx_trs] = self.idx[cells[idx_trs]]
+        cells, neigh, idx_inf = self.T.serialize_info2idx(self.norig, self.idx)
+        ncell_tot = self.T.num_cells
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
-        return cells, neigh, idx_inf, idx_verts, idx_cells
+        return cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot
 
     def voronoi_volumes(self):
         r"""Get the voronoi cell volumes for the original vertices on this leaf.

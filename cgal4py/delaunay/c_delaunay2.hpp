@@ -877,6 +877,80 @@ public:
   }
 
   template <typename I>
+  I serialize_info2idx(I &n, I &m, int32_t &d,
+		       I* faces, I* neighbors,
+		       Info max_info, I* idx) const
+  {
+    I idx_inf = std::numeric_limits<I>::max();
+
+    // Header
+    n = static_cast<I>(max_info);
+    d = static_cast<I>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
+
+    Face_hash F;
+
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    Vertex_handle v = T.infinite_vertex();
+
+    // vertices of the faces
+    int j;
+    bool *include_face = (bool*)malloc(m*sizeof(bool));
+    I inum = 0, inum_tot = 0;
+    for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+	 ib != T.tds().face_iterator_base_end(); ++ib) {
+      include_face[inum_tot] = false;
+      for (j = 0; j < dim ; ++j) {
+	vit = ib->vertex(j);
+	// if ((v != vit) and (vit->info() < max_info)) {
+	//   include_face[inum_tot] = true;
+	//   break;
+	// }
+	if ( v == vit) {
+	  include_face[inum_tot] = false;
+	  break;
+	} else if (vit->info() < max_info) {
+	  include_face[inum_tot] = true;
+	}
+      }
+      if (include_face[inum_tot]) {
+	for (j = 0; j < dim ; ++j) {
+	  vit = ib->vertex(j);
+	  if ( v == vit )
+	    faces[dim*inum + j] = idx_inf;
+	  else
+	    faces[dim*inum + j] = idx[vit->info()];
+	}
+	F[ib] = inum++;
+      } else {
+	F[ib] = idx_inf;
+      }
+      inum_tot++;
+    }
+    m = inum;
+  
+    // neighbor pointers of the faces
+    inum = 0, inum_tot = 0;
+    for (All_faces_iterator it = T.tds().face_iterator_base_begin();
+	 it != T.tds().face_iterator_base_end(); ++it) {
+      if (include_face[inum_tot]) {
+	for (j = 0; j < d+1; ++j){
+	  neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+	}
+	inum++;
+      }
+      inum_tot++;
+    }
+
+    free(include_face);
+    return idx_inf;
+  }
+
+  template <typename I>
   void deserialize(I n, I m, int32_t d,
 		   double* vert_pos, Info* vert_info, 
 		   I* faces, I* neighbors, I idx_inf)

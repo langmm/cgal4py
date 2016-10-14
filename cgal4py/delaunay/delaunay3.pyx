@@ -1859,12 +1859,14 @@ cdef class Delaunay3:
                 overall. Defaults to False.
 
         Returns: 
-            tuple with 2 arrays: 
+            tuple containing:
                 cells (np.ndarray of info_t): (n,m) Indices for m vertices in 
                     each of the n cells. A value of np.iinfo(np_info).max 
                     indicates the infinite vertex. 
                 neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of 
                     the m neighbors to each of the n cells. 
+                idx_inf (I): Value representing the infinite vertex and or 
+                    a missing neighbor.
 
         """
         cdef info_t n, m, i
@@ -1889,6 +1891,145 @@ cdef class Delaunay3:
             with nogil:
                 sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _serialize_info2idx_int32(self, info_t max_info,
+                                  np.ndarray[np.int32_t] idx,
+                                  pybool sort=False):
+        cdef int32_t n, m
+        cdef int32_t d
+        cdef np.ndarray[np.int32_t, ndim=2] cells
+        cdef np.ndarray[np.int32_t, ndim=2] neighbors
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(idx.size >= n)
+        d = 3
+        cells = np.zeros((m, d+1), 'int32')
+        neighbors = np.zeros((m, d+1), 'int32')
+        cdef int32_t idx_inf
+        with nogil:
+            idx_inf = self.T.serialize_info2idx[int32_t](
+                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+        cells.resize(m, d+1, refcheck=False)
+        neighbors.resize(m, d+1, refcheck=False)
+        if sort:
+            with nogil:
+                sortSerializedTess[int32_t](&cells[0,0], &neighbors[0,0], m, d+1)
+        return cells, neighbors, idx_inf
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _serialize_info2idx_uint32(self, info_t max_info,
+                                   np.ndarray[np.uint32_t] idx,
+                                   pybool sort=False):
+        cdef uint32_t n, m
+        cdef int32_t d
+        cdef np.ndarray[np.uint32_t, ndim=2] cells
+        cdef np.ndarray[np.uint32_t, ndim=2] neighbors
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(idx.size >= n)
+        d = 3
+        cells = np.zeros((m, d+1), 'uint32')
+        neighbors = np.zeros((m, d+1), 'uint32')
+        cdef uint32_t idx_inf
+        with nogil:
+            idx_inf = self.T.serialize_info2idx[uint32_t](
+                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+        cells.resize(m, d+1, refcheck=False)
+        neighbors.resize(m, d+1, refcheck=False)
+        if sort:
+            with nogil:
+                sortSerializedTess[uint32_t](&cells[0,0], &neighbors[0,0], m, d+1)
+        return cells, neighbors, idx_inf
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _serialize_info2idx_int64(self, info_t max_info,
+                                  np.ndarray[np.int64_t] idx,
+                                  pybool sort=False):
+        cdef int64_t n, m
+        cdef int32_t d
+        cdef np.ndarray[np.int64_t, ndim=2] cells
+        cdef np.ndarray[np.int64_t, ndim=2] neighbors
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(idx.size >= n)
+        d = 3
+        cells = np.zeros((m, d+1), 'int64')
+        neighbors = np.zeros((m, d+1), 'int64')
+        cdef int64_t idx_inf
+        with nogil:
+            idx_inf = self.T.serialize_info2idx[int64_t](
+                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+        cells.resize(m, d+1, refcheck=False)
+        neighbors.resize(m, d+1, refcheck=False)
+        if sort:
+            with nogil:
+                sortSerializedTess[int64_t](&cells[0,0], &neighbors[0,0], m, d+1)
+        return cells, neighbors, idx_inf
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _serialize_info2idx_uint64(self, info_t max_info,
+                                   np.ndarray[np.uint64_t] idx,
+                                   pybool sort=False):
+        cdef uint64_t n, m
+        cdef int32_t d
+        cdef np.ndarray[np.uint64_t, ndim=2] cells
+        cdef np.ndarray[np.uint64_t, ndim=2] neighbors
+        n = self.T.num_finite_verts()
+        m = self.T.num_cells()
+        assert(idx.size >= n)
+        d = 3
+        cells = np.zeros((m, d+1), 'uint64')
+        neighbors = np.zeros((m, d+1), 'uint64')
+        cdef uint64_t idx_inf
+        with nogil:
+            idx_inf = self.T.serialize_info2idx[uint64_t](
+                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+        cells.resize(m, d+1, refcheck=False)
+        neighbors.resize(m, d+1, refcheck=False)
+        if sort:
+            with nogil:
+                sortSerializedTess[uint64_t](&cells[0,0], &neighbors[0,0], m, d+1)
+        return cells, neighbors, idx_inf
+
+    def serialize_info2idx(self, max_info, idx, pybool sort = False):
+        r"""Serialize triangulation, only including some vertices and 
+        translating the indices. 
+
+        Args:
+            max_info (info_t): Maximum value of info for verts that will be
+                included in the serialization.  
+            idx (np.ndarray of I): Indices that should be used to map from 
+                vertex info.     
+            sort (bool, optional): If True, cells info is sorted so that the 
+                verts are in descending order for each cell and ascending order 
+                overall. Defaults to False.
+
+        Returns: 
+            tuple containing:
+                cells (np.ndarray of info_t): (n,m) Indices for m vertices in 
+                    each of the n cells. A value of np.iinfo(np_info).max 
+                    indicates the infinite vertex. 
+                neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of 
+                    the m neighbors to each of the n cells. 
+                idx_inf (I): Value representing the infinite vertex and or 
+                    a missing neighbor.
+
+        """
+        if idx.dtype == np.int32:
+            return self._serialize_info2idx_int32(<info_t>max_info, idx, sort)
+        elif idx.dtype == np.uint32:
+            return self._serialize_info2idx_uint32(<info_t>max_info, idx, sort)
+        elif idx.dtype == np.int64:
+            return self._serialize_info2idx_int64(<info_t>max_info, idx, sort)
+        elif idx.dtype == np.uint64:
+            return self._serialize_info2idx_uint64(<info_t>max_info, idx, sort)
+        else:
+            raise TypeError("idx.dtype = {} is not supported.".format(idx.dtype))
 
     @_update_to_tess
     @cython.boundscheck(False)

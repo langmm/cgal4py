@@ -75,6 +75,96 @@ def test_ParallelLeaf_periodic_3D():
     pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2], out[1][3], pts[out[1][0][0],:])
     pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2], out[0][3], pts[out[0][0][0],:])
 
+def test_ParallelVoronoiVolumes_2D():
+    # Small test with known solution
+    pts, tree = make_test(0, 2)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Larger random test on 2 processors
+    pts, tree = make_test(1000, 2, nleaves=2)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 2, leafsize=8)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
+    for i in range(pts.shape[0]):
+        print v_seri[i], v_para[i]
+    assert(np.allclose(v_seri, v_para))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 2, nleaves=8)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
+    assert(np.allclose(v_seri, v_para))
+
+def test_ParallelVoronoiVolumes_3D():
+    # Small test with known solution
+    pts, tree = make_test(0, 3)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Larger random test on 2 processors
+    pts, tree = make_test(1000, 3, nleaves=2)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 3, leafsize=8)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
+    assert(np.allclose(v_seri, v_para))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 3, nleaves=8)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
+    assert(np.allclose(v_seri, v_para))
+
+def test_ParallelVoronoiVolumes_2D_periodic():
+    # Small test with known solution
+    pts, tree = make_test(0, 2, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Larger random test on 2 processors
+    pts, tree = make_test(1000, 2, nleaves=2, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 2, leafsize=8, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
+    assert(np.allclose(v_seri, v_para))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 2, nleaves=8, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
+    assert(np.allclose(v_seri, v_para))
+
+def test_ParallelVoronoiVolumes_3D_periodic():
+    # Small test with known solution
+    pts, tree = make_test(0, 3, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Larger random test on 2 processors
+    pts, tree = make_test(1000, 3, nleaves=2, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
+    assert(np.allclose(v_seri, v_para))
+    # Medium test on 4 processors
+    pts, tree = make_test(4*4*2, 3, leafsize=8, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
+    assert(np.allclose(v_seri, v_para))
+    # Large test on 8 processors
+    pts, tree = make_test(1e5, 3, nleaves=8, periodic=True)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
+    assert(np.allclose(v_seri, v_para))
+
 def test_ParallelDelaunay_2D():
     # Small test with known solution
     pts, tree = make_test(0, 2)

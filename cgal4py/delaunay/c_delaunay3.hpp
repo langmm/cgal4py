@@ -982,6 +982,80 @@ class Delaunay_with_info_3
   }
 
   template <typename I>
+  I serialize_info2idx(I &n, I &m, int32_t &d,
+		       I* cells, I* neighbors,
+		       Info max_info, I* idx) const
+  {
+    I idx_inf = std::numeric_limits<I>::max();
+
+    // Header
+    n = static_cast<I>(max_info);
+    d = static_cast<int>(T.dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return idx_inf;
+    }
+
+    Cell_hash C;
+      
+    // first (infinite) vertex 
+    Vertex_handle vit;
+    Vertex_handle v = T.infinite_vertex();
+    
+    // vertices of the cells
+    int j;
+    bool *include_cell = (bool*)malloc(m*sizeof(bool));
+    I inum = 0, inum_tot = 0;
+    for( Cell_iterator ib = T.tds().cells_begin(); 
+	 ib != T.tds().cells_end(); ++ib) {
+      include_cell[inum_tot] = false;
+      for (j = 0; j < dim ; ++j) {
+        vit = ib->vertex(j);
+	// if ((v != vit) and (vit->info() < max_info)) {
+	//   include_cell[inum_tot] = true;
+	//   break;
+	// }
+        if ( v == vit) {
+          include_cell[inum_tot] = false;
+          break;
+        } else if (vit->info() < max_info) {
+          include_cell[inum_tot] = true;
+        }
+      }
+      if (include_cell[inum_tot]) {
+	for (j = 0; j < dim ; ++j) {
+	  vit = ib->vertex(j);
+	  if ( v == vit )
+	    cells[dim*inum + j] = idx_inf;
+	  else
+	    cells[dim*inum + j] = idx[vit->info()];
+	}
+	C[ib] = inum++;
+      } else {
+        C[ib] = idx_inf;
+      }
+      inum_tot++;
+    }
+    m = inum;
+  
+    // neighbor pointers of the cells
+    inum = 0, inum_tot = 0;
+    for( Cell_iterator it = T.tds().cells_begin();
+	 it != T.tds().cells_end(); ++it) {
+      if (include_cell[inum_tot]) {
+	for (int j = 0; j < d+1; ++j){
+	  neighbors[(d+1)*inum + j] = C[it->neighbor(j)];
+	}
+	inum++;
+      }
+      inum_tot++;
+    }
+
+    free(include_cell);
+    return idx_inf;
+  }
+
+  template <typename I>
   void deserialize(I n, I m, int32_t d,
                    double* vert_pos, Info* vert_info,
                    I* cells, I* neighbors, I idx_inf)

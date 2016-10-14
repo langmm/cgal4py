@@ -7,6 +7,7 @@ from libc.stdint cimport uint32_t, uint64_t, int64_t, int32_t
 from libcpp cimport bool as cbool
 from cpython cimport bool as pybool
 import copy
+import time
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -541,11 +542,96 @@ def py_arg_partition_tess(np.ndarray[np.int64_t, ndim=2] cells,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial,
-                                        np.ndarray[np.uint64_t] leaf_start,
-                                        np.ndarray[np.uint64_t] leaf_stop):
-    assert(len(serial) == leaf_start.shape[0])
-    assert(len(serial) == leaf_stop.shape[0])
+cdef void _swap_cells_int32(np.ndarray[np.int32_t, ndim=2] verts, 
+                            np.ndarray[np.int32_t, ndim=2] neigh,
+                            np.uint64_t i1, np.uint64_t i2):
+    if verts.ndim != 2: 
+        return
+    assert(verts.ndim == neigh.ndim)
+    assert(verts.shape[0] == neigh.shape[0])
+    assert(verts.shape[1] == neigh.shape[1])
+    cdef uint64_t ncells = <uint64_t>verts.shape[0]
+    cdef uint32_t ndim = <uint32_t>verts.shape[1]
+    if i1 >= ncells or i2 >= ncells:
+        return
+    with nogil:
+        swap_cells[int32_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void _swap_cells_uint32(np.ndarray[np.uint32_t, ndim=2] verts, 
+                             np.ndarray[np.uint32_t, ndim=2] neigh,
+                             np.uint64_t i1, np.uint64_t i2):
+    if verts.ndim != 2: 
+        return
+    assert(verts.ndim == neigh.ndim)
+    assert(verts.shape[0] == neigh.shape[0])
+    assert(verts.shape[1] == neigh.shape[1])
+    cdef uint64_t ncells = <uint64_t>verts.shape[0]
+    cdef uint32_t ndim = <uint32_t>verts.shape[1]
+    if i1 >= ncells or i2 >= ncells:
+        return
+    with nogil:
+        swap_cells[uint32_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void _swap_cells_int64(np.ndarray[np.int64_t, ndim=2] verts, 
+                            np.ndarray[np.int64_t, ndim=2] neigh,
+                            np.uint64_t i1, np.uint64_t i2):
+    if verts.ndim != 2: 
+        return
+    assert(verts.ndim == neigh.ndim)
+    assert(verts.shape[0] == neigh.shape[0])
+    assert(verts.shape[1] == neigh.shape[1])
+    cdef uint64_t ncells = <uint64_t>verts.shape[0]
+    cdef uint32_t ndim = <uint32_t>verts.shape[1]
+    if i1 >= ncells or i2 >= ncells:
+        return
+    with nogil:
+        swap_cells[int64_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void _swap_cells_uint64(np.ndarray[np.uint64_t, ndim=2] verts, 
+                             np.ndarray[np.uint64_t, ndim=2] neigh,
+                             np.uint64_t i1, np.uint64_t i2):
+    if verts.ndim != 2: 
+        return
+    assert(verts.ndim == neigh.ndim)
+    assert(verts.shape[0] == neigh.shape[0])
+    assert(verts.shape[1] == neigh.shape[1])
+    cdef uint64_t ncells = <uint64_t>verts.shape[0]
+    cdef uint32_t ndim = <uint32_t>verts.shape[1]
+    if i1 >= ncells or i2 >= ncells:
+        return
+    with nogil:
+        swap_cells[uint64_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
+
+def py_swap_cells(verts, neigh, i1, i2):
+    r"""Swap the verts and neighbors for two cells.
+
+    Args:
+        verts (np.ndarray of int): Indices of cell vertices.
+        neigh (np.ndarray of int): Indices of neighboring cells.
+        i1 (uint64): Index of cell to swap with cell i2.
+        i2 (uint64): Index of cell to swap with cell i1.
+
+    """
+    if verts.dtype == np.int32:
+        _swap_cells_int32(verts, neigh, i1, i2)
+    elif verts.dtype == np.uint32:
+        _swap_cells_uint32(verts, neigh, i1, i2)
+    elif verts.dtype == np.int64:
+        _swap_cells_int64(verts, neigh, i1, i2)
+    elif verts.dtype == np.uint64:
+        _swap_cells_uint64(verts, neigh, i1, i2)
+    else:
+        raise TypeError
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial):
     cdef int i
     cdef object s
     cdef sLeaves32 leaves
@@ -563,19 +649,14 @@ cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial,
         sort_cells = s[4]
         ncells = <int64_t>verts.shape[0]
         with nogil:
-            leaves.push_back(sLeaf32(i, ndim, ncells,
-                                     <uint32_t>leaf_start[i], <uint32_t>leaf_stop[i],
-                                     idx_inf, &verts[0,0], &neigh[0,0],
+            leaves.push_back(sLeaf32(i, ndim, ncells, idx_inf,
+                                     &verts[0,0], &neigh[0,0],
                                      &sort_verts[0,0], &sort_cells[0]))
     return leaves
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial,
-                                        np.ndarray[np.uint64_t] leaf_start,
-                                        np.ndarray[np.uint64_t] leaf_stop):
-    assert(len(serial) == leaf_start.shape[0])
-    assert(len(serial) == leaf_stop.shape[0])
+cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial):
     cdef int i
     cdef object s
     cdef sLeaves64 leaves
@@ -593,9 +674,8 @@ cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial,
         sort_cells = s[4]
         ncells = <int64_t>verts.shape[0]
         with nogil:
-            leaves.push_back(sLeaf64(i, ndim, ncells,
-                                     <uint64_t>leaf_start[i], <uint64_t>leaf_stop[i],
-                                     idx_inf, &verts[0,0], &neigh[0,0],
+            leaves.push_back(sLeaf64(i, ndim, ncells, idx_inf,
+                                     &verts[0,0], &neigh[0,0],
                                      &sort_verts[0,0], &sort_cells[0]))
     return leaves
         
@@ -607,16 +687,22 @@ cdef np.int64_t _consolidate_uint32_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint64_t, ndim=2] verts, 
                                            np.ndarray[np.uint64_t, ndim=2] cells):
-    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint64_t,uint32_t] obj
+    cdef uint64_t i
     with nogil:
         obj = ConsolidatedLeaves[uint64_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], leaves)
+                                                    &verts[0,0], &cells[0,0], 
+                                                    &leaf_start[0], &leaf_stop[0])
+        for i in range(num_leaves):
+            obj.add_leaf(leaves[i])
+        obj.add_inf()
+        obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
     return ncells
 
@@ -628,16 +714,22 @@ cdef np.int64_t _consolidate_uint32_uint32(np.uint32_t ndim, np.uint32_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint32_t, ndim=2] verts, 
                                            np.ndarray[np.uint32_t, ndim=2] cells):
-    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
+    cdef uint64_t i
     with nogil:
         obj = ConsolidatedLeaves[uint32_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], leaves)
+                                                    &verts[0,0], &cells[0,0], 
+                                                    &leaf_start[0], &leaf_stop[0])
+        for i in range(num_leaves):
+            obj.add_leaf(leaves[i])
+        obj.add_inf()
+        obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
     return ncells
 
@@ -649,16 +741,22 @@ cdef np.int64_t _consolidate_uint64_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint64_t, ndim=2] verts, 
                                            np.ndarray[np.uint64_t, ndim=2] cells):
-    cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial, leaf_start, leaf_stop)
+    cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint64_t,uint64_t] obj
+    cdef uint64_t i
     with nogil:
         obj = ConsolidatedLeaves[uint64_t,uint64_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], leaves)
+                                                    &verts[0,0], &cells[0,0], 
+                                                    &leaf_start[0], &leaf_stop[0])
+        for i in range(num_leaves):
+            obj.add_leaf(leaves[i])
+        obj.add_inf()
+        obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
     return ncells
 
@@ -667,12 +765,20 @@ def consolidate_leaves(ndim, idx_inf, serial, leaf_start, leaf_stop):
     dtype_leaf = serial[0][0].dtype
     ncells = 0
     for s in serial:
-        ncells += s[0].shape[0]
+        ncells += np.int64(s[5])
+    # Allocate
+    t0 = time.time()
+    verts = np.empty((ncells, ndim+1), dtype_comb)
+    neigh = np.empty((ncells, ndim+1), dtype_comb)
+    verts.fill(idx_inf)
+    neigh.fill(idx_inf)
+    t1 = time.time()
+    print("Allocation took {} s".format(t1-t0))
+    # Consolidate
+    t0 = time.time()
     if dtype_comb == np.uint32:
-        verts = idx_inf*np.ones((ncells, ndim+1), 'uint32')
-        neigh = idx_inf*np.ones((ncells, ndim+1), 'uint32')
         if dtype_leaf == np.uint32:
-            ncells = _consolidate_uint32_uint32(<np.uint32_t>ndim, idx_inf, serial, 
+            ncells = _consolidate_uint32_uint32(ndim, idx_inf, serial, 
                                                 leaf_start, leaf_stop,
                                                 verts, neigh)
         # This case makes no sense so it is not currently supported
@@ -683,8 +789,6 @@ def consolidate_leaves(ndim, idx_inf, serial, leaf_start, leaf_stop):
         else:
             raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
     elif dtype_comb == np.uint64:
-        verts = idx_inf*np.ones((ncells, ndim+1), 'uint64')
-        neigh = idx_inf*np.ones((ncells, ndim+1), 'uint64')
         if dtype_leaf == np.uint32:
             ncells = _consolidate_uint32_uint64(ndim, idx_inf, serial, 
                                                 leaf_start, leaf_stop,
@@ -697,6 +801,132 @@ def consolidate_leaves(ndim, idx_inf, serial, leaf_start, leaf_stop):
             raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
     else:
         raise TypeError("Combined type {} not supported.".format(dtype_comb))
+    t1 = time.time()
+    print("Consolidation (cython) took {}s".format(t1-t0))
     verts.resize((ncells, ndim+1))
     neigh.resize((ncells, ndim+1))
     return verts, neigh
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t idx_inf,
+                                        np.ndarray[np.uint32_t, ndim=2] all_verts,
+                                        np.ndarray[np.uint32_t, ndim=2] all_neigh,
+                                        np.ndarray[np.uint64_t] leaf_start,
+                                        np.ndarray[np.uint64_t] leaf_stop,
+                                        np.ndarray[np.uint32_t, ndim=2] key_split_map,
+                                        np.ndarray[np.uint64_t, ndim=1] val_split_map,
+                                        np.ndarray[np.uint32_t, ndim=2] key_inf_map,
+                                        np.ndarray[np.uint64_t, ndim=1] val_inf_map,
+                                        int leaf_id, np.uint32_t leaf_idx_inf,
+                                        np.ndarray[np.uint32_t, ndim=2] leaf_verts,
+                                        np.ndarray[np.uint32_t, ndim=2] leaf_neigh,
+                                        np.ndarray[np.uint32_t, ndim=2] leaf_sort_verts,
+                                        np.ndarray[np.uint64_t, ndim=1] leaf_sort_cells):
+    cdef float t1, t0
+    # Checking to ensure no out-of-bounds things
+    t0 = time.time()
+    assert(leaf_start.size == leaf_stop.size)
+    assert(all_verts.size == all_neigh.size)
+    assert(key_split_map.size == val_split_map.size*(ndim+1))
+    assert(key_inf_map.size == val_inf_map.size*(ndim+1))
+    assert(leaf_verts.size == leaf_neigh.size)
+    if all_verts.shape[0] == 0 or leaf_verts.shape[0] == 0:
+        return ncells, (key_split_map, val_split_map), (key_inf_map, val_inf_map)
+    t1 = time.time()
+    print("Assertions took {} s".format(t1-t0))
+    # Variables from sizes
+    cdef uint64_t num_leaves = <uint64_t>leaf_start.size
+    cdef int64_t max_ncells = <int64_t>all_verts.shape[0]
+    cdef uint64_t n_split_map = <uint64_t>val_split_map.size
+    cdef uint64_t n_inf_map = <uint64_t>val_inf_map.size
+    cdef int64_t leaf_ncells = <int64_t>leaf_verts.shape[0]
+    # Create a serialized leaf object
+    t0 = time.time()
+    cdef sLeaf32 leaf = sLeaf32(leaf_id, ndim, leaf_ncells, leaf_idx_inf,
+                                &leaf_verts[0,0], &leaf_neigh[0,0],
+                                &leaf_sort_verts[0,0], &leaf_sort_cells[0])
+    t1 = time.time()
+    print("Creating the leaf took {} s".format(t1-t0))
+    # Create consolidated leaves object
+    cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
+    cdef uint64_t i
+    t0 = time.time()
+    with nogil:
+        obj = ConsolidatedLeaves[uint32_t,uint32_t](
+            ndim, ncells, num_leaves, idx_inf, max_ncells,
+            &all_verts[0,0], &all_neigh[0,0], 
+            &leaf_start[0], &leaf_stop[0], 
+            n_split_map, &key_split_map[0,0], &val_split_map[0],
+            n_inf_map, &key_inf_map[0,0], &val_inf_map[0])
+    t1 = time.time()
+    print("Initialization of consolidated leaves took {} s".format(t1-t0))
+    # Insert leaf
+    t0 = time.time()
+    with nogil:
+        obj.add_leaf(leaf)
+    t1 = time.time()
+    print("Adding leaf took {} s".format(t1-t0))
+    # Get map arrays
+    t0 = time.time()
+    n_split_map = obj.size_split_map()
+    cdef np.ndarray[np.uint64_t, ndim=1] val_split_map0
+    cdef np.ndarray[np.uint32_t, ndim=2] key_split_map0
+    val_split_map0 = np.empty(n_split_map, 'uint64')
+    key_split_map0 = np.empty((n_split_map, ndim+1), 'uint32')
+    obj.get_split_map(&key_split_map0[0,0],&val_split_map0[0])
+    # val_split_map.resize(n_split_map, refcheck=False)
+    # key_split_map.resize(n_split_map, ndim+1, refcheck=False)
+    # obj.get_split_map(&key_split_map[0,0],&val_split_map[0])
+    n_inf_map = obj.size_inf_map()
+    cdef np.ndarray[np.uint64_t, ndim=1] val_inf_map0
+    cdef np.ndarray[np.uint32_t, ndim=2] key_inf_map0
+    val_inf_map0 = np.empty(n_inf_map, 'uint64')
+    key_inf_map0 = np.empty((n_inf_map, ndim+1), 'uint32')
+    obj.get_inf_map(&key_inf_map0[0,0],&val_inf_map0[0])
+    # val_inf_map.resize(n_inf_map, refcheck=False)
+    # key_inf_map.resize(n_inf_map, ndim+1, refcheck=False)
+    # obj.get_inf_map(&key_inf_map[0,0],&val_inf_map[0])
+    t1 = time.time()
+    print("Getting map arrays took {} s".format(t1-t0))
+    # Clean up things allocated during initialization
+    t0 = time.time()
+    with nogil:
+        obj.cleanup()
+    t1 = time.time()
+    print("Clean up took {} s".format(t1-t0))
+    ncells = obj.ncells
+    return ncells, (key_split_map0, val_split_map0), (key_inf_map0, val_inf_map0)
+    # return ncells, (key_split_map, val_split_map), (key_inf_map, val_inf_map)
+
+def add_leaf(ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop,
+             key_split_map, val_split_map, key_inf_map, val_inf_map,
+             leaf_id, leaf_idx_inf, leaf_verts, leaf_neigh, 
+             leaf_sort_verts, leaf_sort_cells):
+    dtype_comb = type(idx_inf)
+    dtype_leaf = type(leaf_idx_inf)
+    t0 = time.time()
+    if dtype_comb == np.uint32:
+        if dtype_leaf == np.uint32:
+            ncells, split_map, inf_map = _add_leaf_uint32_uint32(
+                ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop,
+                key_split_map, val_split_map, key_inf_map, val_inf_map,
+                leaf_id, leaf_idx_inf, leaf_verts, leaf_neigh,
+                leaf_sort_verts, leaf_sort_cells)
+        # This case makes no sense so it is not currently supported
+        # elif dtype_leaf == np.uint64:
+        else:
+            raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
+    elif dtype_comb == np.uint64:
+        if dtype_leaf == np.uint32:
+            pass
+        elif dtype_leaf == np.uint64:
+            pass
+        else:
+            raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
+    else:
+        raise TypeError("Combined type {} not supported.".format(dtype_comb))
+    t1 = time.time()
+    print("Consolidation (cython) took {}s".format(t1-t0))
+    return ncells, split_map, inf_map
+

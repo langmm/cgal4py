@@ -2,7 +2,7 @@ import numpy as np
 from nose import with_setup
 from nose.tools import assert_equal
 from nose.tools import assert_raises
-from cgal4py.delaunay import Delaunay, tools
+from cgal4py.delaunay import Delaunay, VoronoiVolumes, tools
 from test_delaunay2 import pts as pts2
 from test_delaunay3 import pts as pts3
 import copy
@@ -22,6 +22,18 @@ def test_Delaunay_double():
     assert_equal(T3.num_finite_verts, pts3.shape[0])
     assert_raises(NotImplementedError, Delaunay, np.zeros((3,4)), True)
     assert_raises(ValueError, Delaunay, np.zeros((3,3,3)), True)
+
+def test_VoronoiVolumes():
+    T2 = VoronoiVolumes(pts2)
+    assert_equal(T2.shape[0], pts2.shape[0])
+    T3 = VoronoiVolumes(pts3)
+    assert_equal(T3.shape[0], pts3.shape[0])
+
+def test_VoronoiVolumes_double():
+    T2 = VoronoiVolumes(pts2, use_double=True)
+    assert_equal(T2.shape[0], pts2.shape[0])
+    T3 = VoronoiVolumes(pts3, use_double=True)
+    assert_equal(T3.shape[0], pts3.shape[0])
 
 # Tools
 def test_intersect_sph_box():

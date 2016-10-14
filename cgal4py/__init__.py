@@ -164,6 +164,7 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
             vols = T.voronoi_volumes()
     return vols
 
-__all__ = ["triangulate","voronoi_volumes","delaunay","plot","utils","domain_decomp"]
+import tests
+__all__ = ["triangulate","voronoi_volumes","delaunay","plot","utils","domain_decomp","tests"]
 if FLAG_MULTIPROC:
     __all__.append("parallel")
