@@ -83,10 +83,8 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
                                       use_double=use_double)
     # Serial
     else:
-        if periodic:
-            raise NotImplementedError
-        else:
-            T = Delaunay(pts, use_double=use_double)
+        T = Delaunay(pts, use_double=use_double, periodic=periodic,
+                     left_edge=left_edge, right_edge=right_edge)
     return T
 
 def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
@@ -157,11 +155,9 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
                                                use_double=use_double)
     # Serial
     else:
-        if periodic:
-            raise NotImplementedError
-        else:
-            T = Delaunay(pts, use_double=use_double)
-            vols = T.voronoi_volumes()
+        T = Delaunay(pts, use_double=use_double, periodic=periodic,
+                     left_edge=left_edge, right_edge=right_edge)
+        vols = T.voronoi_volumes()
     return vols
 
 import tests

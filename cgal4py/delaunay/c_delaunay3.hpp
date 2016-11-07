@@ -14,23 +14,32 @@
 #include <limits>
 #include <stdint.h>
 #ifdef READTHEDOCS
+#define VALID 1
 #include "dummy_CGAL.hpp"
 #else
+#define VALID 1
+#include <CGAL/config.h>
+#if (CGAL_VERSION_NR >= 1040401000)
+#include <CGAL/Delaunay_triangulation_cell_base_with_circumcenter_3.h>
+#else
+#include <CGAL/Triangulation_cell_base_with_circumcenter_3.h>
+#endif
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
-#include <CGAL/Triangulation_cell_base_with_circumcenter_3.h>
 #include <CGAL/squared_distance_3.h>
 #include <CGAL/Unique_hash_map.h>
 #endif
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel         K;
-typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K>      Cb3;
-
+typedef CGAL::Exact_predicates_inexact_constructions_kernel           K;
+#if (CGAL_VERSION_NR >= 1040401000)
+typedef CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<K> Cb3;
+#else
+typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K>          Cb3;
+#endif
 
 template <typename Info_>
 class Delaunay_with_info_3
-// class Delaunay_with_info_3 : public CGAL::Delaunay_triangulation_3<K, CGAL::Triangulation_data_structure_3<CGAL::Triangulation_vertex_base_with_info_3<Info_, K>>>
 {
  public:
   typedef CGAL::Delaunay_triangulation_3<K, CGAL::Triangulation_data_structure_3<CGAL::Triangulation_vertex_base_with_info_3<Info_, K>, Cb3>> Delaunay;

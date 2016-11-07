@@ -2,9 +2,17 @@ from cgal4py.delaunay import Delaunay, tools
 
 import numpy as np
 import sys, os, time, copy, struct
+from datetime import datetime
 
 import multiprocessing as mp
 import ctypes
+
+def _leaf_tess_filename(leaf_id, unique_str = None):
+    if isinstance(unique_str, str):
+        fname = '{}_leaf{}.dat'.format(unique_str, leaf_id)
+    else:
+        fname = 'leaf{}.dat'.format(leaf_id)
+    return fname
 
 def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     r"""Return the voronoi cell volumes after constructing triangulation in 
@@ -45,9 +53,11 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     out_pipes = [None for _ in xrange(nproc)]
     for i in range(nproc):
         out_pipes[i],in_pipes[i] = mp.Pipe(True)
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
     processes = [DelaunayProcess('volumes', _, task2leaves[_], ptsArray, idxArray,
                                  left_edges, right_edges,
-                                 queues, lock, count, in_pipes[_]) for _ in xrange(nproc)]
+                                 queues, lock, count, in_pipes[_],
+                                 unique_str = unique_str) for _ in xrange(nproc)]
     for p in processes:
         p.start()
     # Get leaves with tessellation
@@ -80,8 +90,7 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
         p.join()
     return vol
 
-# @profile
-def ParallelDelaunay(pts, tree, nproc, use_double=False):
+def ParallelDelaunay(pts, tree, nproc, use_double=False, in_memory=False):#True):
     r"""Return a triangulation that is constructed in parallel.
 
     Args:
@@ -93,6 +102,11 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
             64bit integers reguardless of if there are too many points for 32bit. 
             Otherwise 32bit integers are used so long as the number of points is 
             <=4294967295. Defaults to False.
+        in_memory (bool, optional): If True, the triangulation results from each 
+            process are moved to local memory using `multiprocessing` pipes. 
+            Otherwise, each process writes out tessellation info to files which 
+            are then incrementally loaded as consolidation occurs. Defaults to
+            True.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
@@ -103,7 +117,6 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     ptsArray = mp.RawArray('d',pts.size)
     memoryview(idxArray)[:] = tree.idx
     memoryview(ptsArray)[:] = pts
-    # pts = pts[tree.idx, :]
     # Split leaves
     task2leaves = [[] for _ in xrange(nproc)]
     for leaf in tree.leaves:
@@ -119,36 +132,50 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     out_pipes = [None for _ in xrange(nproc)]
     for i in range(nproc):
         out_pipes[i],in_pipes[i] = mp.Pipe(True)
-    processes = [DelaunayProcess('triangulate', _, task2leaves[_], ptsArray, idxArray, 
-                                 left_edges, right_edges,
-                                 queues, lock, count, in_pipes[_]) for _ in xrange(nproc)]
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    if in_memory:
+        processes = [DelaunayProcess('triangulate', _, task2leaves[_], ptsArray, idxArray, 
+                                     left_edges, right_edges,
+                                     queues, lock, count, in_pipes[_],
+                                     unique_str = unique_str) for _ in xrange(nproc)]
+    else:
+        processes = [DelaunayProcess('output', _, task2leaves[_], ptsArray, idxArray, 
+                                     left_edges, right_edges,
+                                     queues, lock, count, in_pipes[_],
+                                     unique_str = unique_str) for _ in xrange(nproc)]
     for p in processes:
         p.start()
-    # Synchronize to ensure rapid receipt
+    # Synchronize to ensure rapid receipt of output info from leaves
     lock.acquire()
     lock.wait()
     lock.release()
-    # Get leaves with tessellation
-    serial = [None for _ in xrange(tree.num_leaves)]
-    # dt2dtype = {'I':np.uint32,'L':np.uint64}
-    dt2dtype = {0:np.uint32,1:np.uint64,2:np.int32,3:np.int64}
-    dummy_head = np.empty(5,'uint64')
-    def recv_leaf(p):
-        out_pipes[p].recv_bytes_into(dummy_head)
-        iid,ncell,dt,idx_inf,ncell_tot = dummy_head
-        dtype = dt2dtype[dt]
-        s = [np.empty((ncell,tree.ndim+1),dtype),
-             np.empty((ncell,tree.ndim+1),dtype),
-             dtype(idx_inf),
-             np.empty((ncell,tree.ndim+1),'uint32'),
-             np.empty(ncell, 'uint64'),
-             ncell_tot]
-        for _ in range(2)+range(3,5):
-            out_pipes[p].recv_bytes_into(s[_])
-        s = tuple(s)
-        assert(tree.leaves[iid].id == iid)
-        serial[iid] = s
-
+    # Setup methods for recieving leaf info
+    if in_memory:
+        serial = [None for _ in xrange(tree.num_leaves)]
+        dt2dtype = {0:np.uint32,1:np.uint64,2:np.int32,3:np.int64}
+        dummy_head = np.empty(5,'uint64')
+        def recv_leaf(p):
+            out_pipes[p].recv_bytes_into(dummy_head)
+            iid,ncell,dt,idx_inf,ncell_tot = dummy_head
+            dtype = dt2dtype[dt]
+            s = [np.empty((ncell,tree.ndim+1),dtype),
+                 np.empty((ncell,tree.ndim+1),dtype),
+                 dtype(idx_inf),
+                 np.empty((ncell,tree.ndim+1),'uint32'),
+                 np.empty(ncell, 'uint64'),
+                 ncell_tot]
+            for _ in range(2)+range(3,5):
+                out_pipes[p].recv_bytes_into(s[_])
+            s = tuple(s)
+            assert(tree.leaves[iid].id == iid)
+            serial[iid] = s
+    else:
+        serial = [0]
+        dummy_head = np.empty(1,'uint64')
+        def recv_leaf(p):
+            out_pipes[p].recv_bytes_into(dummy_head)
+            serial[0] += dummy_head[0]
+    # Recieve output from processes
     total_count = 0
     max_total_count = tree.num_leaves
     proc_list = range(nproc)
@@ -165,7 +192,8 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     print("Recieving took {} s".format(t1-t0))
     # Consolidate tessellation
     t0 = time.time()
-    out = consolidate_tess(tree, serial, pts, use_double=use_double)
+    out = consolidate_tess(tree, serial, pts, use_double = use_double, 
+                           unique_str = unique_str, in_memory = in_memory)
     t1 = time.time()
     print("Consolidation took {} s".format(t1-t0))
     # Close queues and processes
@@ -174,18 +202,27 @@ def ParallelDelaunay(pts, tree, nproc, use_double=False):
     return out
 
 # @profile
-def consolidate_tess(tree, serial, pts, use_double=False):
+def consolidate_tess(tree, leaf_output, pts, use_double = False, 
+                     unique_str = None, in_memory = True):
     r"""Creates a single triangulation from the triangulations of leaves.
 
     Args:
         tree (object): Domain decomposition tree for splitting points among the 
             processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
-        serial (list): Serialized tessellation info for each leaf.
+        leaf_output (object): Output from each parallel leaf.
         pts (np.ndarray of float64): (n,m) Array of n mD points. 
         use_double (bool, optional): If True, the triangulation is forced to use 
             64bit integers reguardless of if there are too many points for 32bit. 
             Otherwise 32bit integers are used so long as the number of points is 
             <=4294967295. Defaults to False.
+        unique_str (str, optional): Unique identifier for files in a run. If
+            `in_memory == False` those files will be loaded and used to create 
+            the consolidated tessellation. Defaults to None. If None, there is a 
+            risk that multiple runs could be sharing files of the same name.
+        in_memory (bool, optional): If True, the triangulation is consolidated 
+            from partial triangulations on each leaf that already exist in 
+            memory. Otherwise, partial triangulations are loaded from files for 
+            each leaf. Defaults to `True`.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:
@@ -202,12 +239,40 @@ def consolidate_tess(tree, serial, pts, use_double=False):
         idx_inf = np.uint64(np.iinfo('uint64').max)
     else:
         idx_inf = np.uint32(uint32_max)
-    # Get starting/stoping index for original particles on each leaf
-    leaf_vidx_start = np.array([leaf.start_idx for leaf in tree.leaves], 'uint64')
-    leaf_vidx_stop = np.array([leaf.stop_idx for leaf in tree.leaves], 'uint64')
-    # Consolidate leaves
-    cells, neigh = tools.consolidate_leaves(ndim, idx_inf, serial,
-                                            leaf_vidx_start, leaf_vidx_stop)
+    # Loop over leaves adding them
+    if in_memory:
+        ncells_tot = 0
+        for s in leaf_output:
+            ncells_tot += np.int64(s[5])
+        if use_double:
+            cons = tools.ConsolidatedLeaves64(ndim, idx_inf, ncells_tot)
+        else:
+            cons = tools.ConsolidatedLeaves32(ndim, idx_inf, ncells_tot)
+        for i,leaf in enumerate(tree.leaves):
+            if isinstance(leaf_output[i][2], np.uint64):
+                sleaf = tools.SerializedLeaf64(
+                    leaf.id, ndim, leaf_output[i][0].shape[0], leaf_output[i][2], 
+                    leaf_output[i][0], leaf_output[i][1], leaf_output[i][3], leaf_output[i][4], 
+                    leaf.start_idx, leaf.stop_idx)
+            else:
+                sleaf = tools.SerializedLeaf32(
+                    leaf.id, ndim, leaf_output[i][0].shape[0], leaf_output[i][2], 
+                    leaf_output[i][0], leaf_output[i][1], leaf_output[i][3], leaf_output[i][4], 
+                    leaf.start_idx, leaf.stop_idx)
+            cons.add_leaf(sleaf)
+    else:
+        ncells_tot = leaf_output[0]
+        if use_double:
+            cons = tools.ConsolidatedLeaves64(ndim, idx_inf, ncells_tot)
+        else:
+            cons = tools.ConsolidatedLeaves32(ndim, idx_inf, ncells_tot)
+        for i,leaf in enumerate(tree.leaves):
+            fname = _leaf_tess_filename(leaf.id, unique_str = unique_str)
+            cons.add_leaf_fromfile(fname)
+            os.remove(fname)
+    cons.finalize()
+    cells = cons.verts
+    neigh = cons.neigh
     # if np.sum(neigh == idx_inf) != 0:
     #     for i in xrange(ncells):
     #         print i,cells[i,:], neigh[i,:]
@@ -245,6 +310,9 @@ class DelaunayProcess(mp.Process):
             points.
         pipe (multiprocessing.Pipe): Input end of pipe that is connected to the 
             master process.
+        unique_str (str, optional): Unique string identifying the domain 
+            decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for 
+            file naming. Defaults to None.
         **kwargs: Variable keyword arguments are passed to `multiprocessing.Process`.
 
     Raises:
@@ -253,16 +321,20 @@ class DelaunayProcess(mp.Process):
     """
 
     def __init__(self, task, proc_idx, leaves, pts, idx, left_edges, right_edges,
-                 queues, lock, count, pipe, **kwargs):
-        if task not in ['tessellate','exchange','enqueue_tess','enqueue_vols','triangulate','volumes']:
+                 queues, lock, count, pipe, unique_str = None, **kwargs):
+        task_list = ['tessellate','exchange','enqueue_tess','enqueue_vols',
+                     'output_tess', 'triangulate','volumes','output']
+        if task not in task_list:
             raise ValueError('{} is not a valid task.'.format(task))
         super(DelaunayProcess, self).__init__(**kwargs)
         self._task = task
-        self._leaves = [ParallelLeaf(leaf, left_edges, right_edges) for leaf in leaves]
+        self._leaves = [ParallelLeaf(leaf, left_edges, right_edges, unique_str) 
+                            for leaf in leaves]
         self._idx = np.frombuffer(idx,dtype='uint64')
         self._ptsFlt = np.frombuffer(pts,dtype='float64')
         ndim = left_edges.shape[1]
         npts = len(self._ptsFlt)/ndim
+        self._ndim = ndim
         self._pts = self._ptsFlt.reshape(npts, ndim)
         self._queues = queues
         self._lock = lock
@@ -337,26 +409,26 @@ class DelaunayProcess(mp.Process):
             self._pipe.send_bytes(struct.pack('QQQQQ',leaf.id,s[0].shape[0],dt,s[2],s[5]))
             for _ in range(2) + range(3,5):
                 self._pipe.send_bytes(s[_])
-        # out = [(leaf.id,leaf.serialize()) for leaf in self._leaves]
-        # self._pipe.send(out)
-        # self._queues[-1].put(out)
 
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
         for leaf in self._leaves:
             self._pipe.send_bytes(struct.pack('Q',leaf.id))
             self._pipe.send_bytes(leaf.voronoi_volumes())
-            # self._pipe.send((leaf.id, leaf.voronoi_volumes()))
-        # out = [(leaf.id,leaf.voronoi_volumes()) for leaf in self._leaves]
-        # self._pipe.send(out)
-        # self._queues[-1].put(out)
 
     def enqueue_number_of_cells(self):
         r"""Enqueue resulting number of cells."""
         ncells = 0
         for leaf in self._leaves:
+            leaf.serialize(store=True)
             ncells += leaf.T.num_cells
         self._pipe.send_bytes(struct.pack('Q',ncells))
+
+    def output_tess(self):
+        r"""Write serialized tessellation info to file for each leaf."""
+        for leaf in self._leaves:
+            ncells = leaf.write_tess_to_file()
+            self._pipe.send_bytes(struct.pack('Q',ncells))
 
     def run(self):
         r"""Performs tessellation and communication for each leaf on this process."""
@@ -369,7 +441,9 @@ class DelaunayProcess(mp.Process):
             self.enqueue_triangulation()
         elif self._task == 'enqueue_vols':
             self.enqueue_volumes()
-        elif self._task in ['triangulate','volumes']:
+        elif self._task == 'output_tess':
+            self.output_tess()
+        elif self._task in ['triangulate','volumes','output']:
             self.tessellate_leaves()
             # Continue exchanges until there are not any particles that need to
             # be exchanged.
@@ -405,6 +479,8 @@ class DelaunayProcess(mp.Process):
                 self.enqueue_triangulation()
             elif self._task == 'volumes':
                 self.enqueue_volumes()
+            elif self._task == 'output':
+                self.output_tess()
         # Synchronize to ensure rapid receipt
         self._lock.acquire()
         with self._count[0].get_lock():
@@ -416,12 +492,65 @@ class DelaunayProcess(mp.Process):
         self._lock.release()
         self._done = True
 
+class ConsolidateProcess(mp.Process):
+    r"""`multiprocessing.Process` subclass for coordinating operations on a 
+    single process during consolidation of a parallel Delaunay triangulation.
+
+    Args:
+        proc_idx (int): Index of this process.
+        leaves (list of leaf objects): Leaves that should be triangulated on 
+            this process. The leaves are created by :meth:`cgal4py.domain_decomp.tree`.
+        queues (list of `multiprocessing.Queue`): List of queues for every 
+            process being used in the triangulation plus one for the main 
+            process.
+        lock (multiprocessing.Lock): Lock for processes.
+        count (multiprocessing.Value): Shared integer for tracking exchanged 
+            points.
+        pipe (multiprocessing.Pipe): Input end of pipe that is connected to the 
+            master process.
+        **kwargs: Variable keyword arguments are passed to `multiprocessing.Process`.
+
+    Raises:
+        ValueError: if `task` is not one of the accepted values listed above.
+
+    """
+
+    def __init__(self, proc_idx, leaves, left_edges, right_edges,
+                 queues, lock, count, pipe, **kwargs):
+        super(ConsolidateProcess, self).__init__(**kwargs)
+        self._task = task
+        self._leaves = [ParallelLeaf(leaf, left_edges, right_edges) for leaf in leaves]
+        self._queues = queues
+        self._lock = lock
+        self._pipe = pipe
+        self._count = count
+        self._num_proc = len(queues)-1
+        self._local_leaves = len(leaves)
+        if self._local_leaves == 0:
+            self._total_leaves = 0
+        else:
+            self._total_leaves = leaves[0].num_leaves
+        self._proc_idx = proc_idx
+        self._done = False
+
+    def run(self):
+        r"""Reads in serialized tessellation information for each leaf on this 
+        process and adds it to the triangulation."""
+
+
 class ParallelLeaf(object):
     r"""Wraps triangulation of a single leaf in a domain decomposition. 
 
     Args:
         leaf (object): Leaf object from a tree returned by 
             :meth:`cgal4py.domain_decomp.tree`.
+        left_edges (np.ndarray): Minimums of each leaf in the domain 
+            decomposition.
+        right_edges (np.ndarray): Maximums of each leaf in the domain 
+            decomposition.
+        unique_str (str, optional): Unique string identifying the domain 
+            decomposition that will be used to construct an output file name.
+            Default to None.
 
     Attributes: 
         norig (int): The number of points originally located on this leaf.
@@ -430,11 +559,25 @@ class ParallelLeaf(object):
         idx (np.ndarray of uint64): Indices of points on this leaf in the domain 
             sorted position array (including those points transfered from other 
             leaves).
+        all_neighbors (set): Indices of all leaves that have been considered 
+            during particle exchanges.
+        neighbors (list): Neighboring leaves that will be considered during the 
+            next particle exchange.
+        left_neighbors (list): Neighboring leaves to the left of this leaf in 
+            each dimension.
+        right_neighbors (list): Neighboring leaves to the right of this leaf in 
+            each dimension.
+        left_edges (np.ndarray): Minimums of the domains in each dimension for 
+            leaves in `self.neighbors`.
+        right_edges (np.ndarray): Maximums of the domains in each dimension for 
+            leaves in `self.neighbors`.
+        unique_str (str): Unique string identifying the domain decomposition 
+            that will be used to construct an output file name.
         All attributes of `leaf`'s class also apply.
 
     """
 
-    def __init__(self, leaf, left_edges, right_edges):
+    def __init__(self, leaf, left_edges, right_edges, unique_str = None):
         self._leaf = leaf
         self.norig = leaf.npts
         self.T = None
@@ -469,6 +612,7 @@ class ParallelLeaf(object):
                     re[k,i] += self.domain_width
         self.left_edges = le[self.neighbors,:]
         self.right_edges = re[self.neighbors,:]
+        self.unique_str = unique_str
 
     def __getattr__(self, name):
         if name in dir(self._leaf):
@@ -656,17 +800,86 @@ class ParallelLeaf(object):
             self.left_neighbors[i] = ln[i]
             self.right_neighbors[i] = rn[i]
 
-    def serialize(self):
+    @property
+    def tess_output_filename(self):
+        r"""The default filename that should be used for tessellation output."""
+        return _leaf_tess_filename(self.id, unique_str = self.unique_str)
+
+    def consolidate(self, ncells, idx_inf, all_verts, all_cells, 
+                    leaf_start, leaf_stop,
+                    split_map, inf_map):
+        r"""Add local tessellation to global one.
+
+        Args:
+            ncells: Total number of cells currently in the global tessellation.
+            split_map: Tuple containing necessary arrays to reconstruct the 
+                map containing information for cells split between leaves.
+            inf_map: Tuple containing necessary arrays to reconstruct the map 
+                containing information for cells that are infinite.
+
+        Returns:
+            ncells: Total number of cells in the global tessellation after 
+                adding this leaf.
+            split_map: Tuple containing necessary arrays to reconstruct the 
+                map containing information for cells split between leaves,
+                updated after adding this leaf.
+            inf_map: Tuple containing necessary arrays to reconstruct the map 
+                containing information for cells that are infinite, updated 
+                after adding this leaf.
+
+        """
+        ncells, split_map, inf_map = tools.add_leaf(
+            self.ndim, ncells, idx_inf, all_verts, all_cells, leaf_start, leaf_stop, 
+            split_map[0], split_map[1], inf_map[0], inf_map[1],
+            leaf.id, leaf.idx_inf, leaf.verts, leaf.neigh,
+            leaf.sort_verts, leaf.sort_cells)
+        return ncells, split_map, inf_map
+
+    def serialize(self, store=False):
         r"""Get the serialized tessellation for this leaf.
+        
+        Args:
+            store (bool, optional): If True, values are stored as attributes and 
+                not returned. Defaults to False.
 
         Returns:
             tuple: Vertices and neighbors for cells in the triangulation.
 
         """
         cells, neigh, idx_inf = self.T.serialize_info2idx(self.norig, self.idx)
-        ncell_tot = self.T.num_cells
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
-        return cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot
+        if store:
+            self.idx_inf = idx_inf
+            self.verts = cells
+            self.neigh = neigh
+            self.sort_verts = idx_verts
+            self.sort_cells = idx_cells
+        else:
+            ncell_tot = self.T.num_cells
+            return cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot
+
+    def write_tess_to_file(self, fname = None):
+        r"""Write out serialized information about the tessellation on this leaf.
+
+        Args:
+            fname (str, optional): Full path to file where tessellation info 
+                should be written. Defaults to None. If None, it is set to
+                :method:`cgal4py.parallel.ParallelLeaf.tess_output_filename`.
+
+        Returns:
+            int: The maximum number of cells that will be contributed by this 
+                leaf. This is based on the number of cells found to be on this 
+                leaf in the local tessellation and includes cells that are not 
+                output to file (e.g. infinite cells).
+
+        """
+
+        if fname is None:
+            fname = self.tess_output_filename
+        cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot = self.serialize()
+        tools.output_leaf(fname, self.id, idx_inf, cells, neigh,
+                          idx_verts, idx_cells, self.start_idx, self.stop_idx)
+        return ncell_tot
 
     def voronoi_volumes(self):
         r"""Get the voronoi cell volumes for the original vertices on this leaf.

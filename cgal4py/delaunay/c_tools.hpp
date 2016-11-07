@@ -340,21 +340,24 @@ public:
   uint64_t size() {
     return (uint64_t)(_m.size());
   }
-  uint64_t insert(I *v, uint32_t *sort_v, uint64_t new_idx) {
+  template <typename leafI>
+  uint64_t insert(leafI *v, uint32_t *sort_v, uint64_t new_idx) {
     std::vector<I> key;
     for (uint32_t i = 0; i < (ndim+1); i++)
-      key.push_back(v[sort_v[i]]);
+      key.push_back((I)(v[sort_v[i]]));
     uint64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
     return idx;
   }
-  uint64_t insert_long(I *v, I *sort_v, uint64_t new_idx) {
+  template <typename leafI>
+  uint64_t insert_long(leafI *v, leafI *sort_v, uint64_t new_idx) {
     std::vector<I> key;
     for (uint32_t i = 0; i < (ndim+1); i++)
-      key.push_back(v[sort_v[i]]);
+      key.push_back((I)(v[sort_v[i]]));
     uint64_t idx = _m.insert(std::make_pair(key, new_idx)).first->second;
     return idx;
   }
-  void put_in_arrays(I *keys, uint64_t *vals) {
+  template <typename leafI>
+  void put_in_arrays(leafI *keys, uint64_t *vals) {
     typename std::map<std::vector<I>, uint64_t>::iterator it;
     std::vector<I> ikey;
     uint64_t i;
@@ -363,12 +366,24 @@ public:
     for (it = _m.begin(); it != _m.end(); it++) {
       ikey = it->first;
       for (j = 0; j < (ndim+1); j++)
-	keys[i*(ndim+1)+j] = ikey[j];
+	keys[i*(ndim+1)+j] = (leafI)(ikey[j]);
       vals[i] = it->second;
       i++;
     }
   }
 };
+
+std::size_t findtype_SerializedLeaf(const char* filename) {
+  std::ifstream os(filename, std::ios::binary);
+  if (!os) std::cerr << "Error cannot open file: " << filename << std::endl;
+  else {
+    std::size_t size_I;
+    os.read((char*)&size_I, sizeof(std::size_t));
+    os.close();
+    return size_I;
+  }
+  return 0;
+}
 
 template <typename I>
 class SerializedLeaf
@@ -377,18 +392,23 @@ public:
   int id;
   uint32_t ndim;
   int64_t ncells;
-  I start_idx;
-  I stop_idx;
+  uint64_t idx_start;
+  uint64_t idx_stop;
   I idx_inf;
   I *verts;
   I *neigh;
   uint32_t *sort_verts;
   uint64_t *sort_cells;
   int64_t *visited;
-  SerializedLeaf() {}
+  bool init_from_file;
+  SerializedLeaf() {
+    visited = NULL;
+    init_from_file = false;
+  }
   SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells, I _idx_inf,
 		 I *_verts, I *_neigh,
-		 uint32_t *_sort_verts, uint64_t *_sort_cells) {
+		 uint32_t *_sort_verts, uint64_t *_sort_cells,
+		 uint64_t _idx_start, uint64_t _idx_stop) {
     id = _id;
     ndim = _ndim;
     ncells = _ncells;
@@ -397,9 +417,12 @@ public:
     neigh = _neigh;
     sort_verts = _sort_verts;
     sort_cells = _sort_cells;
+    idx_start = _idx_start;
+    idx_stop = _idx_stop;
     visited = (int64_t*)malloc(ncells*sizeof(int64_t));
     for (int64_t i = 0; i < ncells; i++)
       visited[i] = -1;
+    init_from_file = false;
   }
   // ~SerializedLeaf() {
   //   free(visited);
@@ -434,59 +457,184 @@ public:
     }
     return -1;
   }
+
+  void write_to_file(const char* filename) const {
+    std::ofstream os(filename, std::ios::binary);
+    if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
+    else {
+      int64_t i;
+      uint32_t j;
+      std::size_t size_I = sizeof(I);
+
+      // Write header
+      os.write((char*)&size_I, sizeof(std::size_t));
+      os.write((char*)&id, sizeof(int));
+      os.write((char*)&ndim, sizeof(uint32_t));
+      os.write((char*)&ncells, sizeof(int64_t));
+      os.write((char*)&idx_inf, size_I);
+      os.write((char*)&idx_start, sizeof(uint64_t));
+      os.write((char*)&idx_stop, sizeof(uint64_t));
+      if (ncells==0) {
+        os.close();
+        return;
+      }
+      // Write cell vertices
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.write((char*)(verts+i*(ndim+1)+j), size_I);
+	}
+      }
+      // Write cell neighbors
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.write((char*)(neigh+i*(ndim+1)+j), size_I);
+	}
+      }
+      // Write sorted verts
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.write((char*)(sort_verts+i*(ndim+1)+j), sizeof(uint32_t));
+	}
+      }
+      // Write sorted cells
+      for (i = 0; i < ncells; i++) {
+	os.write((char*)(sort_cells+i), sizeof(uint64_t));
+      }
+      os.close();
+
+    }
+  }
+
+  int64_t read_from_file(const char* filename) {
+    std::ifstream os(filename, std::ios::binary);
+    if (!os) std::cerr << "Error cannot open file: " << filename << std::endl;
+    else {
+      int64_t i;
+      uint32_t j;
+      std::size_t size_I;
+
+      // Read header
+      os.read((char*)&size_I, sizeof(std::size_t));
+      if (size_I != sizeof(I)) {
+	std::cerr << "Error this object uses the wrong template type." << std::endl;
+	os.close();
+	return 0;
+      }
+      os.read((char*)&id, sizeof(int));
+      os.read((char*)&ndim, sizeof(uint32_t));
+      os.read((char*)&ncells, sizeof(int64_t));
+      os.read((char*)&idx_inf, size_I);
+      os.read((char*)&idx_start, sizeof(uint64_t));
+      os.read((char*)&idx_stop, sizeof(uint64_t));
+      if (ncells==0) {
+        os.close();
+        return 0;
+      }
+      // Read cell vertices
+      verts = (I*)malloc(ncells*(ndim+1)*size_I);
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.read((char*)(verts+i*(ndim+1)+j), size_I);
+	}
+      }
+      // Read cell neighbors
+      neigh = (I*)malloc(ncells*(ndim+1)*size_I);
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.read((char*)(neigh+i*(ndim+1)+j), size_I);
+	}
+      }
+      // Read sorted verts
+      sort_verts = (uint32_t*)malloc(ncells*(ndim+1)*sizeof(uint32_t));
+      for (i = 0; i < ncells; i++) {
+	for (j = 0; j < (ndim+1); j++) {
+	  os.read((char*)(sort_verts+i*(ndim+1)+j), sizeof(uint32_t));
+	}
+      }
+      // Read sorted cells
+      sort_cells = (uint64_t*)malloc(ncells*sizeof(uint64_t));
+      for (i = 0; i < ncells; i++) {
+	os.read((char*)(sort_cells+i), sizeof(uint64_t));
+      }
+      os.close();
+
+      // Create visited array
+      init_from_file = true;
+      visited = (int64_t*)malloc(ncells*sizeof(int64_t));
+      for (int64_t i = 0; i < ncells; i++)
+	visited[i] = -1;
+
+      return ncells;
+    }
+    return 0;
+  }
+
+  void cleanup() {
+    if (visited != NULL) 
+      free(visited);
+    if (init_from_file) {
+      free(verts);
+      free(neigh);
+      free(sort_verts);
+      free(sort_cells);
+    }
+  }
+
 };
 
-template <typename I, typename leafI>
+template <typename I>
 class ConsolidatedLeaves
 {
 public:
   uint32_t ndim;
   int64_t ncells;
   int64_t max_ncells;
-  uint64_t num_leaves;
   I *allverts;
   I *allneigh;
   I idx_inf;
-  uint64_t *leaf_start_idx;
-  uint64_t *leaf_stop_idx;
-  CellMap<leafI> split_map;
+  CellMap<I> split_map;
   CellMap<I> inf_map;
   uint32_t *matches1;
   uint32_t *matches2;
   ConsolidatedLeaves() {}
-  ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
-		     int64_t _max_ncells, I *_verts, I *_neigh,
-		     uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx) {
+  ConsolidatedLeaves(uint32_t _ndim, I _idx_inf, int64_t _max_ncells, 
+		     I *_verts, I *_neigh) {
     ncells = 0;
     max_ncells = _max_ncells;
     ndim = _ndim;
-    num_leaves = _num_leaves;
     allverts = _verts;
     allneigh = _neigh;
     idx_inf = _idx_inf;
-    leaf_start_idx = _leaf_start_idx;
-    leaf_stop_idx = _leaf_stop_idx;
-    split_map = CellMap<leafI>(ndim);
+    split_map = CellMap<I>(ndim);
     inf_map = CellMap<I>(ndim);
     matches1 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
     matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
   }
-  ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, uint64_t _num_leaves, I _idx_inf,
+  ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, I _idx_inf,
+		     int64_t _max_ncells, I *_verts, I *_neigh) {
+    ncells = _ncells;
+    max_ncells = _max_ncells;
+    ndim = _ndim;
+    allverts = _verts;
+    allneigh = _neigh;
+    idx_inf = _idx_inf;
+    split_map = CellMap<I>(ndim);
+    inf_map = CellMap<I>(ndim);
+    matches1 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+    matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
+  }
+  ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, I _idx_inf,
 		     int64_t _max_ncells, I *_verts, I *_neigh,
-		     uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx, 
-		     uint64_t n_split_map, leafI *key_split_map, uint64_t *val_split_map,
+		     uint64_t n_split_map, I *key_split_map, uint64_t *val_split_map,
 		     uint64_t n_inf_map, I *key_inf_map, uint64_t *val_inf_map) {
     // This version allows use of pre-existing information
     ncells = _ncells;
     max_ncells = _max_ncells;
     ndim = _ndim;
-    num_leaves = _num_leaves;
     allverts = _verts;
     allneigh = _neigh;
     idx_inf = _idx_inf;
-    leaf_start_idx = _leaf_start_idx;
-    leaf_stop_idx = _leaf_stop_idx;
-    split_map = CellMap<leafI>(ndim, n_split_map, key_split_map, val_split_map);
+    split_map = CellMap<I>(ndim, n_split_map, key_split_map, val_split_map);
     inf_map = CellMap<I>(ndim, n_inf_map, key_inf_map, val_inf_map);
     matches1 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
     matches2 = (uint32_t*)malloc((ndim+1)*sizeof(uint32_t));
@@ -497,7 +645,7 @@ public:
   uint64_t size_inf_map() {
     return inf_map.size(); 
   }
-  void get_split_map(leafI *keys, uint64_t *vals) {
+  void get_split_map(I *keys, uint64_t *vals) {
     split_map.put_in_arrays(keys, vals);
   }
   void get_inf_map(I *keys, uint64_t *vals) {
@@ -510,6 +658,26 @@ public:
     free(matches2);
   }
 
+  void add_leaf_fromfile(const char* filename) {
+    std::size_t size_I;
+    size_I = findtype_SerializedLeaf(filename);
+    if (size_I == 4) {
+      SerializedLeaf<uint32_t> leaf = SerializedLeaf<uint32_t>();
+      leaf.read_from_file(filename);
+      add_leaf(leaf);
+      leaf.cleanup();
+    } else if (size_I == 8) {
+      SerializedLeaf<uint64_t> leaf = SerializedLeaf<uint64_t>();
+      leaf.read_from_file(filename);
+      add_leaf(leaf);
+      leaf.cleanup();
+    } else {
+      std::cerr << "Error this file does not follow a recognized template type. Size = " << size_I << std::endl;
+      return;
+    }
+  }
+
+  template <typename leafI>
   void add_leaf(SerializedLeaf<leafI> leaf) {
     leafI i;
     int64_t idx;
@@ -521,6 +689,7 @@ public:
     }
   }
 
+  template <typename leafI>
   int64_t new_cell(leafI *verts) {
     uint32_t j;
     int64_t idx = ncells;
@@ -542,6 +711,7 @@ public:
     return idx;
   }
 
+  template <typename leafI>
   int64_t add_cell(SerializedLeaf<leafI> leaf, leafI icell) {
     int64_t idx = -1;
     leafI *verts = leaf.verts + icell*(ndim+1);
@@ -558,7 +728,7 @@ public:
     leafI vmin = verts[sort_verts[ndim]];
     if (vmax == leaf.idx_inf)
       vmax = verts[sort_verts[1]];
-    if ((vmin >= leaf_start_idx[leaf.id]) and (vmax < leaf_stop_idx[leaf.id])) {
+    if ((vmin >= leaf.idx_start) and (vmax < leaf.idx_stop)) {
       // All points on this leaf
       idx = leaf.visited[icell];
       if (idx < 0) {
@@ -576,6 +746,7 @@ public:
     return idx;
   }
 
+  template <typename leafI>
   void add_neigh(SerializedLeaf<leafI> leaf, leafI icell, int64_t c_total) {
     bool match;
     uint32_t n_local, n_total, n_other, n;
@@ -628,35 +799,35 @@ public:
 	// This leaf
 	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
 	arg_sortCellVerts(allverts+c_total*(ndim+1), sort_verts, 1, ndim+1);
-	src_leaves = find_leaves(allverts+c_total*(ndim+1), sort_verts);
+	// src_leaves = find_leaves(allverts+c_total*(ndim+1), sort_verts);
 	printf("    this (%ld): ", c_total);
 	for (i = 0; i < (int)(ndim+1); i++) 
 	  printf("%ld ", (int64_t)(allverts[c_total*(ndim+1)+i]));
-	printf(", leaves = ");
-	for (i = 0; i < (int)(src_leaves.size()); i++)
-	  printf("%d ", src_leaves[i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < (int)(src_leaves.size()); i++)
+	//   printf("%d ", src_leaves[i]);
 	printf("\n");
 	// The existing neighbor
 	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
 	arg_sortCellVerts(allverts+c_exist*(ndim+1), sort_verts, 1, ndim+1);
-	src_leaves = find_leaves(allverts+c_exist*(ndim+1), sort_verts);
+	// src_leaves = find_leaves(allverts+c_exist*(ndim+1), sort_verts);
 	printf("    old (%ld): ", (int64_t)(c_exist));
 	for (i = 0; i < (int)(ndim+1); i++) 
 	  printf("%ld ", (int64_t)(allverts[c_exist*(ndim+1)+i]));
-	printf(", leaves = ");
-	for (i = 0; i < (int)(src_leaves.size()); i++)
-	  printf("%d ", src_leaves[i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < (int)(src_leaves.size()); i++)
+	//   printf("%d ", src_leaves[i]);
 	printf("\n");
 	// The new neighbor
 	for (i = 0; i < (int)(ndim+1); i++) sort_verts[i] = i;
 	arg_sortCellVerts(allverts+c_other*(ndim+1), sort_verts, 1, ndim+1);
-	src_leaves = find_leaves(allverts+c_other*(ndim+1), sort_verts);
+	// src_leaves = find_leaves(allverts+c_other*(ndim+1), sort_verts);
 	printf("    new (%ld): ", c_other);
 	for (i = 0; i < (int)(ndim+1); i++) 
 	  printf("%ld ", (int64_t)(allverts[c_other*(ndim+1)+i]));
-	printf(", leaves = ");
-	for (i = 0; i < (int)(src_leaves.size()); i++)
-	  printf("%d ", src_leaves[i]);
+	// printf(", leaves = ");
+	// for (i = 0; i < (int)(src_leaves.size()); i++)
+	//   printf("%d ", src_leaves[i]);
 	printf("\n");
 	// // throw std::logic_error;
       }
@@ -664,7 +835,9 @@ public:
   }
 
   template<typename I2>
-  std::vector<int> find_leaves(I2 *verts, uint32_t *sort_verts) {
+  std::vector<int> find_leaves(uint64_t num_leaves, 
+			       uint64_t *leaf_start_idx, uint64_t *leaf_stop_idx,
+			       I2 *verts, uint32_t *sort_verts) {
     std::vector<int> out;
     int ic_final = 0, il_final = num_leaves;
     int ic = ndim, il = 0;

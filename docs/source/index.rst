@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   install
    code
 
 Indices and tables
@@ -22,10 +23,10 @@ Indices and tables
 
 
 .. todo::
-   * class for each process that contains leaf/leaves and handles communication
-   * general class for domain decomp that returns full list of leaves
-   * for mpi parallelism, each node gets base class
-   * for thread parallelism, single base class, separate class for each process
+   * serial periodic in 2D
+   * serial periodic in 3D
+   * conditional compilation of periodic cases if CGAL version is not 4.9 or higher
+   * documentation for simple examples
    * General structure:
       * MPI parallelism:
 	 1. Do domain decomp on process 0

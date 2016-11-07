@@ -6,6 +6,8 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 cdef extern from "c_delaunay3.hpp":
+    cdef int VALID
+
     cdef cppclass Delaunay_with_info_3[Info] nogil:
         Delaunay_with_info_3() except +
         Delaunay_with_info_3(double *pts, Info *val, uint32_t n) except +

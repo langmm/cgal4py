@@ -5,14 +5,19 @@ from libcpp.pair cimport pair
 from libcpp cimport bool
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
-cdef extern from "c_delaunay2.hpp":
+cdef extern from "c_periodic_delaunay2.hpp":
     cdef int VALID
-    
-    cdef cppclass Delaunay_with_info_2[Info] nogil:
-        Delaunay_with_info_2() except +
-        Delaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
+
+    cdef cppclass PeriodicDelaunay_with_info_2[Info] nogil:
+        PeriodicDelaunay_with_info_2() except +
+        PeriodicDelaunay_with_info_2(const double *domain) except +
+        PeriodicDelaunay_with_info_2(double *pts, Info *val, uint32_t n) except +
+        PeriodicDelaunay_with_info_2(double *pts, Info *val, uint32_t n,
+                                     const double *domain) except +
         bool updated
         bool is_valid() const
+        void num_sheets(int32_t *ns_out) const
+        uint32_t num_sheets_total() const
         uint32_t num_finite_verts() const
         uint32_t num_finite_edges() const
         uint32_t num_finite_cells() const
@@ -22,13 +27,30 @@ cdef extern from "c_delaunay2.hpp":
         uint32_t num_verts() const
         uint32_t num_edges() const
         uint32_t num_cells() const
+        uint32_t num_stored_verts() const
+        uint32_t num_stored_edges() const
+        uint32_t num_stored_cells() const
 
-        bool is_equal(const Delaunay_with_info_2[Info] other) const
+        bool is_equal(const PeriodicDelaunay_with_info_2[Info] other) const
 
         cppclass Vertex
         cppclass Edge
         cppclass Cell
 
+        bool has_offset(Vertex v) const
+        bool has_offset(Edge e) const
+        bool has_offset(Cell c) const
+        void point(Vertex v, double* pos) const
+        void periodic_point(Vertex v, double* pos) const
+        void periodic_offset(Vertex v, int32_t* off) const
+        void point(Edge e, int i, double* pos) const
+        void periodic_point(Edge e, int i, double* pos) const
+        void periodic_offset(Edge e, int i, int32_t* off) const
+        void point(Cell c, int i, double* pos) const
+        void periodic_point(Cell c, int i, double* pos) const
+        void periodic_offset(Cell c, int i, int32_t* off) const
+
+        void set_domain(const double *domain) except +
         void insert(double *, Info *val, uint32_t n) except +
         void remove(Vertex v) except +
         void clear() except +
@@ -38,18 +60,24 @@ cdef extern from "c_delaunay2.hpp":
         void write_to_file(const char* filename) except +
         void read_from_file(const char* filename) except +
         I serialize[I](I &n, I &m, int32_t &d,
+                       double* domain, int32_t* cover,
                        double* vert_pos, Info* vert_info,
-                       I* faces, I* neighbors) const
-        Info serialize_idxinfo[I](I &n, I &m, int32_t &d,
-                                  Info* faces, I* neighbors) const
+                       I* faces, I* neighbors, int32_t *offsets) const
+        Info serialize_idxinfo[I](I &n, I &m, int32_t &d, 
+                                  double* domain, int32_t* cover,
+                                  Info* faces, I* neighbors, int32_t *offsets) const
         I serialize_info2idx[I](I &n, I &m, int32_t &d,
-                                I* faces, I* neighbors,
+                                double* domain, int32_t* cover,
+                                I* faces, I* neighbors, int32_t *offsets,
                                 Info max_info, I* idx) const
         void deserialize[I](I n, I m, int32_t d,
+                            double* domain, int32_t *cover,
                             double* vert_pos, Info* vert_info,
-                            I* faces, I* neighbors, I idx_inf) 
-        void deserialize_idxinfo[I](I n, I m, int32_t d, double* vert_pos,
-                                    I* faces, I* neighbors, I idx_inf)
+                            I* faces, I* neighbors, int32_t* offsets, I idx_inf) 
+        void deserialize_idxinfo[I](I n, I m, int32_t d, 
+                                    double* domain, int32_t *cover,
+                                    double* vert_pos,
+                                    I* faces, I* neighbors, int32_t* offsets, I idx_inf)
 
         Vertex get_vertex(Info index) except +
         Cell locate(double* pos, int& lt, int& li)
@@ -74,6 +102,7 @@ cdef extern from "c_delaunay2.hpp":
             bool operator==(Vertex other)
             bool operator!=(Vertex other)
             void point(double* out)
+            void offset(int32_t* out)
             Info info()
             Cell cell()
             void set_cell(Cell c)
@@ -97,6 +126,7 @@ cdef extern from "c_delaunay2.hpp":
             int ind()
             Vertex v1()
             Vertex v2()
+            Vertex vertex(int i)
             bool operator==(Edge other)
             bool operator!=(Edge other)
 
@@ -151,7 +181,6 @@ cdef extern from "c_delaunay2.hpp":
         bool is_edge(Vertex x1, Vertex x2, Cell& c, int& i)
         bool is_cell(Vertex x1, Vertex x2, Vertex x3)
         bool is_cell(Vertex x1, Vertex x2, Vertex x3, Cell& c)
-        bool includes_edge(Vertex va, Vertex vb, Vertex& vbr, Cell& c, int& i)
 
         vector[Vertex] incident_vertices(Vertex x)
         vector[Edge] incident_edges(Vertex x)
@@ -167,7 +196,6 @@ cdef extern from "c_delaunay2.hpp":
 
         Vertex nearest_vertex(double* pos)
 
-        Edge mirror_edge(Edge x) const
         int mirror_index(Cell x, int i) const 
         Vertex mirror_vertex(Cell x, int i) const 
 
@@ -185,8 +213,6 @@ cdef extern from "c_delaunay2.hpp":
         vector[Cell] get_conflicts(double* pos, Cell start)
         pair[vector[Cell],vector[Edge]] get_conflicts_and_boundary(double* pos, Cell start)
 
-        vector[Cell] line_walk(double* pos1, double* pos2) const
-
         int oriented_side(Cell f, const double* pos) const
         int side_of_oriented_circle(Cell f, const double* pos) const
 
@@ -197,8 +223,3 @@ cdef extern from "c_delaunay2.hpp":
                              vector[Info]& rx, vector[Info]& ry,
                              vector[Info]& alln) const
 
-# cdef class Delaunay2:
-#     cdef int n
-#     cdef void *_T
-#     # cdef Delaunay_with_info_2[info_t] *T
-#     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)

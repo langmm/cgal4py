@@ -6,6 +6,8 @@ from libcpp.pair cimport pair
 from libc.stdint cimport uint32_t, uint64_t, int64_t, int32_t
 from libcpp cimport bool as cbool
 from cpython cimport bool as pybool
+from cython.operator cimport dereference
+
 import copy
 import time
 
@@ -631,7 +633,9 @@ def py_swap_cells(verts, neigh, i1, i2):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial):
+cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial,
+                                        np.ndarray[np.uint64_t] idx_start,
+                                        np.ndarray[np.uint64_t] idx_stop):
     cdef int i
     cdef object s
     cdef sLeaves32 leaves
@@ -651,12 +655,15 @@ cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial):
         with nogil:
             leaves.push_back(sLeaf32(i, ndim, ncells, idx_inf,
                                      &verts[0,0], &neigh[0,0],
-                                     &sort_verts[0,0], &sort_cells[0]))
+                                     &sort_verts[0,0], &sort_cells[0],
+                                     idx_start[i], idx_stop[i]))
     return leaves
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial):
+cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial,
+                                        np.ndarray[np.uint64_t] idx_start,
+                                        np.ndarray[np.uint64_t] idx_stop):
     cdef int i
     cdef object s
     cdef sLeaves64 leaves
@@ -676,7 +683,8 @@ cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial):
         with nogil:
             leaves.push_back(sLeaf64(i, ndim, ncells, idx_inf,
                                      &verts[0,0], &neigh[0,0],
-                                     &sort_verts[0,0], &sort_cells[0]))
+                                     &sort_verts[0,0], &sort_cells[0],
+                                     idx_start[i], idx_stop[i]))
     return leaves
         
 @cython.boundscheck(False)
@@ -687,20 +695,19 @@ cdef np.int64_t _consolidate_uint32_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint64_t, ndim=2] verts, 
                                            np.ndarray[np.uint64_t, ndim=2] cells):
-    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial)
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
-    cdef ConsolidatedLeaves[uint64_t,uint32_t] obj
+    cdef ConsolidatedLeaves[uint64_t] obj
     cdef uint64_t i
     with nogil:
-        obj = ConsolidatedLeaves[uint64_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], 
-                                                    &leaf_start[0], &leaf_stop[0])
+        obj = ConsolidatedLeaves[uint64_t](ndim, idx_inf, max_ncells,
+                                           &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
-            obj.add_leaf(leaves[i])
+            obj.add_leaf[uint32_t](leaves[i])
         obj.add_inf()
         obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
@@ -714,20 +721,19 @@ cdef np.int64_t _consolidate_uint32_uint32(np.uint32_t ndim, np.uint32_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint32_t, ndim=2] verts, 
                                            np.ndarray[np.uint32_t, ndim=2] cells):
-    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial)
+    cdef sLeaves32 leaves = _vectorize_leaves_uint32(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
-    cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
+    cdef ConsolidatedLeaves[uint32_t] obj
     cdef uint64_t i
     with nogil:
-        obj = ConsolidatedLeaves[uint32_t,uint32_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], 
-                                                    &leaf_start[0], &leaf_stop[0])
+        obj = ConsolidatedLeaves[uint32_t](ndim, idx_inf, max_ncells,
+                                           &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
-            obj.add_leaf(leaves[i])
+            obj.add_leaf[uint32_t](leaves[i])
         obj.add_inf()
         obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
@@ -741,20 +747,19 @@ cdef np.int64_t _consolidate_uint64_uint64(np.uint32_t ndim, np.uint64_t idx_inf
                                            np.ndarray[np.uint64_t] leaf_stop,
                                            np.ndarray[np.uint64_t, ndim=2] verts, 
                                            np.ndarray[np.uint64_t, ndim=2] cells):
-    cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial)
+    cdef sLeaves64 leaves = _vectorize_leaves_uint64(ndim, serial, leaf_start, leaf_stop)
     cdef uint64_t num_leaves = <uint64_t>leaves.size()
     cdef int64_t max_ncells = <int64_t>verts.shape[0]
     if max_ncells == 0:
         return max_ncells
     assert(cells.shape[0] == max_ncells)
-    cdef ConsolidatedLeaves[uint64_t,uint64_t] obj
+    cdef ConsolidatedLeaves[uint64_t] obj
     cdef uint64_t i
     with nogil:
-        obj = ConsolidatedLeaves[uint64_t,uint64_t](ndim, num_leaves, idx_inf, max_ncells,
-                                                    &verts[0,0], &cells[0,0], 
-                                                    &leaf_start[0], &leaf_stop[0])
+        obj = ConsolidatedLeaves[uint64_t](ndim, idx_inf, max_ncells,
+                                           &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
-            obj.add_leaf(leaves[i])
+            obj.add_leaf[uint64_t](leaves[i])
         obj.add_inf()
         obj.cleanup()
     cdef np.int64_t ncells = obj.ncells
@@ -809,20 +814,53 @@ def consolidate_leaves(ndim, idx_inf, serial, leaf_start, leaf_stop):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+cdef void _output_leaf_uint32(char* fname, int leaf_id, np.uint32_t idx_inf, 
+                              np.ndarray[np.uint32_t, ndim=2] verts,
+                              np.ndarray[np.uint32_t, ndim=2] neigh,
+                              np.ndarray[np.uint32_t, ndim=2] sort_verts,
+                              np.ndarray[np.uint64_t, ndim=1] sort_cells,
+                              np.uint64_t idx_start, np.uint64_t idx_stop):
+    cdef int64_t ncells = verts.shape[0]
+    cdef uint32_t ndim = verts.shape[1]-1
+    if (ncells == 0) or (ndim == 0):
+        return
+    assert(neigh.shape[0] == ncells)
+    assert(neigh.shape[1] == ndim+1)
+    assert(sort_verts.shape[0] == ncells)
+    assert(sort_verts.shape[1] == ndim+1)
+    assert(sort_cells.shape[0] == ncells)
+    cdef sLeaf32 leaf = sLeaf32(leaf_id, ndim, ncells, idx_inf,
+                                &verts[0,0], &neigh[0,0],
+                                &sort_verts[0,0], &sort_cells[0],
+                                idx_start, idx_stop)
+    with nogil:
+        leaf.write_to_file(fname)
+
+def output_leaf(fname, leaf_id, idx_inf, verts, neigh, sort_verts, sort_cells,
+                idx_start, idx_stop):
+    cdef char* cfname = fname
+    if verts.dtype == np.uint32:
+        _output_leaf_uint32(cfname, leaf_id, idx_inf, verts, neigh,
+                            sort_verts, sort_cells, idx_start, idx_stop)
+    else:
+        NotImplementedError("Output of leaves with template type {} not supported".format(type(idx_inf)))
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
 def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t idx_inf,
-                                        np.ndarray[np.uint32_t, ndim=2] all_verts,
-                                        np.ndarray[np.uint32_t, ndim=2] all_neigh,
-                                        np.ndarray[np.uint64_t] leaf_start,
-                                        np.ndarray[np.uint64_t] leaf_stop,
-                                        np.ndarray[np.uint32_t, ndim=2] key_split_map,
-                                        np.ndarray[np.uint64_t, ndim=1] val_split_map,
-                                        np.ndarray[np.uint32_t, ndim=2] key_inf_map,
-                                        np.ndarray[np.uint64_t, ndim=1] val_inf_map,
-                                        int leaf_id, np.uint32_t leaf_idx_inf,
-                                        np.ndarray[np.uint32_t, ndim=2] leaf_verts,
-                                        np.ndarray[np.uint32_t, ndim=2] leaf_neigh,
-                                        np.ndarray[np.uint32_t, ndim=2] leaf_sort_verts,
-                                        np.ndarray[np.uint64_t, ndim=1] leaf_sort_cells):
+                            np.ndarray[np.uint32_t, ndim=2] all_verts,
+                            np.ndarray[np.uint32_t, ndim=2] all_neigh,
+                            np.ndarray[np.uint64_t] leaf_start,
+                            np.ndarray[np.uint64_t] leaf_stop,
+                            np.ndarray[np.uint32_t, ndim=2] key_split_map,
+                            np.ndarray[np.uint64_t, ndim=1] val_split_map,
+                            np.ndarray[np.uint32_t, ndim=2] key_inf_map,
+                            np.ndarray[np.uint64_t, ndim=1] val_inf_map,
+                            int leaf_id, np.uint32_t leaf_idx_inf,
+                            np.ndarray[np.uint32_t, ndim=2] leaf_verts,
+                            np.ndarray[np.uint32_t, ndim=2] leaf_neigh,
+                            np.ndarray[np.uint32_t, ndim=2] leaf_sort_verts,
+                            np.ndarray[np.uint64_t, ndim=1] leaf_sort_cells):
     cdef float t1, t0
     # Checking to ensure no out-of-bounds things
     t0 = time.time()
@@ -845,18 +883,18 @@ def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t id
     t0 = time.time()
     cdef sLeaf32 leaf = sLeaf32(leaf_id, ndim, leaf_ncells, leaf_idx_inf,
                                 &leaf_verts[0,0], &leaf_neigh[0,0],
-                                &leaf_sort_verts[0,0], &leaf_sort_cells[0])
+                                &leaf_sort_verts[0,0], &leaf_sort_cells[0],
+                                leaf_start[leaf_id], leaf_stop[leaf_id])
     t1 = time.time()
     print("Creating the leaf took {} s".format(t1-t0))
     # Create consolidated leaves object
-    cdef ConsolidatedLeaves[uint32_t,uint32_t] obj
+    cdef ConsolidatedLeaves[uint32_t] obj
     cdef uint64_t i
     t0 = time.time()
     with nogil:
-        obj = ConsolidatedLeaves[uint32_t,uint32_t](
-            ndim, ncells, num_leaves, idx_inf, max_ncells,
+        obj = ConsolidatedLeaves[uint32_t](
+            ndim, ncells, idx_inf, max_ncells,
             &all_verts[0,0], &all_neigh[0,0], 
-            &leaf_start[0], &leaf_stop[0], 
             n_split_map, &key_split_map[0,0], &val_split_map[0],
             n_inf_map, &key_inf_map[0,0], &val_inf_map[0])
     t1 = time.time()
@@ -864,7 +902,7 @@ def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t id
     # Insert leaf
     t0 = time.time()
     with nogil:
-        obj.add_leaf(leaf)
+        obj.add_leaf[uint32_t](leaf)
     t1 = time.time()
     print("Adding leaf took {} s".format(t1-t0))
     # Get map arrays
@@ -906,6 +944,11 @@ def add_leaf(ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop,
     dtype_comb = type(idx_inf)
     dtype_leaf = type(leaf_idx_inf)
     t0 = time.time()
+    if ncells == 0:
+        key_split_map = np.empty((0, ndim+1), dtype_comb)
+        val_split_map = np.empty(0, 'uint64')
+        key_inf_map = np.empty((0, ndim+1), dtype_comb)
+        val_inf_map = np.empty(0, 'uint64')
     if dtype_comb == np.uint32:
         if dtype_leaf == np.uint32:
             ncells, split_map, inf_map = _add_leaf_uint32_uint32(
@@ -919,9 +962,9 @@ def add_leaf(ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop,
             raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
     elif dtype_comb == np.uint64:
         if dtype_leaf == np.uint32:
-            pass
+            raise NotImplementedError
         elif dtype_leaf == np.uint64:
-            pass
+            raise NotImplementedError
         else:
             raise TypeError("Leaf type {} not supported.".format(dtype_leaf))
     else:
@@ -930,3 +973,307 @@ def add_leaf(ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop,
     print("Consolidation (cython) took {}s".format(t1-t0))
     return ncells, split_map, inf_map
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _add_inf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t idx_inf,
+                           np.ndarray[np.uint32_t, ndim=2] all_verts,
+                           np.ndarray[np.uint32_t, ndim=2] all_neigh,
+                           np.ndarray[np.uint64_t] leaf_start,
+                           np.ndarray[np.uint64_t] leaf_stop):
+    cdef float t1, t0
+    # Checking to ensure no out-of-bounds things
+    t0 = time.time()
+    assert(leaf_start.size == leaf_stop.size)
+    assert(all_verts.size == all_neigh.size)
+    if all_verts.shape[0] == 0:
+        return ncells
+    t1 = time.time()
+    print("Assertions took {} s".format(t1-t0))
+    # Variables from sizes
+    cdef uint64_t num_leaves = <uint64_t>leaf_start.size
+    cdef int64_t max_ncells = <int64_t>all_verts.shape[0]
+    # Create consolidated leaves object
+    cdef ConsolidatedLeaves[uint32_t] obj
+    cdef uint64_t i
+    t0 = time.time()
+    with nogil:
+        obj = ConsolidatedLeaves[uint32_t](
+            ndim, ncells, idx_inf, max_ncells,
+            &all_verts[0,0], &all_neigh[0,0])
+    t1 = time.time()
+    print("Initialization of consolidated leaves (for inf) took {} s".format(t1-t0))
+    # Insert leaf
+    t0 = time.time()
+    with nogil:
+        obj.add_inf()
+    t1 = time.time()
+    print("Adding infinite cells took {} s".format(t1-t0))
+    # Clean up things allocated during initialization
+    t0 = time.time()
+    with nogil:
+        obj.cleanup()
+    t1 = time.time()
+    print("Clean up took {} s".format(t1-t0))
+    ncells = obj.ncells
+    return ncells
+
+def add_inf(ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop):
+    dtype_comb = type(idx_inf)
+    t0 = time.time()
+    if dtype_comb == np.uint32:
+        ncells, split_map, inf_map = _add_inf_uint32_uint32(
+            ndim, ncells, idx_inf, all_verts, all_neigh, leaf_start, leaf_stop)
+    elif dtype_comb == np.uint64:
+        pass
+    else:
+        raise TypeError("Combined type {} not supported.".format(dtype_comb))
+    t1 = time.time()
+    print("Adding infinite cells (cython) took {}s".format(t1-t0))
+    return ncells
+            
+cdef class SerializedLeaf32:
+    r"""Wrapper class for C++ SerializedLeaf class with 32bit cell indices.
+
+    Args:
+        id (int): Leaf identifier.
+        ndim (uint32): Number of dimensions in the domain.
+        ncells (int64): Number of cells in the leaf triangulation.
+        idx_inf (uint32): Flag for infinite vertices or cells.
+        verts (np.ndarray of uint32): Indices of vertices making up each cell.
+        neigh (np.ndarray of uint32): Indices of neighbor cells for each cell.
+        sort_verts (np.ndarray of uint32): Indices required to sort vertices 
+            in each cell in decreasing order.
+        sort_cells (np.ndarray of uint64): Indices required to sort cells by 
+            the sorted vertices.
+        idx_start (np.uint64): Index that this leaf starts at in the full
+            domain decomposition.
+        idx_stop (np.uint64): Index that this leaf stops at in the full
+            domain decomposition.
+
+    Attributes:
+        id (int): Leaf identifier.
+        ndim (uint32): Number of dimensions in the domain.
+        ncells (int64): Number of cells in the leaf triangulation.
+        idx_inf (uint32): Flag for infinite vertices or cells.
+        verts (np.ndarray of uint32): Indices of vertices making up each cell.
+        neigh (np.ndarray of uint32): Indices of neighbor cells for each cell.
+        sort_verts (np.ndarray of uint32): Indices required to sort vertices 
+            in each cell in decreasing order.
+        sort_cells (np.ndarray of uint64): Indices required to sort cells by 
+            the sorted vertices.
+        idx_start (np.uint64): Index that this leaf starts at in the full
+            domain decomposition.
+        idx_stop (np.uint64): Index that this leaf stops at in the full
+            domain decomposition.
+
+    """
+    cdef SerializedLeaf[uint32_t] *SL
+    cdef public int id
+    cdef public np.uint32_t ndim
+    cdef public np.int64_t ncells
+    cdef public np.uint32_t idx_inf
+    cdef public object verts
+    cdef public object neigh
+    cdef public object sort_verts
+    cdef public object sort_cells
+    cdef public np.uint64_t idx_start
+    cdef public np.uint64_t idx_stop
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def __cinit__(self, int leaf_id, uint32_t ndim, int64_t ncells, uint32_t idx_inf, 
+                  np.ndarray[np.uint32_t, ndim=2] verts,
+                  np.ndarray[np.uint32_t, ndim=2] neigh,
+                  np.ndarray[np.uint32_t, ndim=2] sort_verts,
+                  np.ndarray[np.uint64_t, ndim=1] sort_cells,
+                  uint64_t idx_start, uint64_t idx_stop):
+        self.id = leaf_id
+        self.ndim = ndim
+        self.ncells = ncells
+        self.idx_inf = idx_inf
+        self.verts = verts
+        self.neigh = neigh
+        self.sort_verts = sort_verts
+        self.sort_cells = sort_cells
+        self.idx_start = idx_start
+        self.idx_stop = idx_stop
+        with nogil:
+            self.SL = new SerializedLeaf[uint32_t](
+                leaf_id, ndim, ncells, idx_inf, &verts[0,0], &neigh[0,0],
+                &sort_verts[0,0], &sort_cells[0], idx_start, idx_stop)
+
+    def __dealloc__(self):
+        self.SL.cleanup()
+
+cdef class SerializedLeaf64:
+    r"""Wrapper class for C++ SerializedLeaf class with 64bit cell indices.
+
+    Args:
+        id (int): Leaf identifier.
+        ndim (uint32): Number of dimensions in the domain.
+        ncells (int64): Number of cells in the leaf triangulation.
+        idx_inf (uint64): Flag for infinite vertices or cells.
+        verts (np.ndarray of uint64): Indices of vertices making up each cell.
+        neigh (np.ndarray of uint64): Indices of neighbor cells for each cell.
+        sort_verts (np.ndarray of uint32): Indices required to sort vertices 
+            in each cell in decreasing order.
+        sort_cells (np.ndarray of uint64): Indices required to sort cells by 
+            the sorted vertices.
+        idx_start (np.uint64): Index that this leaf starts at in the full
+            domain decomposition.
+        idx_stop (np.uint64): Index that this leaf stops at in the full
+            domain decomposition.
+
+    Attributes:
+        id (int): Leaf identifier.
+        ndim (uint32): Number of dimensions in the domain.
+        ncells (int64): Number of cells in the leaf triangulation.
+        idx_inf (uint64): Flag for infinite vertices or cells.
+        verts (np.ndarray of uint64): Indices of vertices making up each cell.
+        neigh (np.ndarray of uint64): Indices of neighbor cells for each cell.
+        sort_verts (np.ndarray of uint32): Indices required to sort vertices 
+            in each cell in decreasing order.
+        sort_cells (np.ndarray of uint64): Indices required to sort cells by 
+            the sorted vertices.
+        idx_start (np.uint64): Index that this leaf starts at in the full
+            domain decomposition.
+        idx_stop (np.uint64): Index that this leaf stops at in the full
+            domain decomposition.
+
+    """
+    cdef SerializedLeaf[uint64_t] *SL
+    cdef public int id
+    cdef public np.uint32_t ndim
+    cdef public np.int64_t ncells
+    cdef public np.uint64_t idx_inf
+    cdef public object verts
+    cdef public object neigh
+    cdef public object sort_verts
+    cdef public object sort_cells
+    cdef public np.uint64_t idx_start
+    cdef public np.uint64_t idx_stop
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def __cinit__(self, int leaf_id, uint32_t ndim, int64_t ncells, uint64_t idx_inf, 
+                  np.ndarray[np.uint64_t, ndim=2] verts,
+                  np.ndarray[np.uint64_t, ndim=2] neigh,
+                  np.ndarray[np.uint32_t, ndim=2] sort_verts,
+                  np.ndarray[np.uint64_t, ndim=1] sort_cells,
+                  uint64_t idx_start, uint64_t idx_stop):
+        self.id = leaf_id
+        self.ndim = ndim
+        self.ncells = ncells
+        self.idx_inf = idx_inf
+        self.verts = verts
+        self.neigh = neigh
+        self.sort_verts = sort_verts
+        self.sort_cells = sort_cells
+        self.idx_start = idx_start
+        self.idx_stop = idx_stop
+        with nogil:
+            self.SL = new SerializedLeaf[uint64_t](
+                leaf_id, ndim, ncells, idx_inf, &verts[0,0], &neigh[0,0],
+                &sort_verts[0,0], &sort_cells[0], idx_start, idx_stop)
+
+    def __dealloc__(self):
+        self.SL.cleanup()
+
+cdef class ConsolidatedLeaves32:
+    r"""Wrapper class for C++ ConsolidatedLeaves class with 32bit cell indices.
+
+    Args:
+        ndim (uint32): Number of dimensions in domain.
+        idx_inf (uint32): Flag identifying infinite vertices/cells.
+        max_ncells (int64): Number of cells that will be allocated for.
+
+    Attributes:
+        ndim (uint32): Number of dimensions in domain.
+        idx_inf (uint32): Flag identifying infinite vertices/cells.
+        max_ncells (int64): Number of cells that will be allocated for.
+        verts (np.ndarray): Indices of vertices constituting cells.
+
+    """
+    cdef ConsolidatedLeaves[uint32_t] *CL
+    cdef public np.uint32_t ndim
+    cdef public np.uint32_t idx_inf
+    cdef public np.int64_t max_ncells
+    cdef public object verts
+    cdef public object neigh
+    
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def __cinit__(self, uint32_t ndim, uint32_t idx_inf, int64_t max_ncells):
+        self.ndim = ndim
+        self.idx_inf = idx_inf
+        self.max_ncells = max_ncells
+        cdef np.ndarray[np.uint32_t, ndim=2] verts 
+        cdef np.ndarray[np.uint32_t, ndim=2] neigh
+        verts = np.empty((max_ncells, ndim+1), 'uint32')
+        neigh = np.empty((max_ncells, ndim+1), 'uint32')
+        verts.fill(idx_inf)
+        neigh.fill(idx_inf)
+        self.verts = verts
+        self.neigh = neigh
+        with nogil:
+            self.CL = new ConsolidatedLeaves[uint32_t](
+                ndim, idx_inf, max_ncells, &verts[0,0], &neigh[0,0])
+
+    def __dealloc__(self):
+        self.CL.cleanup()
+
+    @property
+    def ncells(self):
+        return self.CL.ncells
+
+    cdef void _add_leaf32(self, SerializedLeaf32 leaf):
+        cdef SerializedLeaf[uint32_t] SL = dereference(leaf.SL)
+        with nogil:
+            self.CL.add_leaf[uint32_t](SL)
+
+    cdef void _add_leaf64(self, SerializedLeaf64 leaf):
+        cdef SerializedLeaf[uint64_t] SL = dereference(leaf.SL)
+        with nogil:
+            self.CL.add_leaf[uint64_t](SL)
+
+    def add_leaf(self, leaf):
+        r"""Add a serialized leaf to the consolidated tessellation.
+
+        Args:
+            leaf (SerializedLeaf32 or SerializedLeaf64): Leaf that should be 
+                added to the tessellation.
+
+        """
+        if isinstance(leaf, SerializedLeaf32):
+            self._add_leaf32(leaf)
+        elif isinstance(leaf, SerializedLeaf64):
+            self._add_leaf64(leaf)
+        else:
+            raise Exception("Unrecognized leaf type: {}".format(type(leaf)))
+
+    def add_leaf_fromfile(self, fname):
+        r"""Add a serialized leaf from a file to the consolidated tessellation.
+
+        Args:
+            fname (str): Full path to file containing serialized leaf info.
+
+        """
+        cdef char* cfname = fname
+        with nogil:
+            self.CL.add_leaf_fromfile(cfname)
+
+    def finalize(self):
+        r"""Perform operations to complete the consolidated triangulation."""
+        self.add_inf()
+        self.resize()
+
+    def add_inf(self):
+        r"""Add infinite cells to tessellation assuming that any cell without a
+        neighbor must be incident to a missing infinite cell."""
+        with nogil:
+            self.CL.add_inf()
+
+    def resize(self):
+        r"""Resize the arrays to match the number of cells."""
+        self.verts.resize((self.ncells, self.ndim+1),refcheck=False)
+        self.neigh.resize((self.ncells, self.ndim+1),refcheck=False)

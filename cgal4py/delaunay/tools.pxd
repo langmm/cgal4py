@@ -33,16 +33,31 @@ cdef extern from "c_tools.hpp":
         SerializedLeaf() except +
         SerializedLeaf(int _id, uint32_t _ndim, int64_t _ncells, I _idx_inf,
                        I *_verts, I *_neigh,
-                       uint32_t *_sort_verts, uint64_t *_sort_cells) except +
-    cdef cppclass ConsolidatedLeaves[I,leafI] nogil:
+                       uint32_t *_sort_verts, uint64_t *_sort_cells,
+                       uint64_t idx_start, uint64_t idx_stop) except +
+        int id
+        uint32_t ndim
+        int64_t ncells
+        uint64_t idx_start
+        uint64_t idx_stop
+        I idx_inf
+        I *verts
+        I *neigh
+        uint32_t *sort_verts
+        uint64_t *sort_cells
+        bool init_from_file
+        void write_to_file(const char* filename)
+        int64_t read_from_file(const char* filename)
+        void cleanup()
+    cdef cppclass ConsolidatedLeaves[I] nogil:
         ConsolidatedLeaves() except +
-        ConsolidatedLeaves(uint32_t _ndim, uint64_t _num_leaves, I _idx_inf,
-                           int64_t _max_ncells, I *_verts, I *_neigh, 
-                           uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx) except +
-        ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, uint64_t _num_leaves, I _idx_inf,
+        ConsolidatedLeaves(uint32_t _ndim, I _idx_inf, int64_t _max_ncells,
+                           I *_verts, I *_neigh) except +
+        ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, I _idx_inf,
+                           int64_t _max_ncells, I *_verts, I *_neigh) except +
+        ConsolidatedLeaves(uint32_t _ndim, int64_t _ncells, I _idx_inf,
                            int64_t _max_ncells, I *_verts, I *_neigh,
-                           uint64_t *_leaf_start_idx, uint64_t *_leaf_stop_idx,
-                           uint64_t n_split_map, leafI *key_split_map, uint64_t *val_split_map,
+                           uint64_t n_split_map, I *key_split_map, uint64_t *val_split_map,
                            uint64_t n_inf_map, I *key_inf_map, uint64_t *val_inf_map) except +
         int64_t ncells
         int64_t max_ncells
@@ -50,10 +65,11 @@ cdef extern from "c_tools.hpp":
         I *allneigh
         uint64_t size_split_map()
         uint64_t size_inf_map()
-        void get_split_map(leafI *keys, uint64_t *vals) 
+        void get_split_map(I *keys, uint64_t *vals) 
         void get_inf_map(I *keys, uint64_t *vals)
         void cleanup()
-        void add_leaf(SerializedLeaf[leafI] leaf)
+        void add_leaf[leafI](SerializedLeaf[leafI] leaf)
+        void add_leaf_fromfile(const char *filename)
         int64_t count_inf()
         void add_inf()
 
