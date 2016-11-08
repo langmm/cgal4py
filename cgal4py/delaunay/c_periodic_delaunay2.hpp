@@ -58,12 +58,7 @@ public:
   typedef typename Delaunay::Vertex_iterator           Vertex_iterator;
   typedef typename Delaunay::Face_iterator             Face_iterator;
   typedef typename Delaunay::Edge_iterator             Edge_iterator;
-  typedef typename Delaunay::Vertex_iterator           All_vertices_iterator;
   typedef typename Delaunay::Unique_vertex_iterator    Unique_vertex_iterator;
-  typedef typename Delaunay::All_faces_iterator        All_faces_iterator;
-  typedef typename Delaunay::Edge_iterator             All_edges_iterator;
-  typedef typename Delaunay::Finite_vertices_iterator  Finite_vertices_iterator;
-  typedef typename Delaunay::Finite_edges_iterator     Finite_edges_iterator;
   typedef typename Delaunay::Locate_type               Locate_type;
   typedef typename Delaunay::Iso_rectangle             Iso_rectangle;
   typedef typename Delaunay::Covering_sheets           Covering_sheets;
@@ -165,7 +160,7 @@ public:
   }
 
   Vertex get_vertex(Info index) const {
-    Finite_vertices_iterator it = T.vertices_begin();
+    Vertex_iterator it = T.vertices_begin();
     for ( ; it != T.vertices_end(); it++) {
       if (it->info() == index)
     	return Vertex(T.get_original_vertex(it));
@@ -216,8 +211,28 @@ public:
     pos[0] = p.x();
     pos[1] = p.y();
   }
+  void point(Edge e, int i, double* pos) const {
+    Point p = T.segment(e._x).vertex(i%2);
+    pos[0] = p.x();
+    pos[1] = p.y();
+  }
+  void point(Cell c, int i, double* pos) const {
+    Point p = T.triangle(c._x).vertex(i%3);
+    pos[0] = p.x();
+    pos[1] = p.y();
+  }
   void periodic_point(Vertex v, double* pos) const {
     Point p = v._x->point();
+    pos[0] = p.x();
+    pos[1] = p.y();
+  }
+  void periodic_point(Edge e, int i, double* pos) const {
+    Point p = T.periodic_segment(e._x)[i%2].first;
+    pos[0] = p.x();
+    pos[1] = p.y();
+  }
+  void periodic_point(Cell c, int i, double* pos) const {
+    Point p = T.periodic_triangle(c._x)[i%3].first;
     pos[0] = p.x();
     pos[1] = p.y();
   }
@@ -227,36 +242,16 @@ public:
     off[0] = o.x();
     off[1] = o.y();
   }
-  void point(Edge e, int i, double* pos) const {
-    Point p = T.segment(e._x).vertex(i%2);
-    pos[0] = p.x();
-    pos[1] = p.y();
-  }
-  void periodic_point(Edge e, int i, double* pos) const {
-    Point p = T.periodic_segment(e._x)[i%2].first;
-    pos[0] = p.x();
-    pos[1] = p.y();
-  }
   void periodic_offset(Edge e, int i, int32_t* off) const {
     Offset o = T.periodic_segment(e._x)[i%2].second;
     off[0] = o.x();
     off[1] = o.y();
   }
-  void point(Cell c, int i, double* pos) const {
-    Point p = T.triangle(c._x).vertex(i%3);
-    pos[0] = p.x();
-    pos[1] = p.y();
-  }
-  void periodic_point(Cell c, int i, double* pos) const {
-    Point p = T.periodic_triangle(c._x)[i%3].first;
-    pos[0] = p.x();
-    pos[1] = p.y();
-  }
   void periodic_offset(Cell c, int i, int32_t* off) const {
-    Offset o = T.int_to_off(c._x->offset(i)); // just cell offset
+    // Offset o = T.int_to_off(c._x->offset(i)); // just cell offset
     // Offset o = T.get_offset(c.vertex(i)._x); // just vertex offset
     // Offset o = T.get_offset(c._x, i); // combined cell and vertex offset
-    // Offset o = T.periodic_triangle(c._x)[i%3].second;
+    Offset o = T.periodic_triangle(c._x)[i%3].second;
     off[0] = o.x();
     off[1] = o.y();
   }
@@ -286,9 +281,9 @@ public:
 
   class All_verts_iter {
   public:
-    All_vertices_iterator _x = All_vertices_iterator();
-    All_verts_iter() { _x = All_vertices_iterator(); }
-    All_verts_iter(All_vertices_iterator x) { _x = x; }
+    Vertex_iterator _x = Vertex_iterator();
+    All_verts_iter() { _x = Vertex_iterator(); }
+    All_verts_iter(Vertex_iterator x) { _x = x; }
     All_verts_iter& operator*() { return *this; }
     All_verts_iter& operator++() {
       _x++;
@@ -337,9 +332,9 @@ public:
 
   class All_edges_iter {
   public:
-    All_edges_iterator _x = All_edges_iterator();
-    All_edges_iter() { _x = All_edges_iterator(); }
-    All_edges_iter(All_edges_iterator x) { _x = x; }
+    Edge_iterator _x = Edge_iterator();
+    All_edges_iter() { _x = Edge_iterator(); }
+    All_edges_iter(Edge_iterator x) { _x = x; }
     All_edges_iter& operator*() { return *this; }
     All_edges_iter& operator++() {
       _x++;
@@ -408,9 +403,9 @@ public:
   // Cell constructs
   class All_cells_iter {
   public:
-    All_faces_iterator _x = All_faces_iterator();
-    All_cells_iter() { _x = All_faces_iterator(); }
-    All_cells_iter(All_faces_iterator x) { _x = x; }
+    Face_iterator _x = Face_iterator();
+    All_cells_iter() { _x = Face_iterator(); }
+    All_cells_iter(Face_iterator x) { _x = x; }
     All_cells_iter& operator*() { return *this; }
     All_cells_iter& operator++() {
       _x++;
@@ -584,7 +579,6 @@ public:
   }
 
   double dual_area(const Vertex v) const {
-
     Face_circulator fstart = T.incident_faces(v._x);
     Face_circulator fcit = fstart;
     std::vector<Point> pts;
@@ -606,15 +600,13 @@ public:
   }
 
   void dual_areas(double* vols) const {
-    Finite_vertices_iterator it = T.vertices_begin();
+    Vertex_iterator it = T.vertices_begin();
     for ( ; it != T.vertices_end(); it++) {
       vols[it->info()] = dual_area(Vertex(it));
     }
   }
 
   double length(const Edge e) const {
-    if (is_infinite(e))
-      return -1.0;
     Segment s = T.segment(e._x);
     double out = std::sqrt(s.squared_length());
     // Vertex_handle v1 = e._v1(), v2 = e._v2();
@@ -748,7 +740,7 @@ public:
 
     // vertices
     inum = 0;
-    for (Finite_vertices_iterator vit = T1.vertices_begin(); vit != T1.vertices_end(); vit++) {
+    for (Vertex_iterator vit = T1.vertices_begin(); vit != T1.vertices_end(); vit++) {
       vert_pos[d*inum + 0] = static_cast<double>(vit->point().x());
       vert_pos[d*inum + 1] = static_cast<double>(vit->point().y());
       vert_info[inum] = vit->info();
@@ -757,7 +749,7 @@ public:
       
     // vertices of the faces
     inum = 0;
-    for (All_faces_iterator ib = T1.tds().face_iterator_base_begin();
+    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
 	 ib != T1.tds().face_iterator_base_end(); ++ib) {
       for (j = 0; j < dim ; ++j) {
 	vit = ib->vertex(j);
@@ -768,7 +760,7 @@ public:
   
     // neighbor pointers of the faces
     inum = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       for (j = 0; j < d+1; ++j){
 	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
@@ -778,7 +770,7 @@ public:
 
     // offsets of face vertices
     inum = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       for (j = 0; j < d+1; ++j){
 	offsets[(d+1)*inum + j] = it->offset(j);
@@ -821,7 +813,7 @@ public:
 
     // vertices of the faces
     inum = 0;
-    for (All_faces_iterator ib = T1.tds().face_iterator_base_begin();
+    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
 	 ib != T1.tds().face_iterator_base_end(); ++ib) {
       for (j = 0; j < dim ; ++j) {
 	vit = ib->vertex(j);
@@ -832,7 +824,7 @@ public:
   
     // neighbor pointers of the faces
     inum = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       for (j = 0; j < d+1; ++j){
 	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
@@ -842,7 +834,7 @@ public:
 
     // offsets of face vertices
     inum = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       for (j = 0; j < d+1; ++j){
 	offsets[(d+1)*inum + j] = it->offset(j);
@@ -887,7 +879,7 @@ public:
     // vertices of the faces
     bool *include_face = (bool*)malloc(m*sizeof(bool));
     inum = 0, inum_tot = 0;
-    for (All_faces_iterator ib = T1.tds().face_iterator_base_begin();
+    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
 	 ib != T1.tds().face_iterator_base_end(); ++ib) {
       include_face[inum_tot] = false;
       for (j = 0; j < dim ; ++j) {
@@ -912,7 +904,7 @@ public:
 
     // neighbor pointers of the faces
     inum = 0, inum_tot = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       if (include_face[inum_tot]) {
 	for (j = 0; j < d+1; ++j){
@@ -925,7 +917,7 @@ public:
 
     // offsets of face vertices
     inum = 0;
-    for (All_faces_iterator it = T1.tds().face_iterator_base_begin();
+    for (Face_iterator it = T1.tds().face_iterator_base_begin();
 	 it != T1.tds().face_iterator_base_end(); ++it) {
       if (include_face[inum_tot]) {
 	for (j = 0; j < d+1; ++j){
@@ -948,8 +940,6 @@ public:
     updated = true;
 
     T.clear();
-    if (T.number_of_vertices() != 0) 
-      T.clear();
   
     if (n==0) {
       return;
@@ -1033,8 +1023,6 @@ public:
     updated = true;
 
     T.clear();
-    if (T.number_of_vertices() != 0) 
-      T.clear();
   
     if (n==0) {
       return;
@@ -1114,7 +1102,7 @@ public:
     Info i;
     Point p;
     Vertex_handle vh1, vh2;
-    for (Finite_vertices_iterator it = T.vertices_begin(); it != T.vertices_end(); it++) {
+    for (Vertex_iterator it = T.vertices_begin(); it != T.vertices_end(); it++) {
       i = it->info();
       p = it->point();
       pos[2*i + 0] = p.x();
@@ -1124,7 +1112,7 @@ public:
 
   void vertex_info(Info* verts) const {
     int i = 0;
-    for (Finite_vertices_iterator it = T.vertices_begin(); it != T.vertices_end(); it++) {
+    for (Vertex_iterator it = T.vertices_begin(); it != T.vertices_end(); it++) {
       verts[i] = it->info();
       i++;
     }
@@ -1133,7 +1121,7 @@ public:
   void edge_info(Info* edges) const {
     int i = 0;
     Info i1, i2;
-    for (Finite_edges_iterator it = T.edges_begin(); it != T.edges_end(); it++) {
+    for (Edge_iterator it = T.edges_begin(); it != T.edges_end(); it++) {
       i1 = it->first->vertex(T.cw(it->second))->info();
       i2 = it->first->vertex(T.ccw(it->second))->info();
       edges[2*i + 0] = i1;
@@ -1175,7 +1163,7 @@ public:
     double cr;
     int i;
 
-    for (All_faces_iterator it = T.faces_begin(); it != T.faces_end(); it++) {
+    for (Face_iterator it = T.faces_begin(); it != T.faces_end(); it++) {
       p1 = T.point(it->vertex(0));
       // p1 = it->vertex(0)->point();
       cc = T.circumcenter(it);
@@ -1204,7 +1192,7 @@ public:
     double cr;
     int i;
 
-    for (All_faces_iterator it = T.faces_begin(); it != T.faces_end(); it++) {
+    for (Face_iterator it = T.faces_begin(); it != T.faces_end(); it++) {
       p1 = T.point(it->vertex(0));
       // p1 = it->vertex(0)->point();
       cc = T.circumcenter(it);

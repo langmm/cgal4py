@@ -5,8 +5,7 @@ import tools
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
-# from periodic_delaunay3 import is_valid as is_valid_P3
-is_valid_P3 = lambda: False
+from periodic_delaunay3 import is_valid as is_valid_P3
 if is_valid_P2():
     from periodic_delaunay2 import PeriodicDelaunay2
 else:
@@ -14,6 +13,9 @@ else:
                   "Update CGAL to at least version 4.9 to enable this feature.")
 if is_valid_P3():
     from periodic_delaunay3 import PeriodicDelaunay3
+else:
+    warnings.warn("Could not import the 3D periodic triangulation package. "+
+                  "Update CGAL to at least version 3.5 to enable this feature.")
 
 FLAG_DOUBLE_AVAIL = False
 try:
@@ -25,7 +27,8 @@ try:
         from periodic_delaunay3_64bit import PeriodicDelaunay3 as PeriodicDelaunay3_64bit
     FLAG_DOUBLE_AVAIL = True
 except:
-    warnings.warn("Could not import packages using long indices. This feature will be disabled.")
+    warnings.warn("Could not import packages using long indices. "+
+                  "This feature will be disabled.")
 
 
 def Delaunay(pts, use_double=False, periodic=False, 

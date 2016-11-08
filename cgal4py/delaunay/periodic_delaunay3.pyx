@@ -1,7 +1,7 @@
 """
 delaunay3.pyx
 
-Wrapper for CGAL 3D Delaunay Triangulation
+Wrapper for CGAL 3D PeriodicDelaunay Triangulation
 """
 
 import cython
@@ -22,11 +22,9 @@ from cython.operator cimport dereference
 from cython.operator cimport preincrement, predecrement
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
-ctypedef uint64_t info_t
-cdef object np_info = np.uint64
-ctypedef np.uint64_t np_info_t
-
-from cgal4py.delaunay.delaunay3 cimport Delaunay_with_info_3,VALID
+ctypedef uint32_t info_t
+cdef object np_info = np.uint32
+ctypedef np.uint32_t np_info_t
 
 def is_valid():
     if (VALID == 1):
@@ -34,44 +32,56 @@ def is_valid():
     else:
         return False
 
-cdef class Delaunay3_vertex:
+cdef class PeriodicDelaunay3_vertex:
     r"""Wrapper class for a triangulation vertex.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this vertex belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].Vertex`): C++ vertex object 
-            Direct interaction with this object is not recommended. 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this vertex belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].Vertex`): C++ vertex 
+            object. Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].Vertex x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].Vertex x
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     Delaunay_with_info_3[info_t].Vertex x):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     PeriodicDelaunay_with_info_3[info_t].Vertex x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-                that this vertex belongs to. 
-            x (:obj:`Delaunay_with_info_3[info_t].Vertex`): C++ vertex object 
-                Direct interaction with this object is not recommended. 
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+                object that this vertex belongs to. 
+            x (:obj:`PeriodicDelaunay_with_info_3[info_t].Vertex`): C++ vertex 
+                object. Direct interaction with this object is not recommended. 
 
         """
         self.T = T
         self.x = x
 
     def __repr__(self):
-        return "Delaunay3_vertex[{} at {:+7.2e},{:+7.2e},{:+7.2e}]".format(
-            self.index, *list(self.point))
+        return str("PeriodicDelaunay3_vertex[{} at ".format(self.index)+
+                   "{:+7.2e},{:+7.2e},{:+7.2e}]".format(*list(self.point)))
 
-    def __richcmp__(Delaunay3_vertex self, Delaunay3_vertex solf, int op):
+    def __richcmp__(PeriodicDelaunay3_vertex self, 
+                    PeriodicDelaunay3_vertex solf, int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
         elif (op == 3):
             return <pybool>(self.x != solf.x)
         else:
             raise NotImplementedError
+
+    property is_unique:
+        r""":obj:`bool`: True if the vertex is the unique unwrapped version."""
+        def __get__(self):
+            return <pybool>self.T.is_unique(self.x)
+
+    property has_offset:
+        r""":obj:`bool`: True if the vertex has a periodic offset (not including 
+        any cell offset. False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.has_offset(self.x)
 
     def is_infinite(self):
         r"""Determine if the vertex is the infinite vertex.
@@ -93,11 +103,12 @@ cdef class Delaunay3_vertex:
         assert(len(pos) == 3)
         self.x.set_point(&pos[0])
 
-    def set_cell(self, Delaunay3_cell c):
+    def set_cell(self, PeriodicDelaunay3_cell c):
         r"""Set the designated cell for this vertex.
 
         Args:
-            c (Delaunay3_cell): Cell that should be set as the designated cell.
+            c (PeriodicDelaunay3_cell): Cell that should be set as the 
+                designated cell.
 
         """
         self.T.updated = <cbool>True
@@ -108,20 +119,31 @@ cdef class Delaunay3_vertex:
         of the vertex."""
         def __get__(self):
             cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
-            if self.is_infinite():
-                out[:] = np.float('inf')
-            else:
-                self.x.point(&out[0])
+            self.T.point(self.x, &out[0])
+            return out
+
+    property periodic_point:
+        r""":obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+        of the vertex, not including the periodic offset."""
+        def __get__(self):
+            cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+            self.T.periodic_point(self.x, &out[0])
+            return out
+
+    property periodic_offset:
+        r""":obj:`ndarray` of :obj:`int`: The number of wrappings applied in 
+        each dimension to create this periodic point."""
+        def __get__(self):
+            cdef np.ndarray[np.int32_t] out = np.zeros(3, 'int32')
+            self.T.periodic_offset(self.x, &out[0])
+            # self.x.offset(&out[0]) # offset only stored on verts during copy 
             return out
 
     property index:
         r"""info_t: The index of the vertex point in the input array."""
         def __get__(self):
             cdef info_t out
-            if self.is_infinite():
-                out = <info_t>np.iinfo(np_info).max
-            else:
-                out = self.x.info()
+            out = self.x.info()
             return out
 
     property dual_volume:
@@ -132,11 +154,11 @@ cdef class Delaunay3_vertex:
             return out
 
     property cell:
-        r"""Delaunay3_cell: Designated cell for this vertex."""
+        r"""PeriodicDelaunay3_cell: Designated cell for this vertex."""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Cell c
+            cdef PeriodicDelaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
-            cdef Delaunay3_cell out = Delaunay3_cell()
+            cdef PeriodicDelaunay3_cell out = PeriodicDelaunay3_cell()
             out.assign(self.T, c)
             return out
 
@@ -144,13 +166,14 @@ cdef class Delaunay3_vertex:
         r"""Find vertices that are adjacent to this vertex.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                vertex.
+            PeriodicDelaunay3_vertex_vector: Iterator over vertices incident to 
+                this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        cdef PeriodicDelaunay3_vertex_vector out
+        out = PeriodicDelaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -158,12 +181,13 @@ cdef class Delaunay3_vertex:
         r"""Find edges that are incident to this vertex.
 
         Returns:
-            Delaunay3_edge_vector: Iterator over edges incident to this vertex.
+            PeriodicDelaunay3_edge_vector: Iterator over edges incident to this 
+                vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Edge] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        cdef PeriodicDelaunay3_edge_vector out = PeriodicDelaunay3_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -171,12 +195,14 @@ cdef class Delaunay3_vertex:
         r"""Find facets that are incident to this vertex.
 
         Returns:
-            Delaunay3_facet_vector: Iterator over facets incident to this vertex.
+            PeriodicDelaunay3_facet_vector: Iterator over facets incident to 
+                this vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Facet] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
-        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        cdef PeriodicDelaunay3_facet_vector out 
+        out = PeriodicDelaunay3_facet_vector()
         out.assign(self.T, it)
         return out
 
@@ -184,44 +210,47 @@ cdef class Delaunay3_vertex:
         r"""Find cells that are incident to this vertex.
 
         Returns:
-            Delaunay3_cell_vector: Iterator over cells incident to this vertex.
+            PeriodicDelaunay3_cell_vector: Iterator over cells incident to this 
+                vertex.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Cell] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        cdef PeriodicDelaunay3_cell_vector out = PeriodicDelaunay3_cell_vector()
         out.assign(self.T, it)
         return out
 
 
-cdef class Delaunay3_vertex_iter:
+cdef class PeriodicDelaunay3_vertex_iter:
     r"""Wrapper class for a triangulation vertex iterator.
 
     Args:
-        T (Delaunay3): Triangulation that this vertex belongs to.
+        T (PeriodicDelaunay3): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include: 
                 'all_begin': The first vertex in an iteration over all vertices.  
                 'all_end': The last vertex in an iteration over all vertices. 
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this vertex belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].All_verts_iter`): C++ vertex 
-            object. Direct interaction with this object is not recommended. 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this vertex belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].All_verts_iter`): C++ 
+           vertex object. Direct interaction with this object is not 
+           recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].All_verts_iter x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].All_verts_iter x
 
-    def __cinit__(self, Delaunay3 T, str vert = None):
+    def __cinit__(self, PeriodicDelaunay3 T, str vert = None):
         self.T = T.T
         if vert == 'all_begin':
             self.x = self.T.all_verts_begin()
         elif vert == 'all_end':
             self.x = self.T.all_verts_end()
 
-    def __richcmp__(Delaunay3_vertex_iter self, Delaunay3_vertex_iter solf, 
+    def __richcmp__(PeriodicDelaunay3_vertex_iter self, 
+                    PeriodicDelaunay3_vertex_iter solf, 
                     int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -248,35 +277,39 @@ cdef class Delaunay3_vertex_iter:
         predecrement(self.x)
 
     property vertex:
-        r"""Delaunay3_vertex: Corresponding vertex object."""
+        r"""PeriodicDelaunay3_vertex: Corresponding vertex object."""
         def __get__(self):
-            cdef Delaunay3_vertex out = Delaunay3_vertex()
-            out.assign(self.T, Delaunay_with_info_3[info_t].Vertex(self.x)) 
+            cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
+            
+            out.assign(self.T, 
+                       PeriodicDelaunay_with_info_3[info_t].Vertex(self.x)) 
             return out
 
 
-cdef class Delaunay3_vertex_range:
+cdef class PeriodicDelaunay3_vertex_range:
     r"""Wrapper class for iterating over a range of triangulation vertices
 
     Args:
-        xstart (Delaunay3_vertex_iter): The starting vertex.  
-        xstop (Delaunay3_vertex_iter): Final vertex that will end the iteration. 
+        xstart (PeriodicDelaunay3_vertex_iter): The starting vertex.  
+        xstop (PeriodicDelaunay3_vertex_iter): Final vertex that will end the 
+            iteration. 
         finite (:obj:`bool`, optional): If True, only finite verts are 
             iterated over. Otherwise, all verts are iterated over. Defaults 
             False.
 
     Attributes:
-        x (Delaunay3_vertex_iter): The current vertex. 
-        xstop (Delaunay3_vertex_iter): Final vertex that will end the iteration. 
+        x (PeriodicDelaunay3_vertex_iter): The current vertex. 
+        xstop (PeriodicDelaunay3_vertex_iter): Final vertex that will end the 
+            iteration. 
         finite (bool): If True, only finite verts are iterater over. Otherwise
             all verts are iterated over. 
 
     """
-    cdef Delaunay3_vertex_iter x
-    cdef Delaunay3_vertex_iter xstop
+    cdef PeriodicDelaunay3_vertex_iter x
+    cdef PeriodicDelaunay3_vertex_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay3_vertex_iter xstart, 
-                  Delaunay3_vertex_iter xstop,
+    def __cinit__(self, PeriodicDelaunay3_vertex_iter xstart, 
+                  PeriodicDelaunay3_vertex_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -286,7 +319,7 @@ cdef class Delaunay3_vertex_range:
         return self
 
     def __next__(self):
-        cdef Delaunay3_vertex out
+        cdef PeriodicDelaunay3_vertex out
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
@@ -297,32 +330,32 @@ cdef class Delaunay3_vertex_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay3_vertex_vector:
+cdef class PeriodicDelaunay3_vertex_vector:
     r"""Wrapper class for a vector of vertices.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-            Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[info_t].Vertex]`): Vector of C++ 
-            vertices.
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+            object. Direct interaction with this object is not recommended.
+        v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Vertex]`): Vector 
+            of C++ vertices.
         n (int): The number of vertices in the vector.
         i (int): The index of the currect vertex.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef vector[Delaunay_with_info_3[info_t].Vertex] v
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef vector[PeriodicDelaunay_with_info_3[info_t].Vertex] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     vector[Delaunay_with_info_3[info_t].Vertex] v):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     vector[PeriodicDelaunay_with_info_3[info_t].Vertex] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-                Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[info_t].Vertex]`): Vector of 
-                C++ vertices.
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+                object. Direct interaction with this object is not recommended.
+            v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Vertex]`): 
+                Vector of C++ vertices.
 
         """
         self.T = T
@@ -334,9 +367,9 @@ cdef class Delaunay3_vertex_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay3_vertex out
+        cdef PeriodicDelaunay3_vertex out
         if self.i < self.n:
-            out = Delaunay3_vertex()
+            out = PeriodicDelaunay3_vertex()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -344,74 +377,93 @@ cdef class Delaunay3_vertex_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay3_vertex out
+        cdef PeriodicDelaunay3_vertex out
         if isinstance(i, int):
-            out = Delaunay3_vertex()
+            out = PeriodicDelaunay3_vertex()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay3_vertex_vector indices must be itegers, "+
-                            "not {}".format(type(i)))
+            raise TypeError("PeriodicDelaunay3_vertex_vector indices must be "+
+                            "integers, not {}".format(type(i)))
 
 
-cdef class Delaunay3_edge:
+cdef class PeriodicDelaunay3_edge:
     r"""Wrapper class for a triangulation edge.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation object 
             that this edge belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].Edge`): C++ edge object 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].Edge`): C++ edge object 
             Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].Edge x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].Edge x
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     Delaunay_with_info_3[info_t].Edge x):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     PeriodicDelaunay_with_info_3[info_t].Edge x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-                that this edge belongs to. 
-            x (:obj:`Delaunay_with_info_3[info_t].Edge`): C++ edge object 
-                Direct interaction with this object is not recommended. 
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+                object that this edge belongs to. 
+            x (:obj:`PeriodicDelaunay_with_info_3[info_t].Edge`): C++ edge 
+                object. Direct interaction with this object is not recommended. 
 
         """
         self.T = T
         self.x = x
 
     @staticmethod
-    def from_cell(Delaunay3_cell c, int i, int j):
+    def from_cell(PeriodicDelaunay3_cell c, int i, int j):
         r"""Construct an edges from a cell and indices of the two vertices 
         in the cell that are incident to the edge.
 
         Args:
-            c (Delaunay3_cell): Cell 
+            c (PeriodicDelaunay3_cell): Cell 
             i (int): Index of one vertex in c, incident to the edge.
             j (int): Index of second vertex in c, incident to the edge.
 
         Returns:
-            Delaunay3_edge: Edge incident to c and vertices i & j of cell c.
+            PeriodicDelaunay3_edge: Edge incident to c and vertices i & j of 
+                cell c.
 
         """
-        cdef Delaunay3_edge out = Delaunay3_edge()
-        cdef Delaunay_with_info_3[info_t].Edge e
-        e = Delaunay_with_info_3[info_t].Edge(c.x, i, j)
+        cdef PeriodicDelaunay3_edge out = PeriodicDelaunay3_edge()
+        cdef PeriodicDelaunay_with_info_3[info_t].Edge e
+        e = PeriodicDelaunay_with_info_3[info_t].Edge(c.x, i, j)
         out.assign(c.T, e)
         return out
 
     def __repr__(self):
-        return "Delaunay3_edge[{},{}]".format(repr(self.vertex1),
+        return "PeriodicDelaunay3_edge[{},{}]".format(repr(self.vertex1),
                                               repr(self.vertex2))
 
-    def __richcmp__(Delaunay3_edge self, Delaunay3_edge solf, int op):
+    def __richcmp__(PeriodicDelaunay3_edge self, PeriodicDelaunay3_edge solf, 
+                    int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
         elif (op == 3):
             return <pybool>(self.x != solf.x)
         else:
             raise NotImplementedError
+
+    property is_unique:
+        r""":obj:`bool`: True if the edge is the unique unwrapped version."""
+        def __get__(self):
+            return <pybool>self.T.is_unique(self.x)
+
+    property has_offset:
+        r""":obj:`bool`: True if any of the incident vertices has a periodic
+        offset (not including any cell offset. False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.has_offset(self.x)
+
+    property spans_wrap:
+        r""":obj:`bool`: True if the incident vertices span the first and 
+        last sheet in one dimension. False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.spans_wrap(self.x)
 
     def is_infinite(self):
         r"""Determine if the edge is incident to the infinite vertex.
@@ -425,22 +477,23 @@ cdef class Delaunay3_edge:
 
     def is_Gabriel(self):
         r"""Determines if the edge is Gabriel (does not contain any other 
-            vertices in it's smallest circumsphere).
+            vertices in it's smallest circumsphere). 
 
-        Returns:
-            bool: True if the edge is Gabriel, False otherwise.
+        Returns: 
+            bool: True if the edge is Gabriel, False otherwise. 
 
         """
         return <pybool>self.T.is_Gabriel(self.x)
 
-    def is_equivalent(self, Delaunay3_edge solf):
+    def is_equivalent(self, PeriodicDelaunay3_edge solf):
         r"""Determine if another edge has the same vertices as this edge.
 
         Args:
-            solf (Delaunay3_edge): Edge for comparison.
+            solf (PeriodicDelaunay3_edge): Edge for comparison.
 
         Returns:
-            bool: True if the two edges share the same vertices, False otherwise.
+            bool: True if the two edges share the same vertices, False 
+                otherwise.
 
         """
         return <pybool>self.T.are_equal(self.x, solf.x)
@@ -452,37 +505,85 @@ cdef class Delaunay3_edge:
             i (int): Index of vertex to return.
 
         Returns:
-            Delaunay3_vertex: ith vertex on this edge.
+            PeriodicDelaunay3_vertex: ith vertex on this edge.
 
         """
-        cdef Delaunay_with_info_3[info_t].Vertex x
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex x
         x = self.x.vertex(i)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, x)
         return out
 
+    def point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        edge including the periodic offsets.
+
+        Args: 
+            i (int): Index of vertex incident to this edge.
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.point(self.x, i, &out[0])
+        return out
+
+    def periodic_point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        edge, not including the periodic offset. 
+
+        Args: 
+            i (int): Index of vertex incident to this edge. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.periodic_point(self.x, i, &out[0])
+        return out
+
+    def periodic_offset(self, int i):
+        r"""Return the number of wrappings in (x,y,z) applied to the ith vertex 
+        of this edge. 
+
+        Args: 
+            i (int): Index of vertex incident to this edge. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`int32`: The number of wrappings in (x,y,z) 
+                applied to the vertex. 
+
+        """
+        cdef np.ndarray[np.int32_t] out = np.zeros(3, 'int32')
+        self.T.periodic_offset(self.x, i, &out[0])
+        return out
+
     property vertex1:
-        r"""Delaunay3_vertex: The first vertex in the edge."""
+        r"""PeriodicDelaunay3_vertex: The first vertex in the edge."""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Vertex x = self.x.v1()
-            cdef Delaunay3_vertex out = Delaunay3_vertex()
+            cdef PeriodicDelaunay_with_info_3[info_t].Vertex x = self.x.v1()
+            cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
             out.assign(self.T, x)
             return out
 
     property vertex2:
-        r"""Delaunay3_vertex: The second vertex in the edge."""
+        r"""PeriodicDelaunay3_vertex: The second vertex in the edge."""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Vertex x = self.x.v2()
-            cdef Delaunay3_vertex out = Delaunay3_vertex()
+            cdef PeriodicDelaunay_with_info_3[info_t].Vertex x = self.x.v2()
+            cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
             out.assign(self.T, x)
             return out
 
     property cell:
-        r"""Delaunay3_cell: The cell this edge is assigned to."""
+        r"""PeriodicDelaunay3_cell: The cell this edge is assigned to."""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Cell c
+            cdef PeriodicDelaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
-            cdef Delaunay3_cell out = Delaunay3_cell()
+            cdef PeriodicDelaunay3_cell out = PeriodicDelaunay3_cell()
             out.assign(self.T, c)
             return out
 
@@ -502,7 +603,7 @@ cdef class Delaunay3_edge:
             if self.is_infinite():
                 return np.float('inf')*np.ones(3, 'float64')
             else:
-                return (self.vertex1.point + self.vertex2.point)/2.0
+                return (self.point(0) + self.point(1))/2.0
 
     property midpoint:
         r""":obj:`ndarray` of float64: x,y,z coordinates of edge midpoint."""
@@ -519,13 +620,14 @@ cdef class Delaunay3_edge:
         r"""Find vertices that are incident to this edge.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                edge.
+            PeriodicDelaunay3_vertex_vector: Iterator over vertices incident to 
+                this edge.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        cdef PeriodicDelaunay3_vertex_vector out
+        out = PeriodicDelaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -533,12 +635,13 @@ cdef class Delaunay3_edge:
         r"""Find edges that are incident to this edge.
 
         Returns:
-            Delaunay3_edge_vector: Iterator over edges incident to this edge. 
+            PeriodicDelaunay3_edge_vector: Iterator over edges incident to this 
+                edge. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Edge] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        cdef PeriodicDelaunay3_edge_vector out = PeriodicDelaunay3_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -546,12 +649,14 @@ cdef class Delaunay3_edge:
         r"""Find facets that are incident to this edge.
 
         Returns:
-            Delaunay3_facet_vector: Iterator over facets incident to this edge. 
+            PeriodicDelaunay3_facet_vector: Iterator over facets incident to 
+                this edge. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Facet] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
-        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        cdef PeriodicDelaunay3_facet_vector out
+        out = PeriodicDelaunay3_facet_vector()
         out.assign(self.T, it)
         return out
 
@@ -559,79 +664,46 @@ cdef class Delaunay3_edge:
         r"""Find cells that are incident to this edge.
 
         Returns:
-            Delaunay3_cell_vector: Iterator over cells incident to this edge.
+            PeriodicDelaunay3_cell_vector: Iterator over cells incident to this 
+                edge.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Cell] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        cdef PeriodicDelaunay3_cell_vector out = PeriodicDelaunay3_cell_vector()
         out.assign(self.T, it)
         return out
 
-    def side(self, np.ndarray[np.float64_t, ndim=1] p):
-        r"""Determine if a point is inside, outside or on this edge.
 
-        Args:
-            p (np.ndarray of float64): x,y,z coordinates.
-
-        Returns:
-            int: -1 if p is inside this edge, 0 if p is one of this edge's 
-                vertices, and 1 if p is outside this edge.
-
-        """
-        cdef int lt, li
-        lt = li = 999
-        return self.T.side_of_edge(&p[0], self.x, lt, li)
-
-    def flip(self):
-        r"""Flip this edge to the other diagonal of the quadrilateral formed by
-        the two cells incident to this edge after first testing that the edge 
-        can be flipped.
-
-        Returns:
-            bool: True if the edge could be flipped, False otherwise. 
-
-        """
-        self.T.updated = <cbool>True
-        return self.T.flip(self.x)
-
-    def flip_flippable(self):
-        r"""Flip this edge to the other diagonal of the quadrilateral formed by
-        the two cells incident to this edge. The edge is assumed flippable to
-        save time.
-        """
-        self.T.updated = <cbool>True
-        self.T.flip_flippable(self.x)
-
-
-cdef class Delaunay3_edge_iter:
+cdef class PeriodicDelaunay3_edge_iter:
     r"""Wrapper class for a triangulation edge iterator.
 
     Args:
-        T (Delaunay3): Triangulation that this edge belongs to.
+        T (PeriodicDelaunay3): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include: 
                 'all_begin': The first edge in an iteration over all edges.
                 'all_end': The last edge in an iteration over all edges.
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this edge belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].All_edges_iter`): C++ edge  
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this edge belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].All_edges_iter`): C++ edge  
             object. Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].All_edges_iter x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].All_edges_iter x
 
-    def __cinit__(self, Delaunay3 T, str edge = None):
+    def __cinit__(self, PeriodicDelaunay3 T, str edge = None):
         self.T = T.T
         if edge == 'all_begin':
             self.x = self.T.all_edges_begin()
         elif edge == 'all_end':
             self.x = self.T.all_edges_end()
 
-    def __richcmp__(Delaunay3_edge_iter self, Delaunay3_edge_iter solf, 
+    def __richcmp__(PeriodicDelaunay3_edge_iter self, 
+                    PeriodicDelaunay3_edge_iter solf, 
                     int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -659,35 +731,38 @@ cdef class Delaunay3_edge_iter:
         predecrement(self.x)
 
     property edge:
-        r"""Delaunay3_edge: Corresponding edge object."""
+        r"""PeriodicDelaunay3_edge: Corresponding edge object."""
         def __get__(self):
-            cdef Delaunay3_edge out = Delaunay3_edge()
-            out.assign(self.T, Delaunay_with_info_3[info_t].Edge(self.x))
+            cdef PeriodicDelaunay3_edge out = PeriodicDelaunay3_edge()
+            out.assign(self.T, 
+                       PeriodicDelaunay_with_info_3[info_t].Edge(self.x))
             return out
 
 
-cdef class Delaunay3_edge_range:
+cdef class PeriodicDelaunay3_edge_range:
     r"""Wrapper class for iterating over a range of triangulation edges.
 
     Args:
-        xstart (Delaunay3_edge_iter): The starting edge.  
-        xstop (Delaunay3_edge_iter): Final edge that will end the iteration. 
+        xstart (PeriodicDelaunay3_edge_iter): The starting edge.  
+        xstop (PeriodicDelaunay3_edge_iter): Final edge that will end the 
+            iteration. 
         finite (:obj:`bool`, optional): If True, only finite edges are 
             iterated over. Otherwise, all edges are iterated over. Defaults 
             False.
 
     Attributes:
-        x (Delaunay3_edge_iter): The currentedge. 
-        xstop (Delaunay3_edge_iter): Final edge that will end the iteration. 
+        x (PeriodicDelaunay3_edge_iter): The currentedge. 
+        xstop (PeriodicDelaunay3_edge_iter): Final edge that will end the 
+            iteration. 
         finite (bool): If True, only finite edges are iterater over. Otherwise
             all edges are iterated over. 
 
     """
-    cdef Delaunay3_edge_iter x
-    cdef Delaunay3_edge_iter xstop
+    cdef PeriodicDelaunay3_edge_iter x
+    cdef PeriodicDelaunay3_edge_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay3_edge_iter xstart, 
-                  Delaunay3_edge_iter xstop,
+    def __cinit__(self, PeriodicDelaunay3_edge_iter xstart, 
+                  PeriodicDelaunay3_edge_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -700,7 +775,7 @@ cdef class Delaunay3_edge_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_edge out
+        cdef PeriodicDelaunay3_edge out
         if self.x != self.xstop:
             out = self.x.edge
             self.x.increment()
@@ -708,32 +783,32 @@ cdef class Delaunay3_edge_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay3_edge_vector:
+cdef class PeriodicDelaunay3_edge_vector:
     r"""Wrapper class for a vector of edges.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-            Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[info_t].Edge]`): Vector of C++ 
-            edges.
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+            object. Direct interaction with this object is not recommended.
+        v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Edge]`): Vector of 
+            C++ edges.
         n (int): The number of edges in the vector.
         i (int): The index of the currect edge.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef vector[Delaunay_with_info_3[info_t].Edge] v
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef vector[PeriodicDelaunay_with_info_3[info_t].Edge] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     vector[Delaunay_with_info_3[info_t].Edge] v):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     vector[PeriodicDelaunay_with_info_3[info_t].Edge] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-                Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[info_t].Edge]`): Vector of 
-                C++ edges.
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+                object. Direct interaction with this object is not recommended.
+            v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Edge]`): Vector 
+                of C++ edges.
 
         """
         self.T = T
@@ -745,9 +820,9 @@ cdef class Delaunay3_edge_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay3_edge out
+        cdef PeriodicDelaunay3_edge out
         if self.i < self.n:
-            out = Delaunay3_edge()
+            out = PeriodicDelaunay3_edge()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -755,74 +830,87 @@ cdef class Delaunay3_edge_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay3_edge out
+        cdef PeriodicDelaunay3_edge out
         if isinstance(i, int):
-            out = Delaunay3_edge()
+            out = PeriodicDelaunay3_edge()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay3_edge_vector indices must be itegers, "+
-                            "not {}".format(type(i)))
+            raise TypeError("PeriodicDelaunay3_edge_vector indices must be "+
+                            "integers, not {}".format(type(i)))
 
 
-cdef class Delaunay3_facet:
+cdef class PeriodicDelaunay3_facet:
     r"""Wrapper class for a triangulation facet.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this facet belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].Facet`): C++ facet object 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this facet belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].Facet`): C++ facet object 
             Direct interaction with this object is not recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].Facet x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].Facet x
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     Delaunay_with_info_3[info_t].Facet x):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     PeriodicDelaunay_with_info_3[info_t].Facet x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-                that this facet belongs to. 
-            x (:obj:`Delaunay_with_info_3[info_t].Facet`): C++ facet object 
-                Direct interaction with this object is not recommended. 
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+                object that this facet belongs to. 
+            x (:obj:`PeriodicDelaunay_with_info_3[info_t].Facet`): C++ facet 
+                object Direct interaction with this object is not recommended. 
 
         """
         self.T = T
         self.x = x
 
     @staticmethod
-    def from_cell(Delaunay3_cell c, int i):
+    def from_cell(PeriodicDelaunay3_cell c, int i):
         r"""Construct a facet from a cell and index of the vertex in the cell 
         opposite the desired facet.
 
         Args:
-            c (Delaunay3_cell): Cell 
+            c (PeriodicDelaunay3_cell): Cell 
             i (int): Index of vertex in c that is opposite the facet.
 
         Returns:
-            Delaunay3_facet: Facet incident to c and opposite vertex i in c.
+            PeriodicDelaunay3_facet: Facet incident to c and opposite vertex i 
+                in c.
 
         """
-        cdef Delaunay3_facet out = Delaunay3_facet()
-        cdef Delaunay_with_info_3[info_t].Facet e
-        e = Delaunay_with_info_3[info_t].Facet(c.x, i)
+        cdef PeriodicDelaunay3_facet out = PeriodicDelaunay3_facet()
+        cdef PeriodicDelaunay_with_info_3[info_t].Facet e
+        e = PeriodicDelaunay_with_info_3[info_t].Facet(c.x, i)
         out.assign(c.T, e)
         return out
 
     def __repr__(self):
-        return "Delaunay3_facet[{},{},{}]".format(repr(self.vertex(0)),
+        return "PeriodicDelaunay3_facet[{},{},{}]".format(repr(self.vertex(0)),
                                                   repr(self.vertex(1)),
                                                   repr(self.vertex(2)))
 
-    def __richcmp__(Delaunay3_facet self, Delaunay3_facet solf, int op):
+    def __richcmp__(PeriodicDelaunay3_facet self, PeriodicDelaunay3_facet solf, 
+                    int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
         elif (op == 3):
             return <pybool>(self.x != solf.x)
         else:
             raise NotImplementedError
+
+    property is_unique:
+        r""":obj:`bool`: True if the facet is the unique unwrapped version."""
+        def __get__(self):
+            return <pybool>self.T.is_unique(self.x)
+
+    property has_offset:
+        r""":obj:`bool`: True if any of the incident vertices has a periodic 
+        offset (not including any cell offset). False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.has_offset(self.x)
 
     def is_infinite(self):
         r"""Determine if the facet is incident to the infinite vertex.
@@ -836,19 +924,19 @@ cdef class Delaunay3_facet:
 
     def is_Gabriel(self):
         r"""Determines if the facet is Gabriel (does not contain any other 
-            vertices in it's smallest circumsphere).
+            vertices in it's smallest circumsphere). 
 
-        Returns:
-            bool: True if the facet is Gabriel, False otherwise.
+        Returns: 
+            bool: True if the facet is Gabriel, False otherwise. 
 
         """
         return <pybool>self.T.is_Gabriel(self.x)
 
-    def is_equivalent(self, Delaunay3_facet solf):
+    def is_equivalent(self, PeriodicDelaunay3_facet solf):
         r"""Determine if another facet has the same vertices as this facet.
 
         Args:
-            solf (Delaunay3_facet): Facet for comparison.
+            solf (PeriodicDelaunay3_facet): Facet for comparison.
 
         Returns:
             bool: True if the two facets share the same vertices, False 
@@ -857,22 +945,6 @@ cdef class Delaunay3_facet:
         """
         return <pybool>self.T.are_equal(self.x, solf.x)
 
-    def vertex(self, int i):
-        r"""Get the ith vertex incident to this facet.
-
-        Args:
-            i (int): Index of vertex that should be returned.
-
-        Returns:
-            Delaunay_vertex: ith vertex of this facet.
-
-        """
-        cdef Delaunay_with_info_3[info_t].Vertex v
-        v = self.x.vertex(i)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
-        out.assign(self.T, v)
-        return out
-
     def edge(self, int i):
         r"""Get the edge opposite the ith vertex incident to this facet.
 
@@ -880,13 +952,77 @@ cdef class Delaunay3_facet:
             i (int): Index of the edge that should be returned.
         
         Returns:
-            Delaunay3_edge: Edge opposite the ith vertex of this facet.
+            PeriodicDelaunay3_edge: Edge opposite the ith vertex of this facet.
 
         """
-        cdef Delaunay_with_info_3[info_t].Edge e
+        cdef PeriodicDelaunay_with_info_3[info_t].Edge e
         e = self.x.edge(i)
-        cdef Delaunay3_edge out = Delaunay3_edge()
+        cdef PeriodicDelaunay3_edge out = PeriodicDelaunay3_edge()
         out.assign(self.T, e)
+        return out
+
+    def vertex(self, int i):
+        r"""Get the ith vertex incident to this facet.
+
+        Args:
+            i (int): Index of vertex that should be returned.
+
+        Returns:
+            PeriodicDelaunay_vertex: ith vertex of this facet.
+
+        """
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
+        v = self.x.vertex(i)
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
+        out.assign(self.T, v)
+        return out
+
+    def point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        facet including the periodic offsets.
+
+        Args: 
+            i (int): Index of vertex incident to this facet.
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.point(self.x, i, &out[0])
+        return out
+
+    def periodic_point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        facet, not including the periodic offset. 
+
+        Args: 
+            i (int): Index of vertex incident to this facet. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.periodic_point(self.x, i, &out[0])
+        return out
+
+    def periodic_offset(self, int i):
+        r"""Return the number of wrappings in (x,y,z) applied to the ith vertex 
+        of this facet. 
+
+        Args: 
+            i (int): Index of vertex incident to this facet. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`int32`: The number of wrappings in (x,y,z) 
+                applied to the vertex. 
+
+        """
+        cdef np.ndarray[np.int32_t] out = np.zeros(3, 'int32')
+        self.T.periodic_offset(self.x, i, &out[0])
         return out
 
     property center:
@@ -895,9 +1031,9 @@ cdef class Delaunay3_facet:
             if self.is_infinite():
                 return np.float('inf')*np.ones(3, 'float64')
             else:
-                return (self.vertex(0).point + \
-                        self.vertex(1).point + \
-                        self.vertex(2).point)/3.0
+                return (self.point(0) + \
+                        self.point(1) + \
+                        self.point(2))/3.0
                         
     property area:
         r"""float64: The area of the facet. If infinite, -1 is returned"""
@@ -906,11 +1042,11 @@ cdef class Delaunay3_facet:
             # return -1
 
     property cell:
-        r"""Delaunay3_cell: The cell this facet is assigned to."""
+        r"""PeriodicDelaunay3_cell: The cell this facet is assigned to."""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Cell c
+            cdef PeriodicDelaunay_with_info_3[info_t].Cell c
             c = self.x.cell()
-            cdef Delaunay3_cell out = Delaunay3_cell()
+            cdef PeriodicDelaunay3_cell out = PeriodicDelaunay3_cell()
             out.assign(self.T, c)
             return out
 
@@ -920,12 +1056,12 @@ cdef class Delaunay3_facet:
             return self.x.ind()
 
     property mirror:
-        r"""Delaunay3_facet: The same facet as this one, but referenced from its 
-        other incident cell"""
+        r"""PeriodicDelaunay3_facet: The same facet as this one, but referenced 
+        from its other incident cell"""
         def __get__(self):
-            cdef Delaunay_with_info_3[info_t].Facet ec
+            cdef PeriodicDelaunay_with_info_3[info_t].Facet ec
             ec = self.T.mirror_facet(self.x)
-            cdef Delaunay3_facet out = Delaunay3_facet()
+            cdef PeriodicDelaunay3_facet out = PeriodicDelaunay3_facet()
             out.assign(self.T, ec)
             return out
 
@@ -933,13 +1069,14 @@ cdef class Delaunay3_facet:
         r"""Find vertices that are incident to this facet.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                facet.
+            PeriodicDelaunay3_vertex_vector: Iterator over vertices incident to 
+                this facet.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        cdef PeriodicDelaunay3_vertex_vector out
+        out = PeriodicDelaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -947,12 +1084,13 @@ cdef class Delaunay3_facet:
         r"""Find edges that are incident to this facet.
 
         Returns:
-            Delaunay3_edge_vector: Iterator over edges incident to this facet. 
+            PeriodicDelaunay3_edge_vector: Iterator over edges incident to this 
+                facet. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Edge] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        cdef PeriodicDelaunay3_edge_vector out = PeriodicDelaunay3_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -960,12 +1098,14 @@ cdef class Delaunay3_facet:
         r"""Find facets that are incident to this facet.
 
         Returns:
-            Delaunay3_facet_vector: Iterator over facets incident to this facet. 
+            PeriodicDelaunay3_facet_vector: Iterator over facets incident to 
+                this facet. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Facet] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
-        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        cdef PeriodicDelaunay3_facet_vector out
+        out = PeriodicDelaunay3_facet_vector()
         out.assign(self.T, it)
         return out
 
@@ -973,29 +1113,15 @@ cdef class Delaunay3_facet:
         r"""Find cells that are incident to this facet.
 
         Returns:
-            Delaunay3_cell_vector: Iterator over cells incident to this facet.
+            PeriodicDelaunay3_cell_vector: Iterator over cells incident to this 
+                facet.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Cell] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        cdef PeriodicDelaunay3_cell_vector out = PeriodicDelaunay3_cell_vector()
         out.assign(self.T, it)
         return out
-
-    def side(self, np.ndarray[np.float64_t, ndim=1] p):
-        r"""Determine if a point is inside, outside or on this facet.
-
-        Args:
-            p (np.ndarray of float64): x,y,z coordinates.
-
-        Returns:
-            int: -1 if p is inside this facet, 0 if p is on one of this facet's 
-                vertices or edges, and 1 if p is outside this facet.
-
-        """
-        cdef int lt, li, lj
-        lt = li = lj = 999
-        return self.T.side_of_facet(&p[0], self.x, lt, li, lj)
 
     # Currently segfaults inside CGAL function
     # def side_of_circle(self, np.ndarray[np.float64_t, ndim=1] pos):
@@ -1012,55 +1138,37 @@ cdef class Delaunay3_facet:
     #     """
     #     return self.T.side_of_circle(self.x, &pos[0])
 
-    def flip(self):
-        r"""Flip this facet to the other diagonal of the quadrilateral formed by
-        the two cells incident to this facet after first testing that the facet 
-        can be flipped.
 
-        Returns:
-            bool: True if the facet could be flipped, False otherwise. 
-
-        """
-        self.T.updated = <cbool>True
-        return self.T.flip(self.x)
-
-    def flip_flippable(self):
-        r"""Flip this facet to the other diagonal of the quadrilateral formed by
-        the two cells incident to this facet. The facet is assumed flippable to
-        save time.
-        """
-        self.T.updated = <cbool>True
-        self.T.flip_flippable(self.x)
-
-
-cdef class Delaunay3_facet_iter:
+cdef class PeriodicDelaunay3_facet_iter:
     r"""Wrapper class for a triangulation facet iterator.
 
     Args:
-        T (Delaunay3): Triangulation that this facet belongs to.
+        T (PeriodicDelaunay3): Triangulation that this facet belongs to.
         facet (:obj:`str`, optional): String specifying the facet that 
             should be referenced. Valid options include: 
                 'all_begin': The first facet in an iteration over all facets.
                 'all_end': The last facet in an iteration over all facets.
  
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this facet belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].All_facets_iter`): C++ facet  
-            object. Direct interaction with this object is not recommended. 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this facet belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].All_facets_iter`): C++ 
+            facet object. Direct interaction with this object is not 
+            recommended. 
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].All_facets_iter x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].All_facets_iter x
 
-    def __cinit__(self, Delaunay3 T, str facet = None):
+    def __cinit__(self, PeriodicDelaunay3 T, str facet = None):
         self.T = T.T
         if facet == 'all_begin':
             self.x = self.T.all_facets_begin()
         elif facet == 'all_end':
             self.x = self.T.all_facets_end()
 
-    def __richcmp__(Delaunay3_facet_iter self, Delaunay3_facet_iter solf, 
+    def __richcmp__(PeriodicDelaunay3_facet_iter self, 
+                    PeriodicDelaunay3_facet_iter solf, 
                     int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
@@ -1088,35 +1196,38 @@ cdef class Delaunay3_facet_iter:
         predecrement(self.x)
 
     property facet:
-        r"""Delaunay3_facet: Corresponding facet object."""
+        r"""PeriodicDelaunay3_facet: Corresponding facet object."""
         def __get__(self):
-            cdef Delaunay3_facet out = Delaunay3_facet()
-            out.assign(self.T, Delaunay_with_info_3[info_t].Facet(self.x))
+            cdef PeriodicDelaunay3_facet out = PeriodicDelaunay3_facet()
+            out.assign(self.T, 
+                       PeriodicDelaunay_with_info_3[info_t].Facet(self.x))
             return out
 
 
-cdef class Delaunay3_facet_range:
+cdef class PeriodicDelaunay3_facet_range:
     r"""Wrapper class for iterating over a range of triangulation facets.
 
     Args:
-        xstart (Delaunay3_facet_iter): The starting facet.  
-        xstop (Delaunay3_facet_iter): Final facet that will end the iteration. 
+        xstart (PeriodicDelaunay3_facet_iter): The starting facet.  
+        xstop (PeriodicDelaunay3_facet_iter): Final facet that will end the 
+            iteration. 
         finite (:obj:`bool`, optional): If True, only finite facets are 
             iterated over. Otherwise, all facets are iterated over. Defaults 
             False.
 
     Attributes:
-        x (Delaunay3_facet_iter): The currentfacet. 
-        xstop (Delaunay3_facet_iter): Final facet that will end the iteration. 
+        x (PeriodicDelaunay3_facet_iter): The currentfacet. 
+        xstop (PeriodicDelaunay3_facet_iter): Final facet that will end the 
+            iteration. 
         finite (bool): If True, only finite facets are iterater over. Otherwise
             all facets are iterated over. 
 
     """
-    cdef Delaunay3_facet_iter x
-    cdef Delaunay3_facet_iter xstop
+    cdef PeriodicDelaunay3_facet_iter x
+    cdef PeriodicDelaunay3_facet_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay3_facet_iter xstart, 
-                  Delaunay3_facet_iter xstop,
+    def __cinit__(self, PeriodicDelaunay3_facet_iter xstart, 
+                  PeriodicDelaunay3_facet_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -1129,7 +1240,7 @@ cdef class Delaunay3_facet_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_facet out
+        cdef PeriodicDelaunay3_facet out
         if self.x != self.xstop:
             out = self.x.facet
             self.x.increment()
@@ -1137,32 +1248,32 @@ cdef class Delaunay3_facet_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay3_facet_vector:
+cdef class PeriodicDelaunay3_facet_vector:
     r"""Wrapper class for a vector of facets.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-            Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[info_t].Facet]`): Vector of C++ 
-            facets.
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+            object. Direct interaction with this object is not recommended.
+        v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Facet]`): Vector of 
+            C++ facets.
         n (int): The number of facets in the vector.
         i (int): The index of the currect facet.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef vector[Delaunay_with_info_3[info_t].Facet] v
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef vector[PeriodicDelaunay_with_info_3[info_t].Facet] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     vector[Delaunay_with_info_3[info_t].Facet] v):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     vector[PeriodicDelaunay_with_info_3[info_t].Facet] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-                Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[info_t].Facet]`): Vector of 
-                C++ facets.
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+                object. Direct interaction with this object is not recommended.
+            v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Facet]`): 
+                Vector of C++ facets.
 
         """
         self.T = T
@@ -1174,9 +1285,9 @@ cdef class Delaunay3_facet_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay3_facet out
+        cdef PeriodicDelaunay3_facet out
         if self.i < self.n:
-            out = Delaunay3_facet()
+            out = PeriodicDelaunay3_facet()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -1184,56 +1295,73 @@ cdef class Delaunay3_facet_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay3_facet out
+        cdef PeriodicDelaunay3_facet out
         if isinstance(i, int):
-            out = Delaunay3_facet()
+            out = PeriodicDelaunay3_facet()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay3_facet_vector indices must be itegers, "+
-                            "not {}".format(type(i)))
+            raise TypeError("PeriodicDelaunay3_facet_vector indices must be "+
+                            "integers, not {}".format(type(i)))
 
 
-cdef class Delaunay3_cell:
+cdef class PeriodicDelaunay3_cell:
     r"""Wrapper class for a triangulation cell.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this cell belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].Cell`): C++ cell object. 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this cell belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].Cell`): C++ cell object. 
             Direct interaction with this object is not recommended.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].Cell x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].Cell x
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     Delaunay_with_info_3[info_t].Cell x):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     PeriodicDelaunay_with_info_3[info_t].Cell x):
         r"""Assign C++ objects to attributes.
 
             Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-                that this cell belongs to. 
-            x (:obj:`Delaunay_with_info_3[info_t].Cell`): C++ cell object 
-                Direct interaction with this object is not recommended. 
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+                object that this cell belongs to. 
+            x (:obj:`PeriodicDelaunay_with_info_3[info_t].Cell`): C++ cell 
+                object. Direct interaction with this object is not recommended. 
 
         """
         self.T = T
         self.x = x
 
     def __repr__(self):
-        return "Delaunay2_cell[{},{},{},{}]".format(repr(self.vertex(0)),
-                                                    repr(self.vertex(1)),
-                                                    repr(self.vertex(2)),
-                                                    repr(self.vertex(3)))
+        return "PeriodicDelaunay2_cell[{},{},{},{}]".format(
+            repr(self.vertex(0)), repr(self.vertex(1)),
+            repr(self.vertex(2)), repr(self.vertex(3)))
 
-    def __richcmp__(Delaunay3_cell self, Delaunay3_cell solf, int op):
+    def __richcmp__(PeriodicDelaunay3_cell self, PeriodicDelaunay3_cell solf, 
+                    int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
         elif (op == 3):
             return <pybool>(self.x != solf.x)
         else:
             raise NotImplementedError
+
+    property is_unique:
+        r""":obj:`bool`: True if the cell is the unique unwrapped version."""
+        def __get__(self):
+            return <pybool>self.T.is_unique(self.x)
+
+    property has_offset:
+        r""":obj:`bool`: True if any of the incident vertices has a periodic 
+        offset (not including any cell offset). False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.has_offset(self.x)
+
+    property spans_wrap:
+        r""":obj:`bool`: True if the incident vertices span the first and 
+        last sheet in one dimension. False otherwise."""
+        def __get__(self):
+            return <pybool>self.T.spans_wrap(self.x)
 
     def is_infinite(self):
         r"""Determine if the cell is incident to the infinite vertex.
@@ -1268,13 +1396,13 @@ cdef class Delaunay3_cell:
                 mirrored vertex. 
 
         Returns:
-            Delaunay3_vertex: Vertex in the ith neighboring cell of this cell, 
-                that is opposite to this cell. 
+            PeriodicDelaunay3_vertex: Vertex in the ith neighboring cell of this 
+                cell, that is opposite to this cell. 
 
         """
-        cdef Delaunay_with_info_3[info_t].Vertex vc
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex vc
         vc = self.T.mirror_vertex(self.x, i)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, vc)
         return out
 
@@ -1285,13 +1413,13 @@ cdef class Delaunay3_cell:
             i (int): Index of vertex opposite the desired facet.
 
         Returns:
-            Delaunay3_facet: The facet opposite the ith vertex incident to this 
-                cell.
+            PeriodicDelaunay3_facet: The facet opposite the ith vertex incident 
+                to this cell.
 
         """
-        cdef Delaunay_with_info_3[info_t].Facet f
+        cdef PeriodicDelaunay_with_info_3[info_t].Facet f
         f = self.x.facet(i)
-        cdef Delaunay3_facet out = Delaunay3_facet()
+        cdef PeriodicDelaunay3_facet out = PeriodicDelaunay3_facet()
         out.assign(self.T, f)
         return out
 
@@ -1302,20 +1430,69 @@ cdef class Delaunay3_cell:
             i (int): The index of the vertex that should be returned.
 
         Returns:
-            Delaunay3_vertex: The ith vertex incident to this cell. 
+            PeriodicDelaunay3_vertex: The ith vertex incident to this cell. 
 
         """
-        cdef Delaunay_with_info_3[info_t].Vertex v
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
         v = self.x.vertex(i)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
         return out
 
-    def has_vertex(self, Delaunay3_vertex v, pybool return_index = False):
+    def point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        facet including the periodic offsets.
+
+        Args: 
+            i (int): Index of vertex incident to this facet.
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.point(self.x, i, &out[0])
+        return out
+
+    def periodic_point(self, int i):
+        r"""Return the (x, y, z) coordinates of the ith vertex incident to this 
+        facet, not including the periodic offset. 
+
+        Args: 
+            i (int): Index of vertex incident to this facet. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`float64`: The cartesian (x,y,z) coordinates 
+                of the vertex including the periodic offset. 
+
+        """
+        cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+        self.T.periodic_point(self.x, i, &out[0])
+        return out
+
+    def periodic_offset(self, int i):
+        r"""Return the number of wrappings in (x,y,z) applied to the ith vertex 
+        of this facet. 
+
+        Args: 
+            i (int): Index of vertex incident to this facet. 
+
+        Returns: 
+            :obj:`ndarray` of :obj:`int32`: The number of wrappings in (x,y,z) 
+                applied to the vertex. 
+
+        """
+        cdef np.ndarray[np.int32_t] out = np.zeros(3, 'int32')
+        self.T.periodic_offset(self.x, i, &out[0])
+        return out
+
+    def has_vertex(self, PeriodicDelaunay3_vertex v, 
+                   pybool return_index = False):
         r"""Determine if a vertex belongs to this cell.
 
         Args:
-            v (Delaunay3_vertex): Vertex to test ownership for. 
+            v (PeriodicDelaunay3_vertex): Vertex to test ownership for. 
             return_index (:obj:`bool`, optional): If True, the index of the 
                 vertex within the cell is returned in the event that it is a 
                 vertex of the cell. Otherwise, the index is not returned.  
@@ -1335,11 +1512,11 @@ cdef class Delaunay3_cell:
             out = self.x.has_vertex(v.x)
             return <pybool>out
             
-    def ind_vertex(self, Delaunay3_vertex v):
+    def ind_vertex(self, PeriodicDelaunay3_vertex v):
         r"""Determine the index of a vertex within a cell. 
 
         Args: 
-            v (Delaunay3_vertex): Vertex to find index for. 
+            v (PeriodicDelaunay3_vertex): Vertex to find index for. 
 
         Returns: 
             int: Index of vertex within the cell. 
@@ -1354,20 +1531,22 @@ cdef class Delaunay3_cell:
             i (int): The index of the neighboring cell that should be returned. 
 
         Returns: 
-            Delaunay2_cell: The neighboring cell opposite the ith vertex. 
+            PeriodicDelaunay2_cell: The neighboring cell opposite the ith 
+                vertex. 
 
         """
-        cdef Delaunay_with_info_3[info_t].Cell v
+        cdef PeriodicDelaunay_with_info_3[info_t].Cell v
         v = self.x.neighbor(i)
-        cdef Delaunay3_cell out = Delaunay3_cell()
+        cdef PeriodicDelaunay3_cell out = PeriodicDelaunay3_cell()
         out.assign(self.T, v)
         return out
 
-    def has_neighbor(self, Delaunay3_cell v, pybool return_index = False):
+    def has_neighbor(self, PeriodicDelaunay3_cell v, 
+                     pybool return_index = False):
         r"""Determine if a cell is a neighbor to this cell. 
 
         Args: 
-            v (Delaunay3_cell): Cell to test as a neighbor. 
+            v (PeriodicDelaunay3_cell): Cell to test as a neighbor. 
             return_index (:obj:`bool`, optional): If True, the index of the 
                 neighbor within the cell is returned in the event that it is a 
                 neighbor of the cell. Otherwise, the index is not returned. 
@@ -1386,11 +1565,11 @@ cdef class Delaunay3_cell:
         else:
             return <pybool>out
 
-    def ind_neighbor(self, Delaunay3_cell v):
+    def ind_neighbor(self, PeriodicDelaunay3_cell v):
         r"""Determine the index of a neighboring cell. 
 
         Args: 
-            v (Delaunay3_cell): Neighboring cell to find index for. 
+            v (PeriodicDelaunay3_cell): Neighboring cell to find index for. 
 
         Returns: 
             int: Index of vertex opposite to neighboring cell. 
@@ -1398,26 +1577,28 @@ cdef class Delaunay3_cell:
         """
         return self.x.ind(v.x)
 
-    def set_vertex(self, int i, Delaunay3_vertex v):
+    def set_vertex(self, int i, PeriodicDelaunay3_vertex v):
         r"""Set the ith vertex of this cell. 
 
         Args: 
             i (int): Index of this cell's vertex that should be set. 
-            v (Delaunay3_vertex): Vertex to set ith vertex of this cell to. 
+            v (PeriodicDelaunay3_vertex): Vertex to set ith vertex of this cell
+                to. 
 
         """
         self.T.updated = <cbool>True
         self.x.set_vertex(i, v.x)
 
-    def set_vertices(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
-                     Delaunay3_vertex v3, Delaunay3_vertex v4):
+    def set_vertices(self, PeriodicDelaunay3_vertex v1, 
+                     PeriodicDelaunay3_vertex v2,
+                     PeriodicDelaunay3_vertex v3, PeriodicDelaunay3_vertex v4):
         r"""Set this cell's vertices. 
 
         Args: 
-            v1 (Delaunay2_vertex): 1st vertex of cell. 
-            v2 (Delaunay2_vertex): 2nd vertex of cell. 
-            v3 (Delaunay2_vertex): 3rd vertex of cell. 
-            v4 (Delaunay2_vertex): 4th vertex of cell. 
+            v1 (PeriodicDelaunay2_vertex): 1st vertex of cell. 
+            v2 (PeriodicDelaunay2_vertex): 2nd vertex of cell. 
+            v3 (PeriodicDelaunay2_vertex): 3rd vertex of cell. 
+            v4 (PeriodicDelaunay2_vertex): 4th vertex of cell. 
 
         """
         self.T.updated = <cbool>True
@@ -1428,26 +1609,27 @@ cdef class Delaunay3_cell:
         self.T.updated = <cbool>True
         self.x.set_vertices()
 
-    def set_neighbor(self, int i, Delaunay3_cell n):
+    def set_neighbor(self, int i, PeriodicDelaunay3_cell n):
         r"""Set the ith neighboring cell of this cell. 
 
         Args: 
             i (int): Index of this cell's neighbor that should be set. 
-            n (Delaunay3_cell): Cell to set ith neighbor of this cell to. 
+            n (PeriodicDelaunay3_cell): Cell to set ith neighbor of this cell to. 
 
         """
         self.T.updated = <cbool>True
         self.x.set_neighbor(i, n.x)
 
-    def set_neighbors(self, Delaunay3_cell c1, Delaunay3_cell c2,
-                      Delaunay3_cell c3, Delaunay3_cell c4):
+    def set_neighbors(self, PeriodicDelaunay3_cell c1, 
+                      PeriodicDelaunay3_cell c2,
+                      PeriodicDelaunay3_cell c3, PeriodicDelaunay3_cell c4):
         r"""Set this cell's neighboring cells. 
 
         Args: 
-            c1 (Delaunay3_cell): 1st neighboring cell. 
-            c2 (Delaunay3_cell): 2nd neighboring cell. 
-            c3 (Delaunay3_cell): 3rd neighboring cell. 
-            c4 (Delaunay3_cell): 4th neighboring cell. 
+            c1 (PeriodicDelaunay3_cell): 1st neighboring cell. 
+            c2 (PeriodicDelaunay3_cell): 2nd neighboring cell. 
+            c3 (PeriodicDelaunay3_cell): 3rd neighboring cell. 
+            c4 (PeriodicDelaunay3_cell): 4th neighboring cell. 
 
         """
         self.T.updated = <cbool>True
@@ -1464,10 +1646,10 @@ cdef class Delaunay3_cell:
             if self.is_infinite():
                 return np.float('inf')*np.ones(3, 'float64')
             else:
-                return (self.vertex(0).point + \
-                        self.vertex(1).point + \
-                        self.vertex(2).point + \
-                        self.vertex(3).point)/4.0
+                return (self.point(0) + \
+                        self.point(1) + \
+                        self.point(2) + \
+                        self.point(3))/4.0
 
     property circumcenter:
         """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""
@@ -1476,17 +1658,25 @@ cdef class Delaunay3_cell:
             self.T.circumcenter(self.x, &out[0])
             return out
 
+    property periodic_circumcenter:
+        """:obj:`ndarray` of float64: x,y,z coordinates of cell circumcenter."""
+        def __get__(self):
+            cdef np.ndarray[np.float64_t] out = np.zeros(3, 'float64')
+            self.T.periodic_circumcenter(self.x, &out[0])
+            return out
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this cell.
 
         Returns:
-            Delaunay3_vertex_vector: Iterator over vertices incident to this 
-                cell.
+            PeriodicDelaunay3_vertex_vector: Iterator over vertices incident to 
+                this cell.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Vertex] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay3_vertex_vector out = Delaunay3_vertex_vector()
+        cdef PeriodicDelaunay3_vertex_vector out
+        out = PeriodicDelaunay3_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -1494,12 +1684,13 @@ cdef class Delaunay3_cell:
         r"""Find edges that are incident to this cell.
 
         Returns:
-            Delaunay3_edge_vector: Iterator over edges incident to this cell. 
+            PeriodicDelaunay3_edge_vector: Iterator over edges incident to this 
+                cell. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Edge] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay3_edge_vector out = Delaunay3_edge_vector()
+        cdef PeriodicDelaunay3_edge_vector out = PeriodicDelaunay3_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -1507,12 +1698,14 @@ cdef class Delaunay3_cell:
         r"""Find facets that are incident to this cell.
 
         Returns:
-            Delaunay3_facet_vector: Iterator over facets incident to this cell. 
+            PeriodicDelaunay3_facet_vector: Iterator over facets incident to 
+                this cell. 
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Facet] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Facet] it
         it = self.T.incident_facets(self.x)
-        cdef Delaunay3_facet_vector out = Delaunay3_facet_vector()
+        cdef PeriodicDelaunay3_facet_vector out
+        out = PeriodicDelaunay3_facet_vector()
         out.assign(self.T, it)
         return out
 
@@ -1520,12 +1713,13 @@ cdef class Delaunay3_cell:
         r"""Find cells that are incident to this cell.
 
         Returns:
-            Delaunay3_cell_vector: Iterator over cells incident to this cell.
+            PeriodicDelaunay3_cell_vector: Iterator over cells incident to this 
+                cell.
 
         """
-        cdef vector[Delaunay_with_info_3[info_t].Cell] it
+        cdef vector[PeriodicDelaunay_with_info_3[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay3_cell_vector out = Delaunay3_cell_vector()
+        cdef PeriodicDelaunay3_cell_vector out = PeriodicDelaunay3_cell_vector()
         out.assign(self.T, it)
         return out
 
@@ -1559,34 +1753,35 @@ cdef class Delaunay3_cell:
         return self.T.side_of_sphere(self.x, &pos[0])
 
 
-cdef class Delaunay3_cell_iter:
+cdef class PeriodicDelaunay3_cell_iter:
     r"""Wrapper class for a triangulation cell iteration.
 
     Args:
-        T (Delaunay3): Triangulation that this cell belongs to. 
+        T (PeriodicDelaunay3): Triangulation that this cell belongs to. 
         cell (:obj:`str`, optional): String specifying the cell that
             should be referenced. Valid options include: 
                 'all_begin': The first cell in an iteration over all cells. 
                 'all_end': The last cell in an iteration over all cells.
     
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
-            that this cell belongs to. 
-        x (:obj:`Delaunay_with_info_3[info_t].All_cells_iter`): C++ cell
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ Triangulation 
+            object that this cell belongs to. 
+        x (:obj:`PeriodicDelaunay_with_info_3[info_t].All_cells_iter`): C++ cell
             object. Direct interaction with this object is not recommended.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef Delaunay_with_info_3[info_t].All_cells_iter x
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t].All_cells_iter x
 
-    def __cinit__(self, Delaunay3 T, str cell = None):
+    def __cinit__(self, PeriodicDelaunay3 T, str cell = None):
         self.T = T.T
         if cell == 'all_begin':
             self.x = self.T.all_cells_begin()
         elif cell == 'all_end':
             self.x = self.T.all_cells_end()
 
-    def __richcmp__(Delaunay3_cell_iter self, Delaunay3_cell_iter solf, int op):
+    def __richcmp__(PeriodicDelaunay3_cell_iter self, 
+                    PeriodicDelaunay3_cell_iter solf, int op):
         if (op == 2):
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -1613,35 +1808,38 @@ cdef class Delaunay3_cell_iter:
         predecrement(self.x)
 
     property cell:
-        r"""Delaunay3_cell: Corresponding cell object."""
+        r"""PeriodicDelaunay3_cell: Corresponding cell object."""
         def __get__(self):
-            cdef Delaunay3_cell out = Delaunay3_cell()
+            cdef PeriodicDelaunay3_cell out = PeriodicDelaunay3_cell()
             out.T = self.T
-            out.x = Delaunay_with_info_3[info_t].Cell(self.x)
+            out.x = PeriodicDelaunay_with_info_3[info_t].Cell(self.x)
             return out
 
 
-cdef class Delaunay3_cell_range:
+cdef class PeriodicDelaunay3_cell_range:
     r"""Wrapper class for iterating over a range of triangulation cells.
 
     Args:
-        xstart (Delaunay3_cell_iter): The starting cell. 
-        xstop (Delaunay3_cell_iter): Final cell that will end the iteration. 
+        xstart (PeriodicDelaunay3_cell_iter): The starting cell. 
+        xstop (PeriodicDelaunay3_cell_iter): Final cell that will end the 
+            iteration. 
         finite (:obj:`bool`, optional): If True, only finite cells are 
             iterated over. Otherwise, all cells are iterated over. Defaults
             to False.  
 
     Attributes:
-        x (Delaunay3_cell_iter): The current cell. 
-        xstop (Delaunay3_cell_iter): Final cell that will end the iteration. 
+        x (PeriodicDelaunay3_cell_iter): The current cell. 
+        xstop (PeriodicDelaunay3_cell_iter): Final cell that will end the 
+            iteration. 
         finite (bool): If True, only finite cells are iterated over. Otherwise, 
             all cells are iterated over.   
 
     """
-    cdef Delaunay3_cell_iter x
-    cdef Delaunay3_cell_iter xstop
+    cdef PeriodicDelaunay3_cell_iter x
+    cdef PeriodicDelaunay3_cell_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay3_cell_iter xstart, Delaunay3_cell_iter xstop,
+    def __cinit__(self, PeriodicDelaunay3_cell_iter xstart, 
+                  PeriodicDelaunay3_cell_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -1654,7 +1852,7 @@ cdef class Delaunay3_cell_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.is_infinite():
                 self.x.increment()
-        cdef Delaunay3_cell out
+        cdef PeriodicDelaunay3_cell out
         if self.x != self.xstop:
             out = self.x.cell
             self.x.increment()
@@ -1662,32 +1860,32 @@ cdef class Delaunay3_cell_range:
         else:
             raise StopIteration()
 
-cdef class Delaunay3_cell_vector:
+cdef class PeriodicDelaunay3_cell_vector:
     r"""Wrapper class for a vector of cells.
 
     Attributes:
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-            Direct interaction with this object is not recommended.
-        v (:obj:`vector[Delaunay_with_info_3[info_t].Cell]`): Vector of C++ 
-            cells.
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+            object. Direct interaction with this object is not recommended.
+        v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Cell]`): Vector of 
+            C++ cells.
         n (int): The number of cells in the vector.
         i (int): The index of the currect cell.
 
     """
-    cdef Delaunay_with_info_3[info_t] *T
-    cdef vector[Delaunay_with_info_3[info_t].Cell] v
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
+    cdef vector[PeriodicDelaunay_with_info_3[info_t].Cell] v
     cdef int n
     cdef int i
 
-    cdef void assign(self, Delaunay_with_info_3[info_t] *T,
-                     vector[Delaunay_with_info_3[info_t].Cell] v):
+    cdef void assign(self, PeriodicDelaunay_with_info_3[info_t] *T,
+                     vector[PeriodicDelaunay_with_info_3[info_t].Cell] v):
         r"""Assign C++ attributes.
 
         Args:
-            T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object.
-                Direct interaction with this object is not recommended.
-            v (:obj:`vector[Delaunay_with_info_3[info_t].Cell]`): Vector of 
-                C++ cells.
+            T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+                object. Direct interaction with this object is not recommended.
+            v (:obj:`vector[PeriodicDelaunay_with_info_3[info_t].Cell]`): Vector 
+                of C++ cells.
 
         """
         self.T = T
@@ -1699,9 +1897,9 @@ cdef class Delaunay3_cell_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay3_cell out
+        cdef PeriodicDelaunay3_cell out
         if self.i < self.n:
-            out = Delaunay3_cell()
+            out = PeriodicDelaunay3_cell()
             out.T = self.T
             out.x = self.v[self.i]
             self.i += 1
@@ -1710,29 +1908,29 @@ cdef class Delaunay3_cell_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay3_cell out
+        cdef PeriodicDelaunay3_cell out
         if isinstance(i, int):
-            out = Delaunay3_cell()
+            out = PeriodicDelaunay3_cell()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay3_cell_vector indices must be itegers, "+
-                            "not {}".format(type(i)))
+            raise TypeError("PeriodicDelaunay3_cell_vector indices must be "+
+                            "integers, not {}".format(type(i)))
 
 
-cdef class Delaunay3:
-    r"""Wrapper class for a 3D Delaunay triangulation.
+cdef class PeriodicDelaunay3:
+    r"""Wrapper class for a 3D PeriodicDelaunay triangulation.
 
     Attributes:
         n (int): The number of points inserted into the triangulation.
-        T (:obj:`Delaunay_with_info_3[info_t]`): C++ triangulation object. 
-            Direct interaction with this object is not recommended. 
+        T (:obj:`PeriodicDelaunay_with_info_3[info_t]`): C++ triangulation 
+            object. Direct interaction with this object is not recommended. 
         n_per_insert (list of int): The number of points inserted at each
             insert.
 
     """
 
-    cdef Delaunay_with_info_3[info_t] *T
+    cdef PeriodicDelaunay_with_info_3[info_t] *T
     cdef readonly int n
     cdef public object n_per_insert
     cdef readonly pybool _locked
@@ -1740,22 +1938,30 @@ cdef class Delaunay3:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def __cinit__(self):
+    def __cinit__(self, np.ndarray[np.float64_t] left_edge = None,
+                  np.ndarray[np.float64_t] right_edge = None):
+        cdef np.ndarray[np.float64_t] domain = np.empty(2*3, 'float64')
+        if left_edge is None or right_edge is None:
+            domain[:3] = [0,0,0]
+            domain[3:] = [1,1,1]
+        else:
+            domain[:3] = left_edge
+            domain[3:] = right_edge
         with nogil:
-            self.T = new Delaunay_with_info_3[info_t]()
+            self.T = new PeriodicDelaunay_with_info_3[info_t](&domain[0])
         self.n = 0
         self.n_per_insert = []
         self._locked = False
         self._cache_to_clear_on_update = {}
 
-    def is_equivalent(Delaunay3 self, Delaunay3 solf):
+    def is_equivalent(PeriodicDelaunay3 self, PeriodicDelaunay3 solf):
         r"""Determine if two triangulations are equivalent. Currently only 
         checks that the triangulations have the same numbers of vertices, cells,
         edges, and facets.
 
         Args:
-            solf (:class:`cgal4py.delaunay.Delaunay3`): Triangulation this one 
-                should be compared to.
+            solf (:class:`cgal4py.delaunay.PeriodicDelaunay3`): Triangulation 
+                this one should be compared to.
 
         Returns:
             bool: True if the two triangulations are equivalent.
@@ -1771,14 +1977,15 @@ cdef class Delaunay3:
         r"""Create a triangulation from serialized information. 
 
         Args: 
-            *args: All arguments are passed to :meth:`cgal4py.delaunay.Delaunay3.deserialize`. 
+            *args: All arguments are passed to 
+                :meth:`cgal4py.delaunay.PeriodicDelaunay3.deserialize`. 
 
         Returns: 
-            :class:`cgal4py.delaunay.Delaunay3`: Triangulation constructed from 
-                deserialized information. 
+            :class:`cgal4py.delaunay.PeriodicDelaunay3`: Triangulation 
+                constructed from deserialized information. 
 
         """
-        T = Delaunay3()
+        T = PeriodicDelaunay3()
         T.deserialize(*args)
         return T
 
@@ -1810,7 +2017,9 @@ cdef class Delaunay3:
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
             if solf._locked:
-                raise RuntimeError("Cannot get dependent property '{}' while triangulation is locked.".format(attr))
+                raise RuntimeError("Cannot get dependent property "+
+                                   "'{}' ".format(attr)+
+                                   "while triangulation is locked.")
             solf._update_tess()
             if attr not in solf._cache_to_clear_on_update:
                 solf._cache_to_clear_on_update[attr] = fget(solf)
@@ -1818,7 +2027,8 @@ cdef class Delaunay3:
         return property(wrapped_fget, None, None, fget.__doc__)
 
     def is_valid(self):
-        r"""Determine if the triangulation is a valid Delaunay triangulation. 
+        r"""Determine if the triangulation is a valid PeriodicDelaunay 
+        triangulation. 
 
         Returns: 
             bool: True if the triangulation is valid, False otherwise. 
@@ -1868,37 +2078,51 @@ cdef class Delaunay3:
 
         Returns: 
             tuple containing:
+                domain (np.ndarray of float64): Min/max bounds of domain in each 
+                    dimension (e.g. [xmin, ymin, zmin, xmax, ymax, zmax]).
+                cover (np.ndarray of int32): Number of times points are 
+                    replicated in each dimension to allow wrapping.  
                 cells (np.ndarray of info_t): (n,m) Indices for m vertices in 
                     each of the n cells. A value of np.iinfo(np_info).max 
                     indicates the infinite vertex. 
                 neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of 
                     the m neighbors to each of the n cells. 
+                offsets (np.ndarray of int32): (n,m) Offset of m vertices in 
+                    each of the ncells.
                 idx_inf (I): Value representing the infinite vertex and or 
                     a missing neighbor.
 
         """
         cdef info_t n, m, i
         cdef int32_t d, j
+        cdef np.ndarray[np.float64_t, ndim=1] domain
+        cdef np.ndarray[np.int32_t, ndim=1] cover
         cdef np.ndarray[np_info_t, ndim=2] cells
         cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef np.ndarray[np.int32_t, ndim=2] offsets
         # Initialize arrays based on properties
         n = self.T.num_finite_verts()
         m = self.T.num_cells()
         assert(n == self.num_finite_verts)
         assert(m == self.num_cells)
         d = 3
+        domain = np.zeros(2*d, np.float64)
+        cover = self.num_sheets
         cells = np.zeros((m, d+1), np_info)
         neighbors = np.zeros((m, d+1), np_info)
+        offsets = np.zeros((m, d+1), np.int32)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
         with nogil:
             idx_inf = self.T.serialize_idxinfo[info_t](
-                n, m, d, &cells[0,0], &neighbors[0,0])
+                n, m, d, &domain[0], &cover[0],
+                &cells[0,0], &neighbors[0,0], &offsets[0,0])
         # Sort if desired
+        # TODO: Sort offsets?
         if sort:
             with nogil:
                 sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
-        return cells, neighbors, idx_inf
+        return domain, cover, cells, neighbors, offsets, idx_inf
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1907,24 +2131,35 @@ cdef class Delaunay3:
                                   pybool sort=False):
         cdef int32_t n, m
         cdef int32_t d
+        cdef np.ndarray[np.float64_t, ndim=1] domain
+        cdef np.ndarray[np.int32_t, ndim=1] cover
         cdef np.ndarray[np.int32_t, ndim=2] cells
         cdef np.ndarray[np.int32_t, ndim=2] neighbors
+        cdef np.ndarray[np.int32_t, ndim=2] offsets
         n = self.T.num_finite_verts()
         m = self.T.num_cells()
         assert(idx.size >= n)
         d = 3
+        domain = np.zeros(2*d, 'float64')
+        cover = np.zeros(d, 'int32')
         cells = np.zeros((m, d+1), 'int32')
         neighbors = np.zeros((m, d+1), 'int32')
+        offsets = np.zeros((m, d+1), 'int32')
         cdef int32_t idx_inf
         with nogil:
             idx_inf = self.T.serialize_info2idx[int32_t](
-                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+                n, m, d, &domain[0], &cover[0],
+                &cells[0,0], &neighbors[0,0], &offsets[0,0], 
+                max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
+        offsets.resize(m, d+1, refcheck=False)
+        # TODO: sort offsets
         if sort:
             with nogil:
-                sortSerializedTess[int32_t](&cells[0,0], &neighbors[0,0], m, d+1)
-        return cells, neighbors, idx_inf
+                sortSerializedTess[int32_t](&cells[0,0], &neighbors[0,0], 
+                                            m, d+1)
+        return domain, cover, cells, neighbors, offsets, idx_inf
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1933,24 +2168,35 @@ cdef class Delaunay3:
                                    pybool sort=False):
         cdef uint32_t n, m
         cdef int32_t d
+        cdef np.ndarray[np.float64_t, ndim=1] domain
+        cdef np.ndarray[np.int32_t, ndim=1] cover
         cdef np.ndarray[np.uint32_t, ndim=2] cells
         cdef np.ndarray[np.uint32_t, ndim=2] neighbors
+        cdef np.ndarray[np.int32_t, ndim=2] offsets
         n = self.T.num_finite_verts()
         m = self.T.num_cells()
         assert(idx.size >= n)
         d = 3
+        domain = np.zeros(2*d, 'float64')
+        cover = np.zeros(d, 'int32')
         cells = np.zeros((m, d+1), 'uint32')
         neighbors = np.zeros((m, d+1), 'uint32')
+        offsets = np.zeros((m, d+1), 'int32')
         cdef uint32_t idx_inf
         with nogil:
             idx_inf = self.T.serialize_info2idx[uint32_t](
-                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+                n, m, d, &domain[0], &cover[0],
+                &cells[0,0], &neighbors[0,0], &offsets[0,0],
+                max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
+        offsets.resize(m, d+1, refcheck=False)
+        # TODO: sort offsets
         if sort:
             with nogil:
-                sortSerializedTess[uint32_t](&cells[0,0], &neighbors[0,0], m, d+1)
-        return cells, neighbors, idx_inf
+                sortSerializedTess[uint32_t](&cells[0,0], &neighbors[0,0], 
+                                             m, d+1)
+        return domain, cover, cells, neighbors, offsets, idx_inf
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1959,24 +2205,35 @@ cdef class Delaunay3:
                                   pybool sort=False):
         cdef int64_t n, m
         cdef int32_t d
+        cdef np.ndarray[np.float64_t, ndim=1] domain
+        cdef np.ndarray[np.int32_t, ndim=1] cover
         cdef np.ndarray[np.int64_t, ndim=2] cells
         cdef np.ndarray[np.int64_t, ndim=2] neighbors
+        cdef np.ndarray[np.int32_t, ndim=2] offsets
         n = self.T.num_finite_verts()
         m = self.T.num_cells()
         assert(idx.size >= n)
         d = 3
+        domain = np.zeros(2*d, 'float64')
+        cover = np.zeros(d, 'int32')
         cells = np.zeros((m, d+1), 'int64')
         neighbors = np.zeros((m, d+1), 'int64')
+        offsets = np.zeros((m, d+1), 'int32')
         cdef int64_t idx_inf
         with nogil:
             idx_inf = self.T.serialize_info2idx[int64_t](
-                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+                n, m, d, &domain[0], &cover[0],
+                &cells[0,0], &neighbors[0,0], &offsets[0,0],
+                max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
+        offsets.resize(m, d+1, refcheck=False)
+        # TODO: sort offsets
         if sort:
             with nogil:
-                sortSerializedTess[int64_t](&cells[0,0], &neighbors[0,0], m, d+1)
-        return cells, neighbors, idx_inf
+                sortSerializedTess[int64_t](&cells[0,0], &neighbors[0,0], 
+                                            m, d+1)
+        return domain, cover, cells, neighbors, offsets, idx_inf
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1985,24 +2242,35 @@ cdef class Delaunay3:
                                    pybool sort=False):
         cdef uint64_t n, m
         cdef int32_t d
+        cdef np.ndarray[np.float64_t, ndim=1] domain
+        cdef np.ndarray[np.int32_t, ndim=1] cover
         cdef np.ndarray[np.uint64_t, ndim=2] cells
         cdef np.ndarray[np.uint64_t, ndim=2] neighbors
+        cdef np.ndarray[np.int32_t, ndim=2] offsets
         n = self.T.num_finite_verts()
         m = self.T.num_cells()
         assert(idx.size >= n)
         d = 3
+        domain = np.zeros(2*d, 'float64')
+        cover = np.zeros(d, 'int32')
         cells = np.zeros((m, d+1), 'uint64')
         neighbors = np.zeros((m, d+1), 'uint64')
+        offsets = np.zeros((m, d+1), 'int32')
         cdef uint64_t idx_inf
         with nogil:
             idx_inf = self.T.serialize_info2idx[uint64_t](
-                n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
+                n, m, d, &domain[0], &cover[0],
+                &cells[0,0], &neighbors[0,0], &offsets[0,0],
+                max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
+        offsets.resize(m, d+1, refcheck=False)
+        # TODO: sort offsets
         if sort:
             with nogil:
-                sortSerializedTess[uint64_t](&cells[0,0], &neighbors[0,0], m, d+1)
-        return cells, neighbors, idx_inf
+                sortSerializedTess[uint64_t](&cells[0,0], &neighbors[0,0], 
+                                             m, d+1)
+        return domain, cover, cells, neighbors, offsets, idx_inf
 
     def serialize_info2idx(self, max_info, idx, pybool sort = False):
         r"""Serialize triangulation, only including some vertices and 
@@ -2019,11 +2287,17 @@ cdef class Delaunay3:
 
         Returns: 
             tuple containing:
+                domain (np.ndarray of float64): Min/max bounds of domain in each 
+                    dimension (e.g. [xmin, ymin, zmin, xmax, ymax, zmax]).
+                cover (np.ndarray of int32): Number of times points are 
+                    replicated in each dimension to allow wrapping.
                 cells (np.ndarray of info_t): (n,m) Indices for m vertices in 
                     each of the n cells. A value of np.iinfo(np_info).max 
                     indicates the infinite vertex. 
                 neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of 
                     the m neighbors to each of the n cells. 
+                offsets (np.ndarray of int32): (n,m) Offset of m vertices in 
+                    each of the ncells.
                 idx_inf (I): Value representing the infinite vertex and or 
                     a missing neighbor.
 
@@ -2037,24 +2311,34 @@ cdef class Delaunay3:
         elif idx.dtype == np.uint64:
             return self._serialize_info2idx_uint64(<info_t>max_info, idx, sort)
         else:
-            raise TypeError("idx.dtype = {} is not supported.".format(idx.dtype))
+            raise TypeError("idx.dtype = {} ".format(idx.dtype)+
+                            "is not supported.")
 
     @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def deserialize(self, np.ndarray[np.float64_t, ndim=2] pos,
+                    np.ndarray[np.float64_t, ndim=1] domain,
+                    np.ndarray[np.int32_t, ndim=1] cover,
                     np.ndarray[np_info_t, ndim=2] cells,
                     np.ndarray[np_info_t, ndim=2] neighbors,
+                    np.ndarray[np.int32_t, ndim=2] offsets,
                     info_t idx_inf):
         r"""Deserialize triangulation. 
 
         Args: 
             pos (np.ndarray of float64): Coordinates of points. 
+            domain (np.ndarray of float64): Min/max bounds of domain in each 
+                dimension (e.g. [xmin, ymin, zmin, xmax, ymax, zmax]).
+            cover (np.ndarray of int32): Number of times points are replicated 
+                in each dimension to allow wrapping. 
             cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
                 of the n cells. A value of np.iinfo(np_info).max A value of 
                 np.iinfo(np_info).max indicates the infinite vertex. 
             neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m 
                 neighbors to each of the n cells. 
+            offsets (np.ndarray of int32): (n,m) Offset of m vertices in each of 
+                the ncells.
             idx_inf (info_t): Index indicating a vertex is infinite. 
 
         """
@@ -2064,8 +2348,10 @@ cdef class Delaunay3:
         if (n == 0) or (m == 0):
             return
         with nogil:
-            self.T.deserialize_idxinfo[info_t](n, m, d, &pos[0,0], 
-                                               &cells[0,0], &neighbors[0,0], idx_inf)
+            self.T.deserialize_idxinfo[info_t](n, m, d, &domain[0], &cover[0],
+                                               &pos[0,0], &cells[0,0], 
+                                               &neighbors[0,0], &offsets[0,0], 
+                                               idx_inf)
         self.n = n
         self.n_per_insert.append(n)
 
@@ -2074,19 +2360,28 @@ cdef class Delaunay3:
     @_update_to_tess
     def deserialize_with_info(self, np.ndarray[np.float64_t, ndim=2] pos,
                               np.ndarray[np_info_t, ndim=1] info,
+                              np.ndarray[np.float64_t, ndim=1] domain,
+                              np.ndarray[np.int32_t, ndim=1] cover,
                               np.ndarray[np_info_t, ndim=2] cells,
                               np.ndarray[np_info_t, ndim=2] neighbors,
+                              np.ndarray[np.int32_t, ndim=2] offsets,
                               info_t idx_inf):
         r"""Deserialize triangulation. 
 
         Args: 
             pos (np.ndarray of float64): Coordinates of points. 
             info (np.ndarray of info_t): Info for points. 
+            domain (np.ndarray of float64): Min/max bounds of domain in each 
+                dimension (e.g. [xmin, ymin, zmin, xmax, ymax, zmax]).
+            cover (np.ndarray of int32): Number of times points are replicated 
+                in each dimension to allow wrapping. 
             cells (np.ndarray of info_t): (n,m) Indices for m vertices in each 
                 of the n cells. A value of np.iinfo(np_info).max A value of 
                 np.iinfo(np_info).max indicates the infinite vertex. 
             neighbors (np.ndarray of info_t): (n,l) Indices in `cells` of the m 
                 neighbors to each of the n cells. 
+            offsets (np.ndarray of int32): (n,m) Offset of m vertices in each of 
+                the ncells.
             idx_inf (info_t): Index indicating a vertex is infinite. 
 
         """
@@ -2096,8 +2391,10 @@ cdef class Delaunay3:
         if (n == 0) or (m == 0):
             return
         with nogil:
-            self.T.deserialize[info_t](n, m, d, &pos[0,0], &info[0],
-                                       &cells[0,0], &neighbors[0,0], idx_inf)
+            self.T.deserialize[info_t](n, m, d, &domain[0], &cover[0],
+                                       &pos[0,0], &info[0],
+                                       &cells[0,0], &neighbors[0,0], 
+                                       &offsets[0,0], idx_inf)
         self.n = n
         self.n_per_insert.append(n)
 
@@ -2111,6 +2408,19 @@ cdef class Delaunay3:
         """
         plot.plot3D(self, *args, **kwargs)
 
+    @_dependent_property
+    def num_sheets(self):
+        r"""np.ndarray of int32: The number of times the original domain is 
+        replicated in each dimension to allow wrapping around periodic 
+        boundaries."""
+        cdef np.ndarray[np.int32_t] ns = np.empty(3,'int32')
+        self.T.num_sheets(&ns[0])
+        return ns
+    @_dependent_property
+    def num_sheets_total(self):
+        r"""int: The number of times the original domain is replicated to allow 
+        wrapping around periodic boundaries."""
+        return self.T.num_sheets_total()
     @_dependent_property
     def num_finite_verts(self): 
         r"""int: The number of finite vertices in the triangulation."""
@@ -2163,6 +2473,49 @@ cdef class Delaunay3:
         r"""int: The total number of cells (finite + infinite) in the 
         triangulation."""
         return self.T.num_cells()
+    @_dependent_property
+    def num_stored_verts(self):
+        r"""int: The total number of vertices (Finite + infinite) in the 
+        triangulation including duplicates made to allow periodic 
+        wrapping."""
+        return self.T.num_stored_verts()
+    @_dependent_property
+    def num_stored_edges(self):
+        r"""int: The total number of edges (Finite + infinite) in the 
+        triangulation including duplicates made to allow periodic 
+        wrapping."""
+        return self.T.num_stored_edges()
+    @_dependent_property
+    def num_stored_facets(self):
+        r"""int: The total number of facets (Finite + infinite) in the 
+        triangulation including duplicates made to allow periodic 
+        wrapping."""
+        return self.T.num_stored_facets()
+    @_dependent_property
+    def num_stored_cells(self):
+        r"""int: The total number of cells (Finite + infinite) in the 
+        triangulation including duplicates made to allow periodic 
+        wrapping."""
+        return self.T.num_stored_cells()
+
+    @_update_to_tess
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def set_domain(self, np.ndarray[np.float64_t] left_edge,
+                   np.ndarray[np.float64_t] right_edge):
+        r"""Set the bounds on the periodic domain. 
+
+        Args: 
+            left_edge (:obj:`ndarray` of :obj:`float64`): Minimum bounds 
+                on domain in each dimension. 
+            right_edge (:obj:`ndarray` of :obj:`float64`): Maximum bounds 
+                on domain in each dimension. 
+
+        """
+        cdef np.ndarray[np.float64_t] domain = np.empty(2*3, 'float64')
+        domain[:3] = left_edge
+        domain[3:] = right_edge
+        self.T.set_domain(&domain[0])
 
     @_update_to_tess
     @cython.boundscheck(False)
@@ -2190,9 +2543,6 @@ cdef class Delaunay3:
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
-        # if self.n != <int64_t>self.T.num_finite_verts():
-        #     print "There were {} duplicates".format(self.n-self.T.num_finite_verts())
-        # assert(self.n == self.T.num_finite_verts())
 
     @_update_to_tess
     def clear(self):
@@ -2241,11 +2591,11 @@ cdef class Delaunay3:
         return out
 
     @_update_to_tess
-    def remove(self, Delaunay3_vertex x):
+    def remove(self, PeriodicDelaunay3_vertex x):
         r"""Remove a vertex from the triangulation. 
 
         Args: 
-            x (Delaunay3_vertex): Vertex that should be removed. 
+            x (PeriodicDelaunay3_vertex): Vertex that should be removed. 
 
         """
         with nogil:
@@ -2254,85 +2604,54 @@ cdef class Delaunay3:
     @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def move(self, Delaunay3_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
+    def move(self, PeriodicDelaunay3_vertex x, 
+             np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 
         moved. 
 
         Args: 
-            x (Delaunay3_vertex): Vertex that should be moved. 
+            x (PeriodicDelaunay3_vertex): Vertex that should be moved. 
             pos (:obj:`ndarray` of float64): x,y,z coordinates that the vertex 
                 be moved to. 
 
         Returns: 
-            Delaunay3_vertex: Vertex at the new position. 
+            PeriodicDelaunay3_vertex: Vertex at the new position. 
 
         """
         assert(len(pos) == 3)
-        cdef Delaunay_with_info_3[info_t].Vertex v
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
         with nogil:
             v = self.T.move(x.x, &pos[0])
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
         return out
 
     @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def move_if_no_collision(self, Delaunay3_vertex x,
+    def move_if_no_collision(self, PeriodicDelaunay3_vertex x,
                              np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location only if there is not already a 
         vertex at the given coordinates. If there is a vertex there, it is 
         returned and the vertex being moved remains at its original location. 
 
         Args: 
-            x (Delaunay3_vertex): Vertex that should be moved. 
+            x (PeriodicDelaunay3_vertex): Vertex that should be moved. 
             pos (:obj:`ndarray` of float64): x,y,z coordinates that the vertex 
                 be moved to. 
 
         Returns: 
-            Delaunay2_vertex: Vertex at the new position. 
+            PeriodicDelaunay2_vertex: Vertex at the new position. 
 
         """
         assert(len(pos) == 3)
-        cdef Delaunay_with_info_3[info_t].Vertex v
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
         with nogil:
             v = self.T.move_if_no_collision(x.x, &pos[0])
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
         return out
-
-    @_update_to_tess
-    def flip(self, Delaunay3_cell x, int i):
-        r"""Flip the facet incident to cell x and neighbor i of cell x. This 
-        method first checks if the facet can be flipped.
-
-        Args:
-            x (Delaunay3_cell): Cell with facet that should be flipped.
-            i (int): Integer specifying neighbor that is also incident to the 
-                cell that should be flipped.
-
-        Returns:
-            bool: True if facet was flipped, False otherwise.
-
-        """
-        cdef cbool out
-        with nogil:
-            out = self.T.flip(x.x, i)
-        return <pybool>out
-
-    @_update_to_tess
-    def flip_flippable(self, Delaunay3_cell x, int i):
-        r"""Same as :meth:`Delaunay3.flip`, but assumes that facet is flippable 
-        and does not check.
-
-        Args:
-            x (Delaunay3_cell): Cell with facet that should be flipped.
-            i (int): Integer specifying neighbor that is also incident to the 
-                cell that should be flipped.
-        """
-        with nogil:
-            self.T.flip_flippable(x.x, i)
 
     def get_vertex(self, np_info_t index):
         r"""Get the vertex object corresponding to the given index. 
@@ -2341,32 +2660,35 @@ cdef class Delaunay3:
             index (np_info_t): Index of vertex that should be found. 
 
         Returns: 
-            Delaunay3_vertex: Vertex corresponding to the given index. If the 
-                index is not found, the infinite vertex is returned. 
+            PeriodicDelaunay3_vertex: Vertex corresponding to the given index. 
+                If the index is not found, the infinite vertex is returned. 
 
         """
-        cdef Delaunay_with_info_3[info_t].Vertex v
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
         with nogil:
             v = self.T.get_vertex(index)
-        cdef Delaunay3_vertex out = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
         return out
 
     def locate(self, np.ndarray[np.float64_t, ndim=1] pos,
-               Delaunay3_cell start = None):
+               PeriodicDelaunay3_cell start = None):
         r"""Get the vertex/cell/facet/edge that a given point is a part of.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.   
-            start (Delaunay3_cell, optional): Cell to start the search at. 
+            start (PeriodicDelaunay3_cell, optional): Cell to start the search 
+                at. 
 
         Returns:
+            Object associated with the search point (vertex, edge, facet, or 
+                cell).
 
         """
         assert(len(pos) == 3)
         cdef int lt, li, lj
         lt = li = lj = 999
-        cdef Delaunay3_cell c = Delaunay3_cell()
+        cdef PeriodicDelaunay3_cell c = PeriodicDelaunay3_cell()
         if start is not None:
             c.assign(self.T, self.T.locate(&pos[0], lt, li, lj, start.x))
         else:
@@ -2378,9 +2700,9 @@ cdef class Delaunay3:
         if lt == 0: # vertex
             return c.vertex(li)
         elif lt == 1: # edge
-            return Delaunay3_edge.from_cell(c, li, lj)
+            return PeriodicDelaunay3_edge.from_cell(c, li, lj)
         elif lt == 2: # facet
-            return Delaunay3_facet.from_cell(c, li)
+            return PeriodicDelaunay3_facet.from_cell(c, li)
         elif lt == 3: # cell
             return c
         elif lt == 4:
@@ -2390,107 +2712,112 @@ cdef class Delaunay3:
             print("Point {} is outside the affine hull.".format(pos))
             return 0
         else:
-            raise RuntimeError("Value of {} not expected from CGAL locate.".format(lt))
+            raise RuntimeError("Value of {} ".format(lt)+
+                               "not expected from CGAL locate.")
 
     @property
     def all_verts_begin(self):
-        r"""Delaunay3_vertex_iter: Starting vertex for all vertices in the 
-        triangulation."""
-        return Delaunay3_vertex_iter(self, 'all_begin')
+        r"""PeriodicDelaunay3_vertex_iter: Starting vertex for all vertices in 
+        the triangulation."""
+        return PeriodicDelaunay3_vertex_iter(self, 'all_begin')
     @property
     def all_verts_end(self):
-        r"""Delaunay3_vertex_iter: Final vertex for all vertices in the 
+        r"""PeriodicDelaunay3_vertex_iter: Final vertex for all vertices in the 
         triangulation."""
-        return Delaunay3_vertex_iter(self, 'all_end')
+        return PeriodicDelaunay3_vertex_iter(self, 'all_end')
     @property
     def all_verts(self):
-        r"""Delaunay3_vertex_range: Iterable for all vertices in the 
+        r"""PeriodicDelaunay3_vertex_range: Iterable for all vertices in the 
         triangulation."""
-        return Delaunay3_vertex_range(self.all_verts_begin, 
+        return PeriodicDelaunay3_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end)
     @property
     def finite_verts(self):
-        r"""Delaunay3_vertex_range: Iterable for finite vertices in the 
+        r"""PeriodicDelaunay3_vertex_range: Iterable for finite vertices in the 
         triangulation."""
-        return Delaunay3_vertex_range(self.all_verts_begin, 
+        return PeriodicDelaunay3_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end, finite = True)
 
     @property
     def all_edges_begin(self):
-        r"""Delaunay3_edge_iter: Starting edge for all edges in the 
+        r"""PeriodicDelaunay3_edge_iter: Starting edge for all edges in the 
         triangulation."""
-        return Delaunay3_edge_iter(self, 'all_begin')
+        return PeriodicDelaunay3_edge_iter(self, 'all_begin')
     @property
     def all_edges_end(self):
-        r"""Delaunay3_edge_iter: Final edge for all edges in the 
+        r"""PeriodicDelaunay3_edge_iter: Final edge for all edges in the 
         triangulation."""
-        return Delaunay3_edge_iter(self, 'all_end')
+        return PeriodicDelaunay3_edge_iter(self, 'all_end')
     @property
     def all_edges(self):
-        r"""Delaunay3_edge_range: Iterable for all edges in the 
+        r"""PeriodicDelaunay3_edge_range: Iterable for all edges in the 
         triangulation."""
-        return Delaunay3_edge_range(self.all_edges_begin,
+        return PeriodicDelaunay3_edge_range(self.all_edges_begin,
                                     self.all_edges_end)
     @property
     def finite_edges(self):
-        r"""Delaunay3_edge_range: Iterable for finite edges in the 
+        r"""PeriodicDelaunay3_edge_range: Iterable for finite edges in the 
         triangulation."""
-        return Delaunay3_edge_range(self.all_edges_begin,
+        return PeriodicDelaunay3_edge_range(self.all_edges_begin,
                                     self.all_edges_end, finite = True)
 
     @property
     def all_facets_begin(self):
-        r"""Delaunay3_facet_iter: Starting facet for all facets in the 
+        r"""PeriodicDelaunay3_facet_iter: Starting facet for all facets in the 
         triangulation."""
-        return Delaunay3_facet_iter(self, 'all_begin')
+        return PeriodicDelaunay3_facet_iter(self, 'all_begin')
     @property
     def all_facets_end(self):
-        r"""Delaunay3_facet_iter: Final facet for all facets in the 
+        r"""PeriodicDelaunay3_facet_iter: Final facet for all facets in the 
         triangulation."""
-        return Delaunay3_facet_iter(self, 'all_end')
+        return PeriodicDelaunay3_facet_iter(self, 'all_end')
     @property
     def all_facets(self):
-        r"""Delaunay3_facet_range: Iterable for all facets in the 
+        r"""PeriodicDelaunay3_facet_range: Iterable for all facets in the 
         triangulation."""
-        return Delaunay3_facet_range(self.all_facets_begin,
+        return PeriodicDelaunay3_facet_range(self.all_facets_begin,
                                      self.all_facets_end)
     @property
     def finite_facets(self):
-        r"""Delaunay3_facet_range: Iterable for finite facets in the 
+        r"""PeriodicDelaunay3_facet_range: Iterable for finite facets in the 
         triangulation."""
-        return Delaunay3_facet_range(self.all_facets_begin,
+        return PeriodicDelaunay3_facet_range(self.all_facets_begin,
                                      self.all_facets_end, finite = True)
 
     @property
     def all_cells_begin(self):
-        r"""Delaunay3_cell_iter: Starting cell for all cells in the triangulation."""
-        return Delaunay3_cell_iter(self, 'all_begin')
+        r"""PeriodicDelaunay3_cell_iter: Starting cell for all cells in the 
+        triangulation."""
+        return PeriodicDelaunay3_cell_iter(self, 'all_begin')
     @property
     def all_cells_end(self):
-        r"""Delaunay3_cell_iter: Finall cell for all cells in the triangulation."""
-        return Delaunay3_cell_iter(self, 'all_end')
+        r"""PeriodicDelaunay3_cell_iter: Final cell for all cells in the 
+        triangulation."""
+        return PeriodicDelaunay3_cell_iter(self, 'all_end')
     @property
     def all_cells(self):
-        r"""Delaunay3_cell_range: Iterable for all cells in the
+        r"""PeriodicDelaunay3_cell_range: Iterable for all cells in the
         triangulation."""
-        return Delaunay3_cell_range(self.all_cells_begin,
+        return PeriodicDelaunay3_cell_range(self.all_cells_begin,
                                     self.all_cells_end)
     @property
     def finite_cells(self):
-        r"""Delaunay3_cell_range: Iterable for finite cells in the
+        r"""PeriodicDelaunay3_cell_range: Iterable for finite cells in the
         triangulation."""
-        return Delaunay3_cell_range(self.all_cells_begin,
+        return PeriodicDelaunay3_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
 
-    def is_edge(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
-                Delaunay3_cell c = Delaunay3_cell(), int i1 = 0, int i2 = 0):
+    def is_edge(self, PeriodicDelaunay3_vertex v1, PeriodicDelaunay3_vertex v2,
+                PeriodicDelaunay3_cell c = PeriodicDelaunay3_cell(), 
+                int i1 = 0, int i2 = 0):
         r"""Determine if two vertices form an edge in the triangulation.  
 
         Args:
-            v1 (Delaunay3_vertex): First vertex. 
-            v2 (Delaunay3_vertex): Second vertex.
-            c (Delaunay3_cell, optional): If provided and the two vertices 
-                form an edge, the cell incident to the edge is stored here.
+            v1 (PeriodicDelaunay3_vertex): First vertex. 
+            v2 (PeriodicDelaunay3_vertex): Second vertex.
+            c (PeriodicDelaunay3_cell, optional): If provided and the two 
+                vertices form an edge, the cell incident to the edge is stored 
+                here.
             i1 (int, optional): If provided and the two vertices form an edge,
                 the index of v1 in cell c is stored here.
             i2 (int, optional): If provided and the two vertices form an edge,
@@ -2505,17 +2832,19 @@ cdef class Delaunay3:
             out = self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
         return <pybool>out
 
-    def is_facet(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
-                 Delaunay3_vertex v3, Delaunay3_cell c = Delaunay3_cell(),
+    def is_facet(self, PeriodicDelaunay3_vertex v1, PeriodicDelaunay3_vertex v2,
+                 PeriodicDelaunay3_vertex v3, 
+                 PeriodicDelaunay3_cell c = PeriodicDelaunay3_cell(),
                  int i1 = 0, int i2 = 0, int i3 = 0):
         r"""Determine if two vertices form a facet in the triangulation.  
 
         Args:
-            v1 (Delaunay3_vertex): First vertex. 
-            v2 (Delaunay3_vertex): Second vertex.
-            v3 (Delaunay3_vertex): Third vertex.
-            c (Delaunay3_cell, optional): If provided and the two vertices 
-                form a facet, the cell incident to the facet is stored here.
+            v1 (PeriodicDelaunay3_vertex): First vertex. 
+            v2 (PeriodicDelaunay3_vertex): Second vertex.
+            v3 (PeriodicDelaunay3_vertex): Third vertex.
+            c (PeriodicDelaunay3_cell, optional): If provided and the two 
+                vertices form a facet, the cell incident to the facet is stored 
+                here.
             i1 (int, optional): If provided and the two vertices form a facet,
                 the index of v1 in cell c is stored here.
             i2 (int, optional): If provided and the two vertices form a facet,
@@ -2532,19 +2861,19 @@ cdef class Delaunay3:
             out = self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
         return <pybool>out
 
-    def is_cell(self, Delaunay3_vertex v1, Delaunay3_vertex v2,
-                Delaunay3_vertex v3, Delaunay3_vertex v4, 
-                Delaunay3_cell c = Delaunay3_cell(),
+    def is_cell(self, PeriodicDelaunay3_vertex v1, PeriodicDelaunay3_vertex v2,
+                PeriodicDelaunay3_vertex v3, PeriodicDelaunay3_vertex v4, 
+                PeriodicDelaunay3_cell c = PeriodicDelaunay3_cell(),
                 int i1 = 0, int i2 = 0, int i3 = 0, int i4 = 0):
         r"""Determine if two vertices form a cell in the triangulation.  
 
         Args:
-            v1 (Delaunay3_vertex): First vertex. 
-            v2 (Delaunay3_vertex): Second vertex.
-            v3 (Delaunay3_vertex): Third vertex.
-            v4 (Delaunay3_vertex): Fourth vertex.
-            c (Delaunay3_cell, optional): If provided and the two vertices 
-                form a cell, the cell they form is stored here.
+            v1 (PeriodicDelaunay3_vertex): First vertex. 
+            v2 (PeriodicDelaunay3_vertex): Second vertex.
+            v3 (PeriodicDelaunay3_vertex): Third vertex.
+            v4 (PeriodicDelaunay3_vertex): Fourth vertex.
+            c (PeriodicDelaunay3_cell, optional): If provided and the two 
+                vertices form a cell, the cell they form is stored here.
             i1 (int, optional): If provided and the two vertices form a cell,
                 the index of v1 in cell c is stored here.
             i2 (int, optional): If provided and the two vertices form a cell,
@@ -2573,35 +2902,35 @@ cdef class Delaunay3:
             x (:obj:`ndarray` of float64): x,y coordinates. 
 
         Returns: 
-            Delaunay3_vertex: Vertex closest to x. 
+            PeriodicDelaunay3_vertex: Vertex closest to x. 
 
         """
         assert(len(x) == 3)
-        cdef Delaunay_with_info_3[info_t].Vertex vc
+        cdef PeriodicDelaunay_with_info_3[info_t].Vertex vc
         with nogil:
             vc = self.T.nearest_vertex(&x[0])
-        cdef Delaunay3_vertex v = Delaunay3_vertex()
+        cdef PeriodicDelaunay3_vertex v = PeriodicDelaunay3_vertex()
         v.assign(self.T, vc)
         return v
 
-    def mirror_facet(self, Delaunay3_facet x):
+    def mirror_facet(self, PeriodicDelaunay3_facet x):
         r"""Get the same facet as referenced from its other incident cell. 
 
         Args:
-            x (Delaunay3_facet): Facet to mirror.
+            x (PeriodicDelaunay3_facet): Facet to mirror.
 
         Returns:
-            Delaunay3_facet: The same facet as x, but referenced from the 
-                other cell incident to x.
+            PeriodicDelaunay3_facet: The same facet as x, but referenced from 
+                the other cell incident to x.
 
         """
         return x.mirror
 
-    def mirror_index(self, Delaunay3_cell x, int i):
+    def mirror_index(self, PeriodicDelaunay3_cell x, int i):
         r"""Get the index of a cell with respect to its ith neighbor. 
 
         Args: 
-            x (Delaunay3_cell): Cell to get mirrored index for. 
+            x (PeriodicDelaunay3_cell): Cell to get mirrored index for. 
             i (int): Index of neighbor that should be used to determine the 
                 mirrored index. 
 
@@ -2611,17 +2940,17 @@ cdef class Delaunay3:
         """
         return x.mirror_index(i)
 
-    def mirror_vertex(self, Delaunay3_cell x, int i):
+    def mirror_vertex(self, PeriodicDelaunay3_cell x, int i):
         r"""Get the vertex of a cell's ith neighbor opposite to the cell. 
 
         Args: 
-            x (Delaunay3_cell): Cell. 
+            x (PeriodicDelaunay3_cell): Cell. 
             i (int): Index of neighbor that should be used to determine the 
                 mirrored vertex. 
 
         Returns:
-            Delaunay3_vertex: Vertex in the ith neighboring cell of cell x, 
-                that is opposite to cell x. 
+            PeriodicDelaunay3_vertex: Vertex in the ith neighboring cell of cell 
+                x, that is opposite to cell x. 
 
         """
         return x.mirror_vertex(i)
@@ -2629,28 +2958,28 @@ cdef class Delaunay3:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
-                                  Delaunay3_cell start):
+                                  PeriodicDelaunay3_cell start):
         r"""Get the facets bounding the zone in conflict with a given point. 
 
         Args: 
             pos (:obj:`ndarray` of float64): x,y,z coordinates. 
-            start (Delaunay3_cell): Cell to start list of facets at. 
+            start (PeriodicDelaunay3_cell): Cell to start list of facets at. 
 
         Returns: 
-            :obj:`list` of Delaunay3_facet: Facets bounding the zone in conflict 
-                 with pos. 
+            :obj:`list` of PeriodicDelaunay3_facet: Facets bounding the zone in 
+                 conflict with pos. 
 
         """
         assert(len(pos) == 3)
-        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
-                  vector[Delaunay_with_info_3[info_t].Facet]] cv
+        cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
+                  vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
         with nogil:
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef np.uint32_t i
-        cdef Delaunay3_facet f
+        cdef PeriodicDelaunay3_facet f
         for i in range(cv.second.size()):
-            f = Delaunay3_facet()
+            f = PeriodicDelaunay3_facet()
             f.assign(self.T, cv.second[i])
             out_facets.append(f)
         return out_facets
@@ -2658,27 +2987,27 @@ cdef class Delaunay3:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
-                      Delaunay3_cell start):
+                      PeriodicDelaunay3_cell start):
         r"""Get the cells in conflict with a given point.
 
         Args: 
             pos (:obj:`ndarray` of float64): x,y,z coordinates. 
-            start (Delaunay3_cell): Cell to start list of facets at. 
+            start (PeriodicDelaunay3_cell): Cell to start list of facets at. 
 
         Returns: 
-            :obj:`list` of Delaunay3_cell: Cells in conflict with pos. 
+            :obj:`list` of PeriodicDelaunay3_cell: Cells in conflict with pos. 
 
         """
         assert(len(pos) == 3)
-        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
-                  vector[Delaunay_with_info_3[info_t].Facet]] cv
+        cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
+                  vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
         with nogil:
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_cells = []
         cdef np.uint32_t i
-        cdef Delaunay3_cell c
+        cdef PeriodicDelaunay3_cell c
         for i in range(cv.first.size()):
-            c = Delaunay3_cell()
+            c = PeriodicDelaunay3_cell()
             c.assign(self.T, cv.first[i])
             out_cells.append(c)
         return out_cells
@@ -2686,35 +3015,36 @@ cdef class Delaunay3:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
-                                   Delaunay3_cell start):
+                                   PeriodicDelaunay3_cell start):
         r"""Get the cells in conflict with a given point and the facets bounding 
             the zone in conflict.
 
         Args: 
             pos (:obj:`ndarray` of float64): x,y,z coordinates. 
-            start (Delaunay3_cell): Cell to start list of facets at. 
+            start (PeriodicDelaunay3_cell): Cell to start list of facets at. 
 
         Returns: 
-            tuple: :obj:`list` of `Delaunay3_cell`s in conflict with pos and 
-                :obj:`list` of `Delaunay3_facet`s bounding the zone in conflict.
+            tuple: :obj:`list` of `PeriodicDelaunay3_cell`s in conflict with pos 
+                and :obj:`list` of `PeriodicDelaunay3_facet`s bounding the zone 
+                in conflict.
 
         """
         assert(len(pos) == 3)
-        cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
-                  vector[Delaunay_with_info_3[info_t].Facet]] cv
+        cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
+                  vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
         with nogil:
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef object out_cells = []
         cdef np.uint32_t i
-        cdef Delaunay3_cell c
-        cdef Delaunay3_facet f
+        cdef PeriodicDelaunay3_cell c
+        cdef PeriodicDelaunay3_facet f
         for i in range(cv.first.size()):
-            c = Delaunay3_cell()
+            c = PeriodicDelaunay3_cell()
             c.assign(self.T, cv.first[i])
             out_cells.append(c)
         for i in range(cv.second.size()):
-            f = Delaunay3_facet()
+            f = PeriodicDelaunay3_facet()
             f.assign(self.T, cv.second[i])
             out_facets.append(f)
         return out_cells, out_facets

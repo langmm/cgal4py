@@ -256,23 +256,23 @@ def test_vert():
     vold = None
     for v in T.all_verts:
         pnt = v.point
-        pnt = v.periodic_point
+        per = v.periodic_point
         idx = v.index
         vol = v.dual_volume
         print(pts[idx,:])
-        print(v, idx, pnt, vol)
+        print(v, idx, vol, pnt, per)
         assert(v == v)
         if vold is not None:
             assert(v != vold)
         if v.is_infinite():
-            assert(np.isinf(pnt).all())
+            assert(np.isinf(per).all())
             assert(idx == np.iinfo(np.uint32).max)
             assert(np.isclose(vol, -1))
         else:
-            assert(np.allclose(pnt, pts[idx,:]))
+            assert(np.allclose(per, pts[idx,:]))
             c = v.cell
             v.set_cell(c)
-            v.set_point(pnt)
+            v.set_point(per)
         vold = v
 
 def test_edge():
@@ -295,10 +295,7 @@ def test_edge():
         else:
             p1 = e.point(0)
             p2 = e.point(1)
-            print p1
-            print p2
             l = np.sqrt(np.sum((p1 - p2)**2.0))
-            print l, elen
             assert(np.isclose(elen, l))
         eold = e
 
@@ -374,7 +371,7 @@ def test_cell():
             assert(c.side(c.center) == 1)
             if np.all((v1.point % 1) == 0):
                 assert(c.side(v1.point) == 0)
-            assert(c.side(p_outside(c.point(0),c.center)))
+            assert(c.side(p_outside(c.point(0),c.center)) == -1)
             assert(c.side_of_circle(c.circumcenter) == 1)
             if np.all((c.point(0) % 1) == 0):
                 assert(c.side_of_circle(c.point(0)) == 0)

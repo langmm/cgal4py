@@ -26,6 +26,12 @@ ctypedef uint32_t info_t
 cdef object np_info = np.uint32
 ctypedef np.uint32_t np_info_t
 
+def is_valid():
+    if (VALID == 1):
+        return True
+    else:
+        return False
+
 cdef class Delaunay3_vertex:
     r"""Wrapper class for a triangulation vertex.
 
@@ -2785,10 +2791,16 @@ cdef class Delaunay3:
         cdef object lind = [None, None, None]
         cdef object rind = [None, None, None]
         cdef info_t iN = 0
-        for i, lr in enumerate([lx, ly, lz]):
+        for i in range(3):
+            if   i == 0: lr = lx
+            elif i == 1: lr = ly
+            elif i == 2: lr = lz
             iN = <info_t>lr.size()
             lind[i] = np.zeros(iN, np_info)
-        for i, lr in enumerate([rx, ry, rz]):
+        for i in range(3):
+            if   i == 0: lr = rx
+            elif i == 1: lr = ry
+            elif i == 2: lr = rz
             iN = <info_t>lr.size()
             rind[i] = np.zeros(iN, np_info)
         # Fill in 
@@ -2796,11 +2808,17 @@ cdef class Delaunay3:
         cdef np.ndarray[info_t] lr_arr
         iN = alln.size()
         iind = np.array([alln[j] for j in xrange(<int>iN)], np_info)
-        for i, lr in enumerate([lx, ly, lz]):
+        for i in range(3):
+            if   i == 0: lr = lx
+            elif i == 1: lr = ly
+            elif i == 2: lr = lz
             iN = <info_t>lr.size()
             lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
             lind[i] = lr_arr
-        for i, lr in enumerate([rx, ry, rz]):
+        for i in range(3):
+            if   i == 0: lr = rx
+            elif i == 1: lr = ry
+            elif i == 2: lr = rz
             iN = <info_t>lr.size()
             lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
             rind[i] = lr_arr
