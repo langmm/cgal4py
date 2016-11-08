@@ -58,9 +58,10 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
 def test_triangulate():
     T2 = triangulate(pts2)
     T3 = triangulate(pts3)
-    # T2 = triangulate(pts2, periodic=True,
-    #                  left_edge=left_edge, right_edge=right_edge)
-    assert_raises(NotImplementedError, triangulate, pts3, periodic=True)
+    T2 = triangulate(pts2, periodic=True,
+                     left_edge=left_edge2, right_edge=right_edge2)
+    T3 = triangulate(pts3, periodic=True,
+                     left_edge=left_edge3, right_edge=right_edge3)
     assert_raises(ValueError, triangulate, np.zeros((3,3,3)))
     assert_raises(ValueError, triangulate, pts2, left_edge=np.zeros(3))
     assert_raises(ValueError, triangulate, pts2, right_edge=np.zeros(3))
@@ -71,9 +72,10 @@ def test_triangulate():
 def test_voronoi_volumes():
     v2 = voronoi_volumes(pts2)
     v3 = voronoi_volumes(pts3)
-    # v2 = voronoi_volumes(pts2, periodic=True,
-    #                      left_edge=left_edge, right_edge=right_edge)
-    assert_raises(NotImplementedError, voronoi_volumes, pts3, periodic=True)
+    v2 = voronoi_volumes(pts2, periodic=True,
+                         left_edge=left_edge2, right_edge=right_edge2)
+    v3 = voronoi_volumes(pts3, periodic=True,
+                         left_edge=left_edge3, right_edge=right_edge3)
     assert_raises(ValueError, voronoi_volumes, np.zeros((3,3,3)))
     assert_raises(ValueError, voronoi_volumes, pts2, left_edge=np.zeros(3))
     assert_raises(ValueError, voronoi_volumes, pts2, right_edge=np.zeros(3))
