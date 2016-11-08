@@ -3,6 +3,9 @@
 #include <memory>
 #include <iterator>
 #include <list>
+#include <iostream>
+#include <sstream>
+#include <fstream>
 
 namespace CGAL 
 {
@@ -67,6 +70,17 @@ enum  Sign
 
   class Exact_predicates_inexact_constructions_kernel {
   public:
+    class Offset {
+    public:
+      Offset() {};
+      Offset(int x, int y) {};
+      Offset(int x, int y, int z) {};
+      int x() { return 0; }
+      int y() { return 0; }
+      int z() { return 0; }
+      int operator[](int i) { return 0;}
+    };
+
     class Point {
     public:
       Point() {};
@@ -81,6 +95,8 @@ enum  Sign
     public:
       Segment() {};
       Segment(Point p1, Point p2) {};
+      Point vertex(int i) { return Point(); }
+      double squared_length() { return 0.0; }
     };
 
     class Triangle {
@@ -88,6 +104,7 @@ enum  Sign
       Triangle() {};
       Triangle(Point p1, Point p2, Point p3) {};
       double area() { return 0.0; }
+      Point vertex(int i) { return Point(); }
     };
 
     class Tetrahedron {
@@ -95,7 +112,65 @@ enum  Sign
       Tetrahedron() {};
       Tetrahedron(Point p1, Point p2, Point p3, Point p4) {};
       double volume() { return 0.0; }
+      Point vertex(int i) { return Point(); }
     };
+
+    class Iso_rectangle {
+    public:
+      Iso_rectangle() {};
+      Iso_rectangle(const Point &p, const Point &q) {};
+      Iso_rectangle(const Point &p, const Point &q, int i) {};
+      Iso_rectangle(const Point &left, const Point &right,
+		    const Point &bottom, const Point &top) {};
+      // Iso_rectangle(double &min_hx, double &min_hy, 
+      // 		    double &max_hx, double &max_hy, double hw=0.0) {};
+      Iso_rectangle(const double min_hx, const double min_hy, 
+		    const double max_hx, const double max_hy, double hw=0.0) {};
+      Point vertex(int i) const { return Point(); }
+      Point operator[](int i) const { return Point(); }
+      Point min() const { return Point(); }
+      Point max() const { return Point(); }
+      double xmin() const { return 0.0; }
+      double ymin() const { return 0.0; }
+      double xmax() const { return 0.0; }
+      double ymax() const { return 0.0; }
+      double min_coord(int i) const { return 0.0; }
+      double max_coord(int i) const { return 0.0; }
+    }; 
+
+    class Iso_cuboid {
+    public:
+      Iso_cuboid() {};
+      Iso_cuboid(const Point &p, const Point &q) {};
+      Iso_cuboid(const Point &p, const Point &q, int i) {};
+      Iso_cuboid(const Point &left, const Point &right,
+		 const Point &bottom, const Point &top,
+		 const Point &far, const Point &close) {};
+      // Iso_cuboid(double &min_hx, double &min_hy, double &min_hz,
+      // 		 double &max_hx, double &max_hy, double &max_hz, double hw=0.0) {};
+      Iso_cuboid(const double min_hx, const double min_hy, const double min_hz,
+		 const double max_hx, const double max_hy, const double max_hz, double hw=0.0) {};
+      Point vertex(int i) const { return Point(); }
+      Point operator[](int i) const { return Point(); }
+      Point min() const { return Point(); }
+      Point max() const { return Point(); }
+      double xmin() const { return 0.0; }
+      double ymin() const { return 0.0; }
+      double zmin() const { return 0.0; }
+      double xmax() const { return 0.0; }
+      double ymax() const { return 0.0; }
+      double zmax() const { return 0.0; }
+      double min_coord(int i) const { return 0.0; }
+      double max_coord(int i) const { return 0.0; }
+    }; 
+   
+    typedef std::array< int, 2 >            Covering_sheets_2;
+    typedef std::array< int, 3 >            Covering_sheets_3;
+    typedef std::pair< Point, Offset >      Periodic_point;
+    typedef std::array< Periodic_point, 2 > Periodic_segment;
+    typedef std::array< Periodic_point, 3 > Periodic_triangle;
+    typedef std::array< Periodic_point, 4 > Periodic_tetrahedron;
+
   };
 
   template < class H, bool Const >
@@ -270,6 +345,7 @@ enum  Sign
     void cw_permute() {};
     int dimension() const { return 0; }
     bool is_valid(bool /*verbose*/=false, int /*level*/= 0) const { return false; }
+    int offset(int i) { return 0; }
   };
 
   template < class Tds >
@@ -311,6 +387,7 @@ enum  Sign
     int dimension() const { return 0; }
     bool is_valid(bool /*verbose*/=false, int /*level*/= 0) const { return false; }
     Point circumcenter() const { return Point(); }
+    int offset(int i) { return 0; }
   };
 
   // Things specific to 2D case
@@ -397,6 +474,7 @@ enum  Sign
     bool operator!=(const Face_handle &fh) const { return pos != fh; }
     Face& operator*() const { return *pos; }
     Face* operator->() const { return &*pos; }
+    bool is_empty() const { return false; }
   };
   template < class Tds_ >
   bool operator==(typename Tds_::Face_handle fh,
@@ -559,17 +637,36 @@ enum  Sign
     }
   };
 
-  template < typename Info_, typename GT>
-  class Triangulation_vertex_base_with_info_2 {
+  template < typename Tds = void >
+  class Triangulation_ds_vertex_base_2 {
+  public:
+    typedef Tds                                   Triangulation_data_structure;
+  };
+
+  template < typename GT, typename Vb = Triangulation_ds_vertex_base_2<> >
+  class Triangulation_vertex_base_2 : public Vb {
+    typedef typename Vb::Triangulation_data_structure    Tds;
+  public:
+    typedef GT                                    Geom_traits;
+    typedef Tds                                   Triangulation_data_structure;
+  };
+
+  template < typename Info_, typename GT, 
+	     typename Vb = Triangulation_vertex_base_2<GT> >
+  class Triangulation_vertex_base_with_info_2 : public Vb {
     Info_ _info;
   public:
     typedef Info_ Info;
   };
 
-  template < class Vb >
+  template < typename GT >
+  class Triangulation_face_base_2 {};
+
+  template < class Vb, 
+	     class Fb = Triangulation_face_base_2<typename Vb::Geom_traits> >
   class Triangulation_data_structure_2 {
   public:
-    typedef Triangulation_data_structure_2<Vb>         Tds;
+    typedef Triangulation_data_structure_2<Vb,Fb>      Tds;
     typedef typename Vb::Info                          Info;
     typedef Vertex_base_2<Tds,Info>                    Vertex;
     typedef Face_base<Tds>                             Face;
@@ -1141,22 +1238,43 @@ enum  Sign
     Proxy_Facet operator->() const { return Proxy_Facet(* *this); }
   };
 
-  template < typename Info_, typename GT>
-  class Triangulation_vertex_base_with_info_3 {
+  // Vertex base in 3D
+  template < typename Tds = void >
+  class Triangulation_ds_vertex_base_3 {};
+
+  template < typename GT, typename Vb = Triangulation_ds_vertex_base_3<> >
+  class Triangulation_vertex_base_3 : public Vb {};
+
+  template < typename Info_, typename GT, 
+	     typename Vb = Triangulation_vertex_base_3<GT> >
+  class Triangulation_vertex_base_with_info_3 : public Vb {
     Info_ _info;
   public:
     typedef Info_ Info;
   };
 
-  template < typename GT>
-  class Triangulation_cell_base_with_circumcenter_3 {};
+  // Cell base in 3D w/ support for deprecated CGAL
+  template < typename Tds = void >
+  class Triangulation_ds_cell_base_3 {};
 
+  template < typename GT, typename Cb = Triangulation_ds_cell_base_3<> >
+  class Triangulation_cell_base_3 : public Cb {};
+
+  template < typename GT, 
+	     typename Cb = Triangulation_cell_base_3<GT> >
+  class Triangulation_cell_base_with_circumcenter_3 {};
+  template < typename GT, 
+	     typename Cb = Triangulation_cell_base_3<GT> >
+  class Delaunay_triangulation_cell_base_with_circumcenter_3 : 
+    public Triangulation_cell_base_with_circumcenter_3<GT, Cb> {};
+
+  // Data structure in 3D
   template < class Vb, class Cb >
   class Triangulation_data_structure_3 {
   public:
     typedef Triangulation_data_structure_3<Vb,Cb>      Tds;
     typedef typename Vb::Info                          Info;
-    typedef Vertex_base_3<Tds,Info>                     Vertex;
+    typedef Vertex_base_3<Tds,Info>                    Vertex;
     typedef Cell_base<Tds>                             Cell;
     
   private:
@@ -1469,6 +1587,16 @@ enum  Sign
     Vertex_handle move_if_no_collision(Vertex_handle v, const Point &p) { return Vertex_handle(); }
     Vertex_handle move(Vertex_handle v, const Point &p) { return Vertex_handle(); }
 
+    Bounded_side side_of_edge(const Point & p, Cell_handle c,
+			      Locate_type & lt, int & li) const { return ON_BOUNDARY; }
+    Bounded_side side_of_edge(const Point & p, const Edge &e,
+			      Locate_type & lt, int & li) const { return ON_BOUNDARY; }
+    Bounded_side side_of_facet(const Point & p, Cell_handle c,
+			       Locate_type & lt, int & li, int & lj) const { return ON_BOUNDARY; }
+    Bounded_side side_of_facet(const Point & p, const Facet &f,
+			       Locate_type & lt, int & li, int & lj) const { return ON_BOUNDARY; }
+    Bounded_side side_of_cell(const Point & p, Cell_handle c,
+			      Locate_type & lt, int & li, int & lj) const { return ON_BOUNDARY; }
     Bounded_side side_of_sphere(Cell_handle c, const Point & p,
 				bool perturb = false) const { return ON_BOUNDARY; }
     Bounded_side side_of_circle( const Facet & f, const Point & p, bool perturb = false) const { return ON_BOUNDARY; }
@@ -1554,5 +1682,208 @@ enum  Sign
 						      OutputIterator res) const { return res; }
     
   };
+
+  // Periodic additions
+  template < typename Tds = void >
+  class Periodic_3_triangulation_ds_vertex_base_3 {};
+  template < typename Tds = void >
+  class Periodic_3_triangulation_ds_cell_base_3 {};
+
+  template < typename GT >
+  class Periodic_2_triangulation_vertex_base_2 {};
+  template < typename GT >
+  class Periodic_2_triangulation_face_base_2 {};
+
+  template < class K >
+  class Periodic_2_triangulation_traits_2 : public K {};
+  template < class K >
+  class Periodic_3_Delaunay_triangulation_traits_3 : public K {};
+
+  template < class Gt, class Tds >
+  class Periodic_2_Delaunay_triangulation_2 : 
+    public Delaunay_triangulation_2<Gt,Tds> {
+    typedef Delaunay_triangulation_2<Gt,Tds>     DS;
+  public:
+    typedef typename DS::Vertex                Vertex;
+    typedef typename DS::Edge                  Edge;
+    typedef typename DS::Face                  Face;
+    typedef typename DS::Vertex_handle         Vertex_handle;
+    typedef typename DS::Face_handle           Face_handle;
+    typedef typename DS::Vertex_circulator     Vertex_circulator;
+    typedef typename DS::Edge_circulator       Edge_circulator;
+    typedef typename DS::Face_circulator       Face_circulator;
+    typedef typename DS::Line_face_circulator  Line_face_circulator;
+    typedef typename DS::All_vertices_iterator Vertex_iterator;
+    typedef typename DS::All_edges_iterator    Edge_iterator;
+    typedef typename DS::All_faces_iterator    Face_iterator;
+
+    // typedef typename Tds::Vertex                 Vertex;
+    // typedef typename Tds::Face                   Face;
+    // typedef typename Tds::Edge                   Edge;
+    // typedef typename Tds::Vertex_handle          Vertex_handle;
+    // typedef typename Tds::Face_handle            Face_handle;
+
+    // typedef typename Tds::Face_circulator        Face_circulator;
+    // typedef typename Tds::Vertex_circulator      Vertex_circulator;
+    // typedef typename Tds::Edge_circulator        Edge_circulator;
+
+    // typedef typename Tds::Line_face_circulator   Line_face_circulator;
+
+    // typedef typename Tds::Face_iterator          All_faces_iterator;
+    // typedef typename Tds::Edge_iterator          All_edges_iterator;
+    // typedef typename Tds::Vertex_iterator        All_vertices_iterator;
+
+    // typedef Filter_iterator<All_faces_iterator>  Finite_faces_iterator;
+    // typedef Filter_iterator<All_edges_iterator>  Finite_edges_iterator;
+    // typedef Filter_iterator<All_vertices_iterator>  Finite_vertices_iterator;
+
+    // typedef Finite_faces_iterator                Face_iterator;
+    // typedef Finite_edges_iterator                Edge_iterator;
+    // typedef Finite_vertices_iterator             Vertex_iterator;
+
+    typedef typename Tds::Info Info;
+    typedef typename Gt::Point Point;
+    typedef typename Gt::Segment Segment;
+    typedef typename Gt::Triangle Triangle;
+    typedef typename Gt::Offset               Offset;
+    typedef typename Gt::Covering_sheets_2    Covering_sheets;
+    typedef typename Gt::Iso_rectangle        Iso_rectangle;
+    typedef typename Gt::Periodic_point       Periodic_point;
+    typedef typename Gt::Periodic_triangle    Periodic_triangle;
+    typedef typename Gt::Periodic_segment     Periodic_segment;
+    int number_of_edges() const { return 0; }
+    Covering_sheets number_of_sheets() const { return {0,0}; }
+    int number_of_stored_vertices() const { return 0; }
+    int number_of_stored_edges() const { return 0; }
+    int number_of_stored_faces() const { return 0; }
+
+    Iso_rectangle domain() const { return Iso_rectangle(); }
+    void set_domain(const Iso_rectangle &x) const {};
+
+    Point point (const Vertex_handle &v) const { return Point(); }
+    Point point(const Periodic_point &p) const { return Point(); }
+    Segment segment(const Edge &e) const { return Segment(); }
+    Segment segment(const Periodic_segment &s) const { return Segment(); }
+    Triangle triangle(const Face_handle f) const { return Triangle(); }
+    Triangle triangle(const Periodic_triangle &t) const { return Triangle(); }
+    Periodic_point periodic_point(const Vertex_handle v) const { return Periodic_point(); }
+    Periodic_point periodic_point(const Face_handle f, int i) const { return Periodic_point(); }
+    Periodic_segment periodic_segment(const Edge &e) const { return Periodic_segment(); }
+    Periodic_segment periodic_segment(const Face_handle f, int i) const { return Periodic_segment(); }
+    Periodic_triangle periodic_triangle(const Face_handle f) const { return Periodic_triangle(); }
+
+    Face_iterator faces_begin() const {return DS::all_faces_begin();}
+    Face_iterator faces_end() const {return DS::all_faces_end();}
+    Edge_iterator edges_begin() const {return DS::all_edges_begin();}
+    Edge_iterator edges_end() const {return DS::all_edges_end();}
+    Vertex_iterator vertices_begin() const {return DS::all_vertices_begin();}
+    Vertex_iterator vertices_end() const {return DS::all_vertices_end();}
+
+    void convert_to_1_sheeted_covering() {};
+    void convert_to_9_sheeted_covering() {};
+
+    Vertex_handle move_point(Vertex_handle v, const Point &p) { return Vertex_handle(); }
+
+    void set_offsets(Face_handle f, int o0, int o1, int o2) {};
+    Offset get_offset(Face_handle f, int i) const { return Offset(); }
+    Offset get_offset(Vertex_handle vh) const { return Offset(); }
+    Vertex_handle get_original_vertex(Vertex_handle vh) const { return Vertex_handle(); }
+    Offset combine_offsets(const Offset& o_c, const Offset& o_t) const { return Offset(); }
+    int off_to_int(const Offset & off) const { return 0; }
+    Offset int_to_off(int i) const { return Offset(); }
+    Vertex_circulator adjacent_vertices(Vertex_handle v,
+					Face_handle f = Face_handle()) const { return Vertex_circulator(); }
+    std::ostream& save(std::ostream& os) const { return os; }
+    std::istream& load(std::istream& is) { return is; }
+    void flippable(Face_handle f, int i) {};
+  };
+  template < class Gt, class Tds >
+  class Periodic_3_Delaunay_triangulation_3 : 
+    public Delaunay_triangulation_3<Gt,Tds> {
+  public:
+    typedef typename Tds::Vertex                 Vertex;
+    typedef typename Tds::Cell                   Cell;
+    typedef typename Tds::Facet                  Facet;
+    typedef typename Tds::Edge                   Edge;
+    typedef typename Tds::Vertex_handle          Vertex_handle;
+    typedef typename Tds::Cell_handle            Cell_handle;
+
+    typedef typename Tds::Cell_circulator        Cell_circulator;
+    typedef typename Tds::Facet_circulator       Facet_circulator;
+
+    typedef typename Tds::Cell_iterator          Cell_iterator;
+    typedef typename Tds::Facet_iterator         Facet_iterator;
+    typedef typename Tds::Edge_iterator          Edge_iterator;
+    typedef typename Tds::Vertex_iterator        Vertex_iterator;
+  
+    typedef Cell_iterator                        All_cells_iterator;
+    typedef Facet_iterator                       All_facets_iterator;
+    typedef Edge_iterator                        All_edges_iterator;
+    typedef Vertex_iterator                      All_vertices_iterator;
+
+    typedef Filter_iterator<All_cells_iterator>  Finite_cells_iterator;
+    typedef Filter_iterator<All_facets_iterator> Finite_facets_iterator;
+    typedef Filter_iterator<All_edges_iterator>  Finite_edges_iterator;
+    typedef Filter_iterator<All_vertices_iterator>  Finite_vertices_iterator;
+
+    typedef typename Tds::Info Info;
+    typedef typename Gt::Point Point;
+    typedef typename Gt::Segment Segment;
+    typedef typename Gt::Triangle Triangle;
+    typedef typename Gt::Tetrahedron Tetrahedron;
+    typedef typename Gt::Offset               Offset;
+    typedef typename Gt::Iso_cuboid           Iso_cuboid;
+    typedef typename Gt::Covering_sheets_3    Covering_sheets;
+    typedef typename Gt::Periodic_point       Periodic_point;
+    typedef typename Gt::Periodic_triangle    Periodic_triangle;
+    typedef typename Gt::Periodic_segment     Periodic_segment;
+    typedef typename Gt::Periodic_tetrahedron Periodic_tetrahedron;
+
+  private:
+    std::vector<Vertex_handle> _vert;
+  public:
+
+    Covering_sheets number_of_sheets() const { return {0,0,0}; }
+    int number_of_stored_vertices() const { return 0; }
+    int number_of_stored_edges() const { return 0; }
+    int number_of_stored_facets() const { return 0; }
+    int number_of_stored_cells() const { return 0; }
+    Iso_cuboid domain() const { return Iso_cuboid(); }
+    void set_domain(const Iso_cuboid &x) const {};
+    Point point(const Vertex_handle &v) const { return Point(); }
+    Point point(const Periodic_point &p) const { return Point(); }
+    Segment segment(const Periodic_segment &s) const { return Segment(); }
+    Triangle triangle(const Periodic_triangle &t) const { return Triangle(); }
+    Tetrahedron tetrahedron(const Periodic_tetrahedron &t) const { return Tetrahedron(); }
+    Periodic_point periodic_point(const Vertex_handle v) const { return Periodic_point(); }
+    Periodic_point periodic_point(const Cell_handle c, int i) const { return Periodic_point(); }
+    Periodic_segment periodic_segment(const Edge &e) const { return Periodic_segment(); }
+    Periodic_segment periodic_segment(const Cell_handle c, int i, int j) const { return Periodic_segment(); }
+    Periodic_triangle periodic_triangle(const Facet &f) const { return Periodic_triangle(); }
+    Periodic_triangle periodic_triangle(const Cell_handle c, int i) const { return Periodic_triangle(); }
+    Periodic_tetrahedron periodic_tetrahedron(const Cell_handle c) const {return Periodic_tetrahedron(); }
+    void convert_to_1_sheeted_covering() {};
+    void convert_to_27_sheeted_covering() {};
+    Vertex_handle move_point(Vertex_handle v, const Point &p) { return Vertex_handle(); }
+    void set_offsets(Cell_handle c, int o0, int o1, int o2, int o3) {};
+    Offset get_offset(Cell_handle ch, int i) const { return Offset(); }
+    Offset get_offset(Vertex_handle vh) const { return Offset(); }
+    Vertex_handle get_original_vertex(Vertex_handle vh) const { return Vertex_handle(); }
+    Offset combine_offsets(const Offset& o_c, const Offset& o_t) const { return Offset(); }
+    int off_to_int(const Offset & off) const { return 0; }
+    Offset int_to_off(int i) const { return Offset(); }
+    Periodic_point periodic_circumcenter(Cell_handle c) const { return Periodic_point(); }
+    const std::vector<Vertex_handle>& periodic_copies(const Vertex_handle v) const { return _vert; }
+  };
+
+  template<class Gt, class Tds>
+  std::istream&
+  operator>>(std::istream& is, Periodic_3_Delaunay_triangulation_3<Gt, Tds> &tr) { return is; }
+  template<class Gt, class Tds>
+  std::ostream&
+  operator<<(std::ostream& os, const Periodic_3_Delaunay_triangulation_3<Gt, Tds> &tr) { return os; }
+  // template<class Gt, class Tds>
+  // std::ofstream&
+  // operator<<(std::ofstream& os, Periodic_3_Delaunay_triangulation_3<Gt, Tds> &tr) { return os; }
 
 };

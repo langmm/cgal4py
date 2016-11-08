@@ -23,9 +23,9 @@ Indices and tables
 
 
 .. todo::
-   * serial periodic in 2D
-   * serial periodic in 3D
-   * conditional compilation of periodic cases if CGAL version is not 4.9 or higher
+   * separate out dummyCGAL into separate cases to make it more managable
+   * design logo
+   * upload to PyPI
    * documentation for simple examples
    * General structure:
       * MPI parallelism:

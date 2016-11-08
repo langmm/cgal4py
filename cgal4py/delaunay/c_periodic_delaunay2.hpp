@@ -58,7 +58,6 @@ public:
   typedef typename Delaunay::Vertex_iterator           Vertex_iterator;
   typedef typename Delaunay::Face_iterator             Face_iterator;
   typedef typename Delaunay::Edge_iterator             Edge_iterator;
-  typedef typename Delaunay::Unique_vertex_iterator    Unique_vertex_iterator;
   typedef typename Delaunay::Locate_type               Locate_type;
   typedef typename Delaunay::Iso_rectangle             Iso_rectangle;
   typedef typename Delaunay::Covering_sheets           Covering_sheets;
@@ -720,7 +719,7 @@ public:
     Iso_rectangle dom_rect = T1.domain();
     Covering_sheets ns_dim = T.number_of_sheets();
     n = static_cast<I>(T1.number_of_vertices());
-    m = static_cast<I>(T1.tds().number_of_full_dim_faces());
+    m = static_cast<I>(T1.number_of_faces());
     d = static_cast<I>(T1.dimension());
     domain[0] = dom_rect.xmin();
     domain[1] = dom_rect.ymin();
@@ -749,8 +748,8 @@ public:
       
     // vertices of the faces
     inum = 0;
-    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
-	 ib != T1.tds().face_iterator_base_end(); ++ib) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < dim ; ++j) {
 	vit = ib->vertex(j);
 	faces[dim*inum + j] = V[vit];
@@ -760,20 +759,20 @@ public:
   
     // neighbor pointers of the faces
     inum = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < d+1; ++j){
-	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+	neighbors[(d+1)*inum + j] = F[ib->neighbor(j)];
       }
       inum++;
     }
 
     // offsets of face vertices
     inum = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < d+1; ++j){
-	offsets[(d+1)*inum + j] = it->offset(j);
+	offsets[(d+1)*inum + j] = ib->offset(j);
       }
       inum++;
     }
@@ -794,7 +793,7 @@ public:
     Iso_rectangle dom_rect = T1.domain();
     Covering_sheets ns_dim = T.number_of_sheets();
     n = static_cast<I>(T1.number_of_vertices());
-    m = static_cast<I>(T1.tds().number_of_full_dim_faces());
+    m = static_cast<I>(T1.number_of_faces());
     d = static_cast<I>(T1.dimension());
     domain[0] = dom_rect.xmin();
     domain[1] = dom_rect.ymin();
@@ -813,8 +812,8 @@ public:
 
     // vertices of the faces
     inum = 0;
-    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
-	 ib != T1.tds().face_iterator_base_end(); ++ib) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < dim ; ++j) {
 	vit = ib->vertex(j);
 	faces[dim*inum + j] = vit->info();
@@ -824,20 +823,20 @@ public:
   
     // neighbor pointers of the faces
     inum = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < d+1; ++j){
-	neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+	neighbors[(d+1)*inum + j] = F[ib->neighbor(j)];
       }
       inum++;
     }
 
     // offsets of face vertices
     inum = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       for (j = 0; j < d+1; ++j){
-	offsets[(d+1)*inum + j] = it->offset(j);
+	offsets[(d+1)*inum + j] = ib->offset(j);
       }
       inum++;
     }
@@ -879,8 +878,8 @@ public:
     // vertices of the faces
     bool *include_face = (bool*)malloc(m*sizeof(bool));
     inum = 0, inum_tot = 0;
-    for (Face_iterator ib = T1.tds().face_iterator_base_begin();
-	 ib != T1.tds().face_iterator_base_end(); ++ib) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       include_face[inum_tot] = false;
       for (j = 0; j < dim ; ++j) {
 	vit = ib->vertex(j);
@@ -904,11 +903,11 @@ public:
 
     // neighbor pointers of the faces
     inum = 0, inum_tot = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       if (include_face[inum_tot]) {
 	for (j = 0; j < d+1; ++j){
-	  neighbors[(d+1)*inum + j] = F[it->neighbor(j)];
+	  neighbors[(d+1)*inum + j] = F[ib->neighbor(j)];
 	}
 	inum++;
       }
@@ -917,11 +916,11 @@ public:
 
     // offsets of face vertices
     inum = 0;
-    for (Face_iterator it = T1.tds().face_iterator_base_begin();
-	 it != T1.tds().face_iterator_base_end(); ++it) {
+    for (Face_iterator ib = T1.faces_begin();
+	 ib != T1.faces_end(); ++ib) {
       if (include_face[inum_tot]) {
 	for (j = 0; j < d+1; ++j){
-	  offsets[(d+1)*inum + j] = it->offset(j);
+	  offsets[(d+1)*inum + j] = ib->offset(j);
 	}
 	inum++;
       }
