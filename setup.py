@@ -3,7 +3,6 @@ from distutils.core import setup
 from distutils.extension import Extension
 import distutils.sysconfig
 from Cython.Build import cythonize
-from Cython.Compiler.Options import directive_defaults
 import numpy
 import os, copy
 try:
@@ -27,8 +26,10 @@ for key, value in cfg_vars.items():
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 # Needed for line_profiler - disable for production code
-directive_defaults['linetrace'] = True
-directive_defaults['binding'] = True
+if not RTDFLAG:
+    from Cython.Compiler.Options import directive_defaults
+    directive_defaults['linetrace'] = True
+    directive_defaults['binding'] = True
 
 # Set generic extension options
 ext_options = dict(language="c++",
