@@ -27,6 +27,7 @@ Indices and tables
    * design logo
    * upload to PyPI
    * documentation for simple examples
+   * run flake8
    * General structure:
       * MPI parallelism:
 	 1. Do domain decomp on process 0
