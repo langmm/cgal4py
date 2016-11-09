@@ -5,17 +5,16 @@ r"""Tests for the 2D Periodic Delaunay Extension.
    * test includes_edge
 
 """
-from nose import with_setup
 import numpy as np
 import os
 from cgal4py.delaunay import PeriodicDelaunay2 as Delaunay2
 
 left_edge = -2*np.ones(2, 'float64')
 right_edge = 2*np.ones(2, 'float64')
-pts = np.array([[-0.4941988586954018 , -0.07594397977563715],
-                [-0.06448037284989526,  0.4958248496365813 ],
-                [+0.4911154367094632 ,  0.09383830681375946],
-                [-0.348353580869097  , -0.3586778257652367 ],
+pts = np.array([[-0.49419885869540180, -0.07594397977563715],
+                [-0.06448037284989526,  0.49582484963658130],
+                [+0.49111543670946320,  0.09383830681375946],
+                [-0.34835358086909700, -0.35867782576523670],
                 [-1,     -1],
                 [-1,      1],
                 [+1,     -1],
@@ -25,16 +24,17 @@ nsheets = np.array([3, 3], 'int32')
 nverts_fin = pts.shape[0]
 nverts_inf = 0
 nverts = nverts_fin + nverts_inf
-nedges_fin = 24 #17
-nedges_inf = 0  #4
+nedges_fin = 24  # 17 in non-periodic
+nedges_inf = 0   # 4 in non-periodic
 nedges = nedges_fin + nedges_inf
-ncells_fin = 16 #10
-ncells_inf = 0  #4
+ncells_fin = 16  # 10 in non-periodic
+ncells_inf = 0   # 4 in non-periodic
 ncells = ncells_fin + ncells_inf
 
 
 def test_create():
     T = Delaunay2(left_edge, right_edge)
+    del T
 
 
 def test_insert():
@@ -224,7 +224,7 @@ def test_serialize():
     Tout.insert(pts)
     out = Tout.serialize()
     Tin = Delaunay2()
-    Tin.deserialize(pts,*out)
+    Tin.deserialize(pts, *out)
     print(Tout.num_cells, Tin.num_cells)
     assert(Tout.num_verts == Tin.num_verts)
     assert(Tout.num_cells == Tin.num_cells)
@@ -235,8 +235,8 @@ def test_locate():
     T.insert(pts)
     for c in T.finite_cells:
         p = c.center
-        print('{}\n{}\n{}'.format(c,p,T.locate(p)))
-        assert(c == T.locate(p,c))
+        print('{}\n{}\n{}'.format(c, p, T.locate(p)))
+        assert(c == T.locate(p, c))
         assert(c == T.locate(p))
         assert(c.vertex(0) == T.locate(c.vertex(0).point))
         assert(c.vertex(0) == T.locate(c.vertex(0).point, c))
@@ -250,7 +250,7 @@ def test_get_vertex():
     T.insert(pts)
     for i in range(nverts_fin):
         v = T.get_vertex(i)
-        assert(np.allclose(v.point, pts[i,:]))
+        assert(np.allclose(v.point, pts[i, :]))
 
 
 def test_remove():
@@ -272,7 +272,8 @@ def test_is_cell():
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
     assert(T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3)))
-    assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(nverts_fin-1)))
+    assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1),
+                         T.get_vertex(nverts_fin-1)))
 
 
 def test_vert():
@@ -284,7 +285,7 @@ def test_vert():
         per = v.periodic_point
         idx = v.index
         vol = v.dual_volume
-        print(pts[idx,:])
+        print(pts[idx, :])
         print(v, idx, vol, pnt, per)
         assert(v == v)
         if vold is not None:
@@ -294,7 +295,7 @@ def test_vert():
             assert(idx == np.iinfo(np.uint32).max)
             assert(np.isclose(vol, -1))
         else:
-            assert(np.allclose(per, pts[idx,:]))
+            assert(np.allclose(per, pts[idx, :]))
             c = v.cell
             v.set_cell(c)
             v.set_point(per)
@@ -342,8 +343,9 @@ def test_cell():
         e2 = c.edge(1)
         e3 = c.edge(2)
         assert(c.has_vertex(v1))
-        assert(c.has_vertex(v1, return_index = True) == 0)
+        assert(c.has_vertex(v1, return_index=True) == 0)
         assert(c.ind_vertex(v1) == 0)
+        del e1, e2, e3
 
         c.reset_vertices()
         c.set_vertex(0, v1)
@@ -353,7 +355,7 @@ def test_cell():
         n2 = c.neighbor(1)
         n3 = c.neighbor(2)
         assert(c.has_neighbor(n1))
-        assert(c.has_neighbor(n1, return_index = True) == 0)
+        assert(c.has_neighbor(n1, return_index=True) == 0)
         assert(c.ind_neighbor(n1) == 0)
 
         c.reset_neighbors()
@@ -361,30 +363,36 @@ def test_cell():
         c.set_neighbors(n3, n2, n1)
 
         p = c.circumcenter + 1.5*(c.point(0) - c.circumcenter)
-        def rad(point,center):
+
+        def rad(point, center):
             return np.sqrt(np.sum((point - center)**2))
-        def p_outside(point,center):
-            r_out = rad(point,center)
+
+        def p_outside(point, center):
+            r_out = rad(point, center)
             p_out = center+1.1*np.sqrt(2)*r_out
             return p_out
         for i in range(3):
-            print i
-            print '    Cell: ', c.point(i), c.periodic_point(i), c.periodic_offset(i)
-            print '    Vert: ', c.vertex(i).point, c.vertex(i).periodic_point, c.vertex(i).periodic_offset
-            # print i, c.point(i), c.periodic_point(i), c.vertex(i).point, rad(c.point(i), c.circumcenter)
-        print p,rad(p,c.circumcenter),c.side_of_circle(p)
-        print 80*'-'
+            print(i)
+            print('    Cell: ', c.point(i), c.periodic_point(i),
+                  c.periodic_offset(i))
+            print('    Vert: ', c.vertex(i).point, c.vertex(i).periodic_point,
+                  c.vertex(i).periodic_offset)
+        print(p, rad(p, c.circumcenter), c.side_of_circle(p))
+        print(80*'-')
         # print(c.side(c.center))
-        # print(c.side(c.point(0)),c.side(v1.point),c.side(v2.point))
+        # print(c.side(c.point(0)), c.side(v1.point), c.side(v2.point))
         # print(c.side(2*c.point(0)-c.center),
         #       c.side(2*v1.point-c.center),
         #       c.side(2*v2.point-c.center),
-        #       c.side(p_outside(c.point(0),c.center)))
+        #       c.side(p_outside(c.point(0), c.center)))
         # print(c.side_of_circle(c.circumcenter))
-        # print(c.side_of_circle(c.point(0)),c.side_of_circle(v1.point))
-        print(c.side_of_circle(1.01*c.point(0)-c.circumcenter), 1.1*c.point(0)-c.circumcenter)
-        print(c.side_of_circle(1.01*v1.point-c.circumcenter), 1.1*v1.point-c.circumcenter)
-        print(c.side_of_circle(p_outside(c.point(0),c.circumcenter)),p_outside(c.point(0),c.circumcenter))
+        # print(c.side_of_circle(c.point(0)), c.side_of_circle(v1.point))
+        print(c.side_of_circle(1.01*c.point(0)-c.circumcenter),
+              1.1*c.point(0)-c.circumcenter)
+        print(c.side_of_circle(1.01*v1.point-c.circumcenter),
+              1.1*v1.point-c.circumcenter)
+        print(c.side_of_circle(p_outside(c.point(0), c.circumcenter)),
+              p_outside(c.point(0), c.circumcenter))
         if c.is_infinite():
             assert(np.isinf(c.center).all())
             assert(c.side(c.center) == -1)
@@ -398,12 +406,13 @@ def test_cell():
             assert(c.side(c.center) == 1)
             if np.all((v1.point % 1) == 0):
                 assert(c.side(v1.point) == 0)
-            assert(c.side(p_outside(c.point(0),c.center)) == -1)
+            assert(c.side(p_outside(c.point(0), c.center)) == -1)
             assert(c.side_of_circle(c.circumcenter) == 1)
             if np.all((c.point(0) % 1) == 0):
                 assert(c.side_of_circle(c.point(0)) == 0)
             # TODO: Fix this, currently fails
-            # assert(c.side_of_circle(p_outside(c.point(0),c.circumcenter)) == -1)
+            # assert(c.side_of_circle(
+            #            p_outside(c.point(0), c.circumcenter)) == -1)
 
         c.reorient()
         c.ccw_permute()
@@ -416,7 +425,7 @@ def test_move():
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
     v0 = T.get_vertex(0)
-    new_pos = np.zeros(2,'float64')
+    new_pos = np.zeros(2, 'float64')
     v = T.move(v0, new_pos)
     assert(np.allclose(v.point, new_pos))
     assert(np.allclose(v0.point, new_pos))
@@ -430,14 +439,14 @@ def test_move_if_no_collision():
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
     v0 = T.get_vertex(0)
-    new_pos = np.zeros(2,'float64')
+    new_pos = np.zeros(2, 'float64')
     v = T.move_if_no_collision(v0, new_pos)
     assert(np.allclose(v.point, new_pos))
     assert(np.allclose(v0.point, new_pos))
     v1 = T.get_vertex(1)
     v = T.move_if_no_collision(v1, new_pos)
     assert(np.allclose(v.point, new_pos))
-    assert(np.allclose(v1.point, pts[1,:]))
+    assert(np.allclose(v1.point, pts[1, :]))
     assert(T.num_verts == nverts)
 
 
@@ -446,12 +455,12 @@ def test_flip():
     T.insert(pts)
     for c in T.all_cells:
         out = T.flip(c, 0)
-        assert(out == True)
+        assert(out)
     print(T.num_edges, nedges)
     assert(T.num_edges == nedges)
     for e in T.all_edges:
         out = e.flip()
-        assert(out == True)
+        assert(out)
     print(T.num_edges, nedges)
 
 
@@ -597,7 +606,7 @@ def test_nearest_vertex():
     idx_test = 7
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
-    v = T.nearest_vertex(pts[idx_test,:]-0.1)
+    v = T.nearest_vertex(pts[idx_test, :]-0.1)
     assert(v.index == idx_test)
 
 
@@ -663,19 +672,20 @@ def test_boundary_points():
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
     out = T.boundary_points(left_edge, right_edge, False)
+    del out
 
 
 def test_outgoing_points():
     T = Delaunay2(left_edge, right_edge)
     T.insert(pts)
-    le = np.array([[-2,-2],
-                   [-1,-1],
-                   [ 0, 0],
-                   [ 1, 1]], 'float64')
-    re = np.array([[-1,-1],
-                   [ 0, 0],
-                   [ 1, 1],
-                   [ 2, 2]], 'float64')
+    le = np.array([[-2, -2],
+                   [-1, -1],
+                   [+0,  0],
+                   [+1,  1]], 'float64')
+    re = np.array([[-1, -1],
+                   [+0,  0],
+                   [+1,  1],
+                   [+2,  2]], 'float64')
     out = T.outgoing_points(le, re)
     assert(len(out) == le.shape[0])
 
