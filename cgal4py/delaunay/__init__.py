@@ -1,3 +1,4 @@
+r"""Access to generic triangulation extensions."""
 import numpy as np
 import warnings
 import tools
