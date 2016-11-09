@@ -1,19 +1,20 @@
+r"""Package for performing Delaunay triangulations in Python using Cython
+wrapped CGAL C++ libraries."""
 import plot
 import utils
 import domain_decomp
 from delaunay import Delaunay
-
+import tests
 import numpy as np
-import sys, os
 import warnings
-
 FLAG_MULTIPROC = False
 try:
     import parallel
     FLAG_MULTIPROC = True
 except:
-    warnings.warn("Package for parallel triangulation could not be imported. "+
-                      "Parallel features will be disabled.")
+    warnings.warn("Package for parallel triangulation could not be " +
+                  "imported. Parallel features will be disabled.")
+
 
 def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
                 use_double=False, nproc=0, dd_method='kdtree', dd_kwargs={},
@@ -22,38 +23,39 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
 
     Args:
         pts (np.ndarray of float64): (n,m) Array of n mD points.
-        left_edge (np.ndarray of float64, optional): (m,) lower limits on 
-            the domain. If None, this is set to np.min(pts, axis=0). 
+        left_edge (np.ndarray of float64, optional): (m,) lower limits on
+            the domain. If None, this is set to np.min(pts, axis=0).
             Defaults to None.
-        right_edge (np.ndarray of float64, optional): (m,) upper limits on 
-            the domain. If None, this is set to np.max(pts, axis=0). 
+        right_edge (np.ndarray of float64, optional): (m,) upper limits on
+            the domain. If None, this is set to np.max(pts, axis=0).
             Defaults to None.
-        periodic (bool optional): If True, the domain is assumed to be 
+        periodic (bool optional): If True, the domain is assumed to be
             periodic at its left and right edges. Defaults to False.
-        use_double (bool, optional): If True, the triangulation is forced to use 
-            64bit integers reguardless of if there are too many points for 32bit. 
-            Otherwise 32bit integers are used so long as the number of points is 
-            <=4294967295. Defaults to False.
-        nproc (int, optional): The number of MPI processes that should be 
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        nproc (int, optional): The number of MPI processes that should be
             spawned. If <2, no processes are spawned. Defaults to 0.
-        dd_method (str, optional): String specifier for a domain 
-            decomposition method. See :meth:`cgal4py.domain_decomp.leaves` 
+        dd_method (str, optional): String specifier for a domain
+            decomposition method. See :meth:`cgal4py.domain_decomp.leaves`
             for available values. Defaults to 'kdtree'.
-        dd_kwargs (dict, optional): Dictionary of keyword arguments for the 
+        dd_kwargs (dict, optional): Dictionary of keyword arguments for the
             selected domain decomposition method. Defaults to empty dict.
-        limit_mem (bool, optional): If True, memory usage is limited by 
-            writing things to file at a cost to performance. Defaults to 
+        limit_mem (bool, optional): If True, memory usage is limited by
+            writing things to file at a cost to performance. Defaults to
             False.
 
     Returns:
-        T (:class:`cgal4py.delaunay.Delaunay2` or :class:`cgal4py.delaunay.Delaunay3`:):
-            2D or 3D triangulation object.
+        T (:class:`cgal4py.delaunay.Delaunay2` or
+            :class:`cgal4py.delaunay.Delaunay3`:): 2D or 3D triangulation
+            object.
 
     Raises:
         ValueError: If `pts` is not a 2D array.
-        ValueError: If `left_edge` is not a 1D array with `pts.shape[1]` 
+        ValueError: If `left_edge` is not a 1D array with `pts.shape[1]`
             elements.
-        ValueError: If `right_edge` is not a 1D array with `pts.shape[1]` 
+        ValueError: If `right_edge` is not a 1D array with `pts.shape[1]`
             elements.
         NotImplementedError: If `limit_mem == True`.
 
@@ -61,25 +63,26 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
     # Check input
     if (pts.ndim != 2):
         raise ValueError("pts must be a 2D array of coordinates")
-    npts = pts.shape[0]
     ndim = pts.shape[1]
     if left_edge is None:
         left_edge = np.min(pts, axis=0)
     else:
         if (left_edge.ndim != 1) or (len(left_edge) != ndim):
-            raise ValueError("left_edge must be a 1D array with {} elements.".format(ndim))
+            raise ValueError("left_edge must be a 1D array with " +
+                             "{} elements.".format(ndim))
     if right_edge is None:
         right_edge = np.max(pts, axis=0)
     else:
         if (right_edge.ndim != 1) or (len(right_edge) != ndim):
-            raise ValueError("right_edge must be a 1D array with {} elements.".format(ndim))
+            raise ValueError("right_edge must be a 1D array with " +
+                             "{} elements.".format(ndim))
     if limit_mem:
         raise NotImplementedError("'limit_mem' has not yet been implemented.")
-    # Parallel 
+    # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
-        tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge, 
+        tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
-        T = parallel.ParallelDelaunay(pts, tree, nproc, 
+        T = parallel.ParallelDelaunay(pts, tree, nproc,
                                       use_double=use_double)
     # Serial
     else:
@@ -87,45 +90,46 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
                      left_edge=left_edge, right_edge=right_edge)
     return T
 
+
 def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
-                    use_double=False, nproc=0, dd_method='kdtree', dd_kwargs={},
-                    limit_mem=False):
+                    use_double=False, nproc=0, dd_method='kdtree',
+                    dd_kwargs={}, limit_mem=False):
     r"""Volume of voronoi cells for each point.
 
     Args:
         pts (np.ndarray of float64): (n,m) Array of n mD points.
-        left_edge (np.ndarray of float64, optional): (m,) lower limits on 
-            the domain. If None, this is set to np.min(pts, axis=0). 
+        left_edge (np.ndarray of float64, optional): (m,) lower limits on
+            the domain. If None, this is set to np.min(pts, axis=0).
             Defaults to None.
-        right_edge (np.ndarray of float64, optional): (m,) upper limits on 
-            the domain. If None, this is set to np.max(pts, axis=0). 
+        right_edge (np.ndarray of float64, optional): (m,) upper limits on
+            the domain. If None, this is set to np.max(pts, axis=0).
             Defaults to None.
-        periodic (bool optional): If True, the domain is assumed to be 
+        periodic (bool optional): If True, the domain is assumed to be
             periodic at its left and right edges. Defaults to False.
-        use_double (bool, optional): If True, the triangulation is forced to use 
-            64bit integers reguardless of if there are too many points for 32bit. 
-            Otherwise 32bit integers are used so long as the number of points is 
-            <=4294967295. Defaults to False.
-        nproc (int, optional): The number of MPI processes that should be 
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        nproc (int, optional): The number of MPI processes that should be
             spawned. If <2, no processes are spawned. Defaults to 0.
-        dd_method (str, optional): String specifier for a domain 
-            decomposition method. See :meth:`cgal4py.domain_decomp.leaves` 
+        dd_method (str, optional): String specifier for a domain
+            decomposition method. See :meth:`cgal4py.domain_decomp.leaves`
             for available values. Defaults to 'kdtree'.
-        dd_kwargs (dict, optional): Dictionary of keyword arguments for the 
+        dd_kwargs (dict, optional): Dictionary of keyword arguments for the
             selected domain decomposition method. Defaults to empty dict.
-        limit_mem (bool, optional): If True, memory usage is limited by 
-            writing things to file at a cost to performance. Defaults to 
+        limit_mem (bool, optional): If True, memory usage is limited by
+            writing things to file at a cost to performance. Defaults to
             False.
 
     Returns:
-        np.ndarray of float64: (n,) array of n voronoi cell mD volumes. A value 
+        np.ndarray of float64: (n,) array of n voronoi cell mD volumes. A value
             of -1 indicates the cell is infinite.
 
     Raises:
         ValueError: If `pts` is not a 2D array.
-        ValueError: If `left_edge` is not a 1D array with `pts.shape[1]` 
+        ValueError: If `left_edge` is not a 1D array with `pts.shape[1]`
             elements.
-        ValueError: If `right_edge` is not a 1D array with `pts.shape[1]` 
+        ValueError: If `right_edge` is not a 1D array with `pts.shape[1]`
             elements.
         NotImplementedError: If `limit_mem == True`.
 
@@ -133,25 +137,26 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
     # Check input
     if (pts.ndim != 2):
         raise ValueError("pts must be a 2D array of coordinates")
-    npts = pts.shape[0]
     ndim = pts.shape[1]
     if left_edge is None:
         left_edge = np.min(pts, axis=0)
     else:
         if (left_edge.ndim != 1) or (len(left_edge) != ndim):
-            raise ValueError("left_edge must be a 1D array with {} elements.".format(ndim))
+            raise ValueError("left_edge must be a 1D array with " +
+                             "{} elements.".format(ndim))
     if right_edge is None:
         right_edge = np.max(pts, axis=0)
     else:
         if (right_edge.ndim != 1) or (len(right_edge) != ndim):
-            raise ValueError("right_edge must be a 1D array with {} elements.".format(ndim))
+            raise ValueError("right_edge must be a 1D array with " +
+                             "{} elements.".format(ndim))
     if limit_mem:
         raise NotImplementedError("'limit_mem' has not yet been implemented.")
-    # Parallel 
+    # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
-        tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge, 
+        tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
-        vols = parallel.ParallelVoronoiVolumes(pts, tree, nproc, 
+        vols = parallel.ParallelVoronoiVolumes(pts, tree, nproc,
                                                use_double=use_double)
     # Serial
     else:
@@ -160,7 +165,7 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
         vols = T.voronoi_volumes()
     return vols
 
-import tests
-__all__ = ["triangulate","voronoi_volumes","delaunay","plot","utils","domain_decomp","tests"]
+__all__ = ["triangulate", "voronoi_volumes", "delaunay", "plot", "utils",
+           "domain_decomp", "tests"]
 if FLAG_MULTIPROC:
     __all__.append("parallel")
