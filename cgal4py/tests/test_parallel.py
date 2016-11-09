@@ -2,7 +2,7 @@ r"""Tests for parallel implementation of triangulations."""
 import numpy as np
 from cgal4py import parallel, delaunay
 from test_cgal4py import make_test
-from test_delaunay2 import pts2
+from test_delaunay2 import pts as pts2
 np.random.seed(10)
 
 

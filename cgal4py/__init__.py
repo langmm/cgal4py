@@ -4,7 +4,6 @@ import plot
 import utils
 import domain_decomp
 from delaunay import Delaunay
-import tests
 import numpy as np
 import warnings
 FLAG_MULTIPROC = False
@@ -164,6 +163,9 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
                      left_edge=left_edge, right_edge=right_edge)
         vols = T.voronoi_volumes()
     return vols
+
+# Must go here to support tests of triangulate & voronoi_volumes
+import tests  # noqa: E402
 
 __all__ = ["triangulate", "voronoi_volumes", "delaunay", "plot", "utils",
            "domain_decomp", "tests"]
