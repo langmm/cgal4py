@@ -1,9 +1,8 @@
-from nose import with_setup
-import numpy as np
 import os
 from cgal4py.delaunay import Delaunay2, Delaunay3
 from test_delaunay2 import pts as pts2
 from test_delaunay3 import pts as pts3
+
 
 def test_plot2D():
     fname_test = "test_plot2D.png"
@@ -12,6 +11,8 @@ def test_plot2D():
     axs = T.plot(plotfile=fname_test, title='Test')
     os.remove(fname_test)
     # T.plot(axs=axs)
+    del axs
+
 
 def test_plot3D():
     fname_test = "test_plot3D.png"
@@ -20,3 +21,4 @@ def test_plot3D():
     axs = T.plot(plotfile=fname_test, title='Test')
     os.remove(fname_test)
     # T.plot(axs=axs)
+    del axs

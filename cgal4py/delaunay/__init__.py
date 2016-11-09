@@ -22,9 +22,11 @@ try:
     from delaunay2_64bit import Delaunay2 as Delaunay2_64bit
     from delaunay3_64bit import Delaunay3 as Delaunay3_64bit
     if is_valid_P2():
-        from periodic_delaunay2_64bit import PeriodicDelaunay2 as PeriodicDelaunay2_64bit
+        from periodic_delaunay2_64bit import \
+            PeriodicDelaunay2 as PeriodicDelaunay2_64bit
     if is_valid_P3():
-        from periodic_delaunay3_64bit import PeriodicDelaunay3 as PeriodicDelaunay3_64bit
+        from periodic_delaunay3_64bit import \
+            PeriodicDelaunay3 as PeriodicDelaunay3_64bit
     FLAG_DOUBLE_AVAIL = True
 except:
     warnings.warn("Could not import packages using long indices. "+
@@ -74,8 +76,9 @@ def Delaunay(pts, use_double=False, periodic=False,
     # Check if 64bit integers need/can be used
     if npts >= np.iinfo('uint32').max or use_double:
         if not FLAG_DOUBLE_AVAIL:
-            raise RuntimeError("The 64bit triangulation package couldn't "+
-                               "be imported and there are {} points.".format(npts))
+            raise RuntimeError("The 64bit triangulation package couldn't " +
+                               "be imported and there are " +
+                               "{} points.".format(npts))
         use_double = True
     # Initialize correct tessellation
     if periodic:
@@ -83,12 +86,14 @@ def Delaunay(pts, use_double=False, periodic=False,
             left_edge = np.min(pts, axis=0)
         else:
             if (left_edge.ndim != 1) or (len(left_edge) != ndim):
-                raise ValueError("left_edge must be a 1D array with {} elements.".format(ndim))
+                raise ValueError("left_edge must be a 1D array with " +
+                                 "{} elements.".format(ndim))
         if right_edge is None:
             right_edge = np.max(pts, axis=0)
         else:
             if (right_edge.ndim != 1) or (len(right_edge) != ndim):
-                raise ValueError("right_edge must be a 1D array with {} elements.".format(ndim))
+                raise ValueError("right_edge must be a 1D array with " +
+                                 "{} elements.".format(ndim))
         try:
             if ndim == 2:
                 if use_double:
@@ -101,9 +106,11 @@ def Delaunay(pts, use_double=False, periodic=False,
                 else:
                     T = PeriodicDelaunay3(left_edge, right_edge)
             else:
-                raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
+                raise NotImplementedError("Only 2D & 3D triangulations are " +
+                                          "currently supported.")
         except NameError:
-            raise NotImplementedError("Periodic triangulation in {}D not available.".format(ndim))
+            raise NotImplementedError("Periodic triangulation in "+
+                                      "{}D not available.".format(ndim))
     else:
         if ndim == 2:
             if use_double:
@@ -116,7 +123,8 @@ def Delaunay(pts, use_double=False, periodic=False,
             else:
                 T = Delaunay3()
         else:
-            raise NotImplementedError("Only 2D & 3D triangulations are currently supported.")
+            raise NotImplementedError("Only 2D & 3D triangulations are " +
+                                      "currently supported.")
     # Insert points into tessellation
     if npts > 0:
         T.insert(pts)
@@ -127,11 +135,12 @@ def VoronoiVolumes(pts, use_double=False):
     r"""Get the volumes of the voronoi cells associated with a set of points.
 
     Args:
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional coordinates.
-        use_double (bool, optional): If True, the triangulation is forced to use 
-            64bit integers reguardless of if there are too many points for 32bit.
-            Otherwise 32bit integers are used so long as the number of points is 
-            <=4294967295. Defaults to False.
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional 
+            coordinates.
+        use_double (bool, optional): If True, the triangulation is forced to 
+            use 64bit integers reguardless of if there are too many points for 
+            32bit. Otherwise 32bit integers are used so long as the number of 
+            points is <=4294967295. Defaults to False.
 
     Returns:
         np.ndarray of float64: Volumes of voronoi cells. Negative values 
