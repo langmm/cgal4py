@@ -159,7 +159,7 @@ cdef extern from "c_delaunayD.hpp":
         vector[Cell] incident_cells(Face x)
 
         vector[Vertex] incident_vertices(Cell x)
-        vector[Face] incident_facet(Cell x, int i)
+        vector[Face] incident_faces(Cell x, int i)
         vector[Cell] incident_cells(Cell x)
 
         int mirror_index(Cell x, int i) const

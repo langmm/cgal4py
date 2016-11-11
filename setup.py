@@ -13,7 +13,7 @@ else:
     use_cython = True
 
 # Versions of Delaunay triangulation that ahve been wrapped
-delaunay_ver = ['2','3','D']
+delaunay_ver = ['2','3']  # ,'D']
 
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
@@ -37,7 +37,9 @@ ext_options = dict(language="c++",
                    extra_compile_args=["-std=c++11"],# "-std=gnu++11",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
-                                  ("NPY_NO_DEPRECATED_API", None)])
+                                  ("NPY_NO_DEPRECATED_API", None)]) #,
+                                  # ("CGAL_EIGEN3_ENABLED",'1'),
+                                  # ("EIGEN3_INC_DIR","/usr/include/eigen3/Eigen/")])
 
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')

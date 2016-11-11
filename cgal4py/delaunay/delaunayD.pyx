@@ -394,7 +394,7 @@ cdef class DelaunayD_face:
     def __repr__(self):
         cdef str out = "DelaunayD_face[{}d: ".format(self.dim)
         cdef int i
-        for i in range(nverts):
+        for i in range(self.nverts):
             out += "{},".format(repr(self.vertex(i)))
         out[-1] = "]"
         return out
@@ -604,7 +604,8 @@ cdef class DelaunayD_facet:
     def dim(self):
         r"""int: Number of dimensions that the facet covers (one less than
         overall domain)."""
-        return self.T.num_dims - 1
+        cdef int out = <int>self.T.num_dims - 1
+        return out
 
     @property
     def nverts(self):
@@ -716,16 +717,6 @@ cdef class DelaunayD_facet:
         r"""int: The index of the vertex this facet is opposite on its cell."""
         def __get__(self):
             return self.x.ind()
-
-    property mirror:
-        r"""DelaunayD_facet: The same facet as this one, but referenced from its 
-        other incident cell"""
-        def __get__(self):
-            cdef Delaunay_with_info_D[dim_t,info_t].Facet ec
-            ec = self.T.mirror_facet(self.x)
-            cdef DelaunayD_facet out = DelaunayD_facet()
-            out.assign(self.T, ec)
-            return out
 
 
 cdef class DelaunayD_facet_iter:
@@ -930,7 +921,7 @@ cdef class DelaunayD_cell:
 
     def __repr__(self):
         cdef str out = "Delaunay2_cell["
-        int i
+        cdef int i
         for i in range(self.nverts):
             out += "{},".format(repr(self.vertex(i)))
         out[-1] = "]"
@@ -1114,11 +1105,6 @@ cdef class DelaunayD_cell:
         """
         self.T.updated = <cbool>True
         self.x.set_vertex(i, v.x)
-
-    def reset_vertices(self):
-        r"""Reset all of this cell's vertices."""
-        self.T.updated = <cbool>True
-        self.x.set_vertices()
 
     def set_neighbor(self, int i, DelaunayD_cell n):
         r"""Set the ith neighboring cell of this cell. 
@@ -1887,8 +1873,6 @@ cdef class DelaunayD:
             c.assign(self.T, self.T.locate(&pos[0], lt, f.x, ft.x))
         print(lt)
         assert(lt != 999)
-        if lt < 2:
-            assert(li != 999)
         if lt == 0: # vertex
             return f.vertex(0)
         elif lt == 1: # face
