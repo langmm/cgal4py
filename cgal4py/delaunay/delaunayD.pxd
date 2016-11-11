@@ -8,7 +8,7 @@ from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 cdef extern from "c_delaunayD.hpp":
     cdef int VALID
 
-    cdef cppclass Delaunay_with_info_D[D,Info] nogil:
+    cdef cppclass Delaunay_with_info_D[Info] nogil:
         Delaunay_with_info_D() except +
         Delaunay_with_info_D(double *pts, Info *val, uint32_t n) except +
         bool updated
@@ -27,7 +27,7 @@ cdef extern from "c_delaunayD.hpp":
         uint32_t num_facets() const
         uint32_t num_cells() const
 
-        bool is_equal(const Delaunay_with_info_D[D,Info] other) const
+        bool is_equal(const Delaunay_with_info_D[Info] other) const
 
         cppclass Vertex
         cppclass Face

@@ -19,10 +19,8 @@
 #if (CGAL_VERSION_NR >= 1040601000)
 #include <CGAL/Epick_d.h>
 #include <CGAL/Delaunay_triangulation.h>
-// #include <CGAL/Triangulation_full_cell.h>
-// #include <CGAL/Triangulation_vertex.h>
-// #include <CGAL/squared_distance_3.h>
 #include <CGAL/Unique_hash_map.h>
+#include <CGAL/Linear_algebraHd.h>
 #else
 #include "dummy_CGAL.hpp"
 #endif
@@ -37,7 +35,9 @@ int factorial(int n)
   return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
 }
 
-template <uint32_t D, typename Info_>
+int D = 4; // REPLACE
+
+template <typename Info_>
 class Delaunay_with_info_D
 {
 public:
@@ -58,10 +58,10 @@ public:
   typedef typename Delaunay::Finite_full_cell_iterator Finite_cell_iterator;
   typedef typename Delaunay::Locate_type               Locate_type;
   typedef typename K::Cartesian_const_iterator_d       Cartesian_const_iterator_d;
-  typedef typename CGAL::Unique_hash_map<Vertex_handle,int>    Vertex_hash;
-  typedef typename CGAL::Unique_hash_map<Full_cell_handle,int> Cell_hash;
+  typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
+  typedef typename CGAL::Unique_hash_map<Cell_handle,int>    Cell_hash;
   typedef Info_ Info;
-  Delaunay T(D);
+  Delaunay T = Delaunay(D);
   bool updated = false;
   Delaunay_with_info_D() {};
   Delaunay_with_info_D(double *pts, Info *val, uint32_t n) {
@@ -75,7 +75,7 @@ public:
   uint32_t num_infinite_cells() const { return (num_cells() - num_finite_cells()); }
   uint32_t num_verts() const { return (num_finite_verts() + num_infinite_verts()); }
   uint32_t num_cells() const { return (uint32_t)(T.number_of_full_cells()); }
-  bool is_equal(const Delaunay_with_info_3<Info> other) const {
+  bool is_equal(const Delaunay_with_info_D<D, Info> other) const {
     // Verts
     if (num_verts() != other.num_verts()) return false;
     if (num_finite_verts() != other.num_finite_verts()) return false;
@@ -226,8 +226,8 @@ public:
     std::vector<Vertex> vertices() const {
       int i;
       std::vector<Vertex> out;
-      for (i = 0; i <= x.dim(); i++)
-	out.push_back(Vertex((Vertex_handle)(x.vertex(i))));
+      for (i = 0; i <= dim(); i++)
+	out.push_back(vertex(i));
       return out;
     }
   };
@@ -423,7 +423,7 @@ public:
       faces = incident_faces(verts[j], i);
       for (k = 0; k < faces.size(); k++) {
 	if (faces[k] != x)
-	  sout.insert(faces[d]);
+	  sout.insert(faces[k]);
       }
     }
     std::vector<Face> out;
@@ -439,7 +439,7 @@ public:
       faces = incident_faces(verts[j], i);
       for (k = 0; k < faces.size(); k++) {
 	if (faces[k] != x)
-	  sout.insert(faces[d]);
+	  sout.insert(faces[k]);
       }
     }
     std::vector<Face> out;
@@ -532,7 +532,7 @@ public:
     std::vector<Point> centers;
     std::vector<Point> pts;
     for (i = 0; i < edges.size(); i++) {
-      midp = CGAL::midpoint(edges[i].vertex(0), edges[i].vertex(1));
+      midp = K::midpoint(edges[i].vertex(0), edges[i].vertex(1));
 
       cells = incident_cells(edges[i]);
 
@@ -778,7 +778,7 @@ public:
 
     T.tds().set_current_dimension(d);
 
-    All_cells_iterator to_delete = T.full_cells_begin();
+    Cell_iterator to_delete = T.full_cells_begin();
 
     std::vector<Vertex_handle> V(n+1);
     std::vector<Cell_handle> C(m);
@@ -956,7 +956,7 @@ public:
       } else {
         p1 = it->vertex(0)->point();
         cc = it->circumcenter();
-        cr = std::sqrt(static_cast<double>(CGAL::squared_distance(p1, cc)));
+        cr = std::sqrt(static_cast<double>(K::squared_distance(p1, cc)));
         for (b = 0; b < nbox; b++) {
           if (intersect_sph_box(&cc, cr, left_edges + d*b, right_edges + d*b))
             for (i = 0; i < (d+1); i++) 
