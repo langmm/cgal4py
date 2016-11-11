@@ -8,11 +8,12 @@ from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 cdef extern from "c_delaunayD.hpp":
     cdef int VALID
 
-    cdef cppclass Delaunay_with_info_D[Info] nogil:
+    cdef cppclass Delaunay_with_info_D[D,Info] nogil:
         Delaunay_with_info_D() except +
         Delaunay_with_info_D(double *pts, Info *val, uint32_t n) except +
         bool updated
         bool is_valid() const
+        uint32_t num_dims() const 
         uint32_t num_finite_verts() const
         uint32_t num_finite_edges() const
         uint32_t num_finite_facets() const
@@ -26,7 +27,7 @@ cdef extern from "c_delaunayD.hpp":
         uint32_t num_facets() const
         uint32_t num_cells() const
 
-        bool is_equal(const Delaunay_with_info_D[Info] other) const
+        bool is_equal(const Delaunay_with_info_D[D,Info] other) const
 
         cppclass Vertex
         cppclass Face
@@ -138,6 +139,9 @@ cdef extern from "c_delaunayD.hpp":
             void set_vertex(int i, Vertex v)
             void set_neighbor(int i, Cell c)
 
+        bool are_equal(Face f1, Face f2)
+        bool are_equal(Facet f1, Facet f2)
+
         bool is_infinite(Vertex x)
         bool is_infinite(Face x)
         bool is_infinite(Facet x)
@@ -162,6 +166,8 @@ cdef extern from "c_delaunayD.hpp":
         Vertex mirror_vertex(Cell x, int i) const
 
         void circumcenter(Cell x, double* out) const
+        double n_simplex_volume(Face f) const
+        double n_simplex_volume(Facet f) const
         double dual_volume(const Vertex v) const
         void dual_volumes(double* vols) const
 

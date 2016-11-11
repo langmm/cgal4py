@@ -61,7 +61,6 @@ public:
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>    Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Full_cell_handle,int> Cell_hash;
   typedef Info_ Info;
-  uint32_t ndim = D;
   Delaunay T(D);
   bool updated = false;
   Delaunay_with_info_D() {};
@@ -69,6 +68,7 @@ public:
     insert(pts, val, n);
   }
   bool is_valid() const { return T.is_valid(); }
+  uint32_t num_dims() const { return (uint32_t)(T.current_dimension()); }
   uint32_t num_finite_verts() const { return (uint32_t)(T.number_of_vertices()); }
   uint32_t num_finite_cells() const { return (uint32_t)(T.number_of_finite_full_cells()); }
   uint32_t num_infinite_verts() const { return 1; }
@@ -94,7 +94,7 @@ public:
 
   Point pos2point(double* pos) {
     std::vector<Info> vp;
-    for (uint32_t i; i < ndim; i++)
+    for (uint32_t i; i < num_dims(); i++)
       vp.push_back(pos[i]);
     return Point(vp.begin(), vp.end());
   }
@@ -105,7 +105,7 @@ public:
     Vertex_handle v;
     std::vector<Info> vp;
     for (i = 0; i < n; i++) {
-      v = T.insert(pos2point(pts+(ndim*i)));
+      v = T.insert(pos2point(pts+(num_dims()*i)));
       v->data() = val[i];
     }
   }
@@ -336,7 +336,42 @@ public:
 
   };
 
-  // TODO: are_equal for generic d-face
+  bool are_equal(Face f1, Face f2) {
+    if (f1.dim() != f2.dim())
+      return false;
+    int i1, i2;
+    Vertex v1;
+    for (i1 = 0; i1 < (f1.dim()+1); i1++) {
+      bool match = false;
+      v1 = f1.vertex(i1);
+      for (i2 = 0; i2 < (f2.dim()); i2++) {
+	if (v1 == f2.vertex(i2)) {
+	  match = true;
+	  break;
+	}
+      }
+      if (!match)
+	return false;
+    }
+    return true;
+  }
+  bool are_equal(Facet f1, Facet f2) {
+    int i1, i2;
+    Vertex v1;
+    for (i1 = 0; i1 < (f1.dim()+1); i1++) {
+      bool match = false;
+      v1 = f1.vertex(i1);
+      for (i2 = 0; i2 < (f2.dim()); i2++) {
+	if (v1 == f2.vertex(i2)) {
+	  match = true;
+	  break;
+	}
+      }
+      if (!match)
+	return false;
+    }
+    return true;
+  }
 
   // Testing incidence to the infinite vertex
   bool is_infinite(Vertex x) const { return T.is_infinite(x._x); }
@@ -433,15 +468,47 @@ public:
   void circumcenter(Cell x, double* out) const {
     int i;
     if (T.is_infinite(x._x)) {
-      for (i = 0; i < ndim; i++)
+      for (i = 0; i < num_dims(); i++)
 	out[i] = std::numeric_limits<double>::infinity();
     } else {
       Point p = x._x->circumcenter();
-      for (i = 0; i < ndim; i++)
+      for (i = 0; i < num_dims(); i++)
 	out[i] = p[i];
     }
   }
 
+  // TODO: fix these. need to transform face to remove 
+  // extra dimension and create a true simplex
+  double n_simplex_volume(Face f) const {
+    int mat_dim = f.dim();
+    int i,j;
+    Matrix A(mat_dim,mat_dim);
+    Point p0 = f.vertex(0)._x;
+    Point p1;
+    for (i = 0; i < mat_dim; i++) { // column
+      for (j = 0; j < mat_dim; j++) { // row
+	p1 = f.vertex(i+1)._x;
+	A(i,j) = p1[j] - p0[j];
+      }
+    }
+    double det = (double)(LA::determinant(A));
+    return std::abs(det/((double)(factorial(mat_dim))));
+  }
+  double n_simplex_volume(Facet f) const {
+    int mat_dim = f.dim();
+    int i,j;
+    Matrix A(mat_dim,mat_dim);
+    Point p0 = f.vertex(0)._x;
+    Point p1;
+    for (i = 0; i < mat_dim; i++) { // column
+      for (j = 0; j < mat_dim; j++) { // row
+	p1 = f.vertex(i+1)._x;
+	A(i,j) = p1[j] - p0[j];
+      }
+    }
+    double det = (double)(LA::determinant(A));
+    return std::abs(det/((double)(factorial(mat_dim))));
+  }
   double n_simplex_volume(std::vector<Point> pts) const {
     int mat_dim = T.current_dimension();
     int i,j;
