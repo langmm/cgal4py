@@ -398,13 +398,13 @@ cdef class DelaunayD_face:
         out[-1] = "]"
         return out
 
-    def __richcmp__(DelaunayD_face self, DelaunayD_face solf, int op):
-        if (op == 2):
-            return <pybool>(self.x == solf.x)
-        elif (op == 3):
-            return <pybool>(self.x != solf.x)
-        else:
-            raise NotImplementedError
+    # def __richcmp__(DelaunayD_face self, DelaunayD_face solf, int op):
+    #     if (op == 2):
+    #         return <pybool>(self.x == solf.x)
+    #     elif (op == 3):
+    #         return <pybool>(self.x != solf.x)
+    #     else:
+    #         raise NotImplementedError
 
     def is_infinite(self):
         r"""Determine if the face is incident to the infinite vertex.
@@ -603,14 +603,14 @@ cdef class DelaunayD_facet:
     def dim(self):
         r"""int: Number of dimensions that the facet covers (one less than
         overall domain)."""
-        cdef int out = <int>self.T.num_dims - 1
+        cdef int out = <int>self.T.num_dims() - 1
         return out
 
     @property
     def nverts(self):
         r"""int: Number of vertices in the facet (same as number of dimensions
         in the domain."""
-        return self.T.num_dims
+        return self.T.num_dims()
 
     @staticmethod
     def from_cell(DelaunayD_cell c, int i):
@@ -639,13 +639,13 @@ cdef class DelaunayD_facet:
         out[-1] = "]"
         return out
 
-    def __richcmp__(DelaunayD_facet self, DelaunayD_facet solf, int op):
-        if (op == 2):
-            return <pybool>(self.x == solf.x)
-        elif (op == 3):
-            return <pybool>(self.x != solf.x)
-        else:
-            raise NotImplementedError
+    # def __richcmp__(DelaunayD_facet self, DelaunayD_facet solf, int op):
+    #     if (op == 2):
+    #         return <pybool>(self.x == solf.x)
+    #     elif (op == 3):
+    #         return <pybool>(self.x != solf.x)
+    #     else:
+    #         raise NotImplementedError
 
     def is_infinite(self):
         r"""Determine if the facet is incident to the infinite vertex.
@@ -717,110 +717,6 @@ cdef class DelaunayD_facet:
         def __get__(self):
             return self.x.ind()
 
-
-cdef class DelaunayD_facet_iter:
-    r"""Wrapper class for a triangulation facet iterator.
-
-    Args:
-        T (DelaunayD): Triangulation that this facet belongs to.
-        facet (:obj:`str`, optional): String specifying the facet that 
-            should be referenced. Valid options include: 
-                'all_begin': The first facet in an iteration over all facets.
-                'all_end': The last facet in an iteration over all facets.
- 
-    Attributes:
-        T (:obj:`Delaunay_with_info_D[info_t]`): C++ Triangulation object 
-            that this facet belongs to. 
-        x (:obj:`Delaunay_with_info_D[info_t].All_facets_iter`): C++ facet  
-            object. Direct interaction with this object is not recommended. 
-
-    """
-    cdef Delaunay_with_info_D[info_t] *T
-    cdef Delaunay_with_info_D[info_t].All_facets_iter x
-
-    def __cinit__(self, DelaunayD T, str facet = None):
-        self.T = T.T
-        if facet == 'all_begin':
-            self.x = self.T.all_facets_begin()
-        elif facet == 'all_end':
-            self.x = self.T.all_facets_end()
-
-    def __richcmp__(DelaunayD_facet_iter self, DelaunayD_facet_iter solf, 
-                    int op):
-        if (op == 2):
-            return <pybool>(self.x == solf.x)
-        elif (op == 3):
-            return <pybool>(self.x != solf.x)
-        else:
-            raise NotImplementedError
-
-    def is_infinite(self):
-        r"""Determine if the facet is incident to the the infinite vertex.
-        
-        Returns:
-            bool: True if the facet is incident to the infinite vertex, False 
-                otherwise.
-
-        """
-        return self.T.is_infinite(self.x)
-
-    def increment(self):
-        r"""Advance to the next facet in the triangulation."""
-        preincrement(self.x)
-
-    def decrement(self):
-        r"""Advance to the previous facet in the triangulation."""
-        predecrement(self.x)
-
-    property facet:
-        r"""DelaunayD_facet: Corresponding facet object."""
-        def __get__(self):
-            cdef DelaunayD_facet out = DelaunayD_facet()
-            out.assign(self.T, Delaunay_with_info_D[info_t].Facet(self.x))
-            return out
-
-
-cdef class DelaunayD_facet_range:
-    r"""Wrapper class for iterating over a range of triangulation facets.
-
-    Args:
-        xstart (DelaunayD_facet_iter): The starting facet.  
-        xstop (DelaunayD_facet_iter): Final facet that will end the iteration. 
-        finite (:obj:`bool`, optional): If True, only finite facets are 
-            iterated over. Otherwise, all facets are iterated over. Defaults 
-            False.
-
-    Attributes:
-        x (DelaunayD_facet_iter): The currentfacet. 
-        xstop (DelaunayD_facet_iter): Final facet that will end the iteration. 
-        finite (bool): If True, only finite facets are iterater over. Otherwise
-            all facets are iterated over. 
-
-    """
-    cdef DelaunayD_facet_iter x
-    cdef DelaunayD_facet_iter xstop
-    cdef pybool finite
-    def __cinit__(self, DelaunayD_facet_iter xstart, 
-                  DelaunayD_facet_iter xstop,
-                  pybool finite = False):
-        self.x = xstart
-        self.xstop = xstop
-        self.finite = finite
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self.finite:
-            while (self.x != self.xstop) and self.x.is_infinite():
-                self.x.increment()
-        cdef DelaunayD_facet out
-        if self.x != self.xstop:
-            out = self.x.facet
-            self.x.increment()
-            return out
-        else:
-            raise StopIteration()
 
 cdef class DelaunayD_facet_vector:
     r"""Wrapper class for a vector of facets.
@@ -896,7 +792,7 @@ cdef class DelaunayD_cell:
     def dim(self):
         r"""int: Number of dimensions that the facet covers (one less than
         overall domain)."""
-        return self.T.num_dims
+        return self.T.num_dims()
 
     @property
     def nverts(self):
@@ -1450,32 +1346,32 @@ cdef class DelaunayD:
             out = self.T.is_valid()
         return <pybool>out
 
-    def write_to_file(self, fname):
-        r"""Write the serialized tessellation information to a file. 
+    # def write_to_file(self, fname):
+    #     r"""Write the serialized tessellation information to a file. 
 
-        Args:
-            fname (str): The full path to the file that the tessellation should 
-                be written to.
+    #     Args:
+    #         fname (str): The full path to the file that the tessellation should 
+    #             be written to.
 
-        """
-        cdef char* cfname = fname
-        with nogil:
-            self.T.write_to_file(cfname)
+    #     """
+    #     cdef char* cfname = fname
+    #     with nogil:
+    #         self.T.write_to_file(cfname)
 
-    @_update_to_tess
-    def read_from_file(self, fname):
-        r"""Read serialized tessellation information from a file.
+    # @_update_to_tess
+    # def read_from_file(self, fname):
+    #     r"""Read serialized tessellation information from a file.
 
-        Args:
-            fname (str): The full path to the file that the tessellation should 
-                be read from.
+    #     Args:
+    #         fname (str): The full path to the file that the tessellation should 
+    #             be read from.
 
-        """
-        cdef char* cfname = fname
-        with nogil:
-            self.T.read_from_file(cfname)
-        self.n = self.T.num_finite_verts()
-        self.n_per_insert.append(self.n)
+    #     """
+    #     cdef char* cfname = fname
+    #     with nogil:
+    #         self.T.read_from_file(cfname)
+    #     self.n = self.T.num_finite_verts()
+    #     self.n_per_insert.append(self.n)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1911,29 +1807,6 @@ cdef class DelaunayD:
         triangulation."""
         return DelaunayD_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end, finite = True)
-
-    @property
-    def all_facets_begin(self):
-        r"""DelaunayD_facet_iter: Starting facet for all facets in the 
-        triangulation."""
-        return DelaunayD_facet_iter(self, 'all_begin')
-    @property
-    def all_facets_end(self):
-        r"""DelaunayD_facet_iter: Final facet for all facets in the 
-        triangulation."""
-        return DelaunayD_facet_iter(self, 'all_end')
-    @property
-    def all_facets(self):
-        r"""DelaunayD_facet_range: Iterable for all facets in the 
-        triangulation."""
-        return DelaunayD_facet_range(self.all_facets_begin,
-                                     self.all_facets_end)
-    @property
-    def finite_facets(self):
-        r"""DelaunayD_facet_range: Iterable for finite facets in the 
-        triangulation."""
-        return DelaunayD_facet_range(self.all_facets_begin,
-                                     self.all_facets_end, finite = True)
 
     @property
     def all_cells_begin(self):

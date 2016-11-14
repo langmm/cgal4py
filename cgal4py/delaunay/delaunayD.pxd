@@ -38,8 +38,8 @@ cdef extern from "c_delaunayD.hpp":
         void remove(Vertex) except +
         void clear() except + 
 
-        void write_to_file(const char* filename) except +
-        void read_from_file(const char* filename) except +
+        # void write_to_file(const char* filename) except +
+        # void read_from_file(const char* filename) except +
         I serialize[I](I &n, I &m, int32_t &d,
                        double* vert_pos, Info* vert_info,
                        I* cells, I* neighbors) const
@@ -85,28 +85,18 @@ cdef extern from "c_delaunayD.hpp":
 
         cppclass Face:
             Face()
-            bool operator==(Face other)
-            bool operator!=(Face other)
+            # bool operator==(Face other)
+            # bool operator!=(Face other)
             Vertex vertex(int i)
             int ind(int i)
             Cell cell()
             int dim()
 
-        cppclass All_facets_iter:
-            All_facets_iter()
-            All_facets_iter& operator++()
-            All_facets_iter& operator--()
-            bool operator==(All_facets_iter other)
-            bool operator!=(All_facets_iter other)
-        All_facets_iter all_facets_begin()
-        All_facets_iter all_facets_end()
-
         cppclass Facet:
             Facet()
-            Facet(All_facets_iter it)
             Facet(Cell x, int i1)
-            bool operator==(Facet other)
-            bool operator!=(Facet other)
+            # bool operator==(Facet other)
+            # bool operator!=(Facet other)
             Cell cell()
             int ind()
             Vertex vertex(int i)
@@ -147,19 +137,18 @@ cdef extern from "c_delaunayD.hpp":
         bool is_infinite(Facet x)
         bool is_infinite(Cell x)
         bool is_infinite(All_verts_iter x)
-        bool is_infinite(All_facets_iter x)
         bool is_infinite(All_cells_iter x)
 
         vector[Vertex] incident_vertices(Vertex x)
-        vector[Face] incident_faces(Vertex x, int i)
-        vector[Cell] incident_cells(Vertex x)
-
         vector[Vertex] incident_vertices(Face x)
-        vector[Face] incident_faces(Face x, int i)
-        vector[Cell] incident_cells(Face x)
-
         vector[Vertex] incident_vertices(Cell x)
+
+        vector[Face] incident_faces(Vertex x, int i)
+        vector[Face] incident_faces(Face x, int i)
         vector[Face] incident_faces(Cell x, int i)
+
+        vector[Cell] incident_cells(Vertex x)
+        vector[Cell] incident_cells(Face x)
         vector[Cell] incident_cells(Cell x)
 
         int mirror_index(Cell x, int i) const
@@ -168,8 +157,8 @@ cdef extern from "c_delaunayD.hpp":
         void circumcenter(Cell x, double* out) const
         double n_simplex_volume(Face f) const
         double n_simplex_volume(Facet f) const
-        double dual_volume(const Vertex v) const
-        void dual_volumes(double* vols) const
+        double dual_volume(const Vertex v)
+        void dual_volumes(double* vols)
 
         vector[vector[Info]] outgoing_points(uint64_t nbox,
                                              double *left_edges, double *right_edges)

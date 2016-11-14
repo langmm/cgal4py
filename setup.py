@@ -37,8 +37,8 @@ if not RTDFLAG:
 
 # Set generic extension options
 ext_options = dict(language="c++",
-                   include_dirs=[numpy.get_include()],
-                   extra_compile_args=["-std=c++11"],# "-std=gnu++11",
+                   include_dirs=[numpy.get_include(),"/usr/include/boost"],
+                   extra_compile_args=["-std=c++14"],# "-std=gnu++11",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
                                   ("NPY_NO_DEPRECATED_API", None)])
@@ -80,7 +80,15 @@ def delaunay_filename(ftype, ver, periodic=False, bit64=False):
         raise ValueError("Unsupported file type {}.".format(ftype))
     return fname
 
-def make_alt_ext(fname0, fname1, replace=[], insert=[], comment='#'):
+def make_alt_ext(fname0, fname1, replace=[], insert=[]):
+    ext = os.path.splitext(fname0)[1]
+    if ext in [".pxd", ".pyx"]:
+        comment = '#'
+    elif ext in [".hpp", ".cpp", ".h", ".c"]:
+        comment = '//'
+    else:
+        raise Exception("Unsupported extension {}".format(ext))
+    
     gen_file_warn = (comment + " WARNING: This file was automatically " +
                      "generated. Do NOT edit it directly.\n")
     if (not os.path.isfile(fname0)):
@@ -115,7 +123,7 @@ def make_nD(dim):
     fnameN = delaunay_filename('hpp', str(dim))
     if os.path.isfile(fnameN): os.remove(fnameN)
     replace = [['Delaunay_with_info_D', 'Delaunay_with_info_{}'.format(dim)],
-               ['int D = 4; // REPLACE', 'int D = {}; // REPLACE'.format(dim)]]
+               ['const int D = 4; // REPLACE', 'const int D = {}; // REPLACE'.format(dim)]]
     make_alt_ext(fnameD, fnameN, replace=replace)
     # pxd
     fnameD = delaunay_filename('pxd', 'D')
@@ -192,9 +200,10 @@ ext_modules = [ ]
 
 for ver in delaunay_ver:
     add_delaunay(ext_modules, ver)
-    add_delaunay(ext_modules, ver, periodic=True)
-    add_delaunay(ext_modules, ver, bit64=True)
-    add_delaunay(ext_modules, ver, bit64=True, periodic=True)
+    if ver <= 3:
+        add_delaunay(ext_modules, ver, periodic=True)
+        add_delaunay(ext_modules, ver, bit64=True)
+        add_delaunay(ext_modules, ver, bit64=True, periodic=True)
 
 # Add other packages
 if use_cython:
