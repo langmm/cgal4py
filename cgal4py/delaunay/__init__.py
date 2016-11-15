@@ -1,6 +1,7 @@
 r"""Access to generic triangulation extensions."""
 import numpy as np
 import warnings
+import importlib
 import tools
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
@@ -34,6 +35,28 @@ except:
     warnings.warn("Could not import packages using long indices. " +
                   "This feature will be disabled.")
 
+def get_DelaunayD(ndim, use_double=False):
+    r"""Dynamically import module for nD Delaunay triangulation and return
+    the associated class.
+
+    Args:
+        ndim (int): Dimensionality that module should have.
+        use_double (bool, optional): If True, the 64bit version of the module
+            is imported.
+
+    Returns:
+        class: Class for `ndim`-dimensional Delaunay triangulation.
+
+    """
+    modname = 'delaunay{}'.format(ndim)
+    clsname = 'Delaunay{}'.format(ndim)
+    if use_double:
+        modname += '_64bit'
+        clsname += '_64bit'
+    try:
+        return getattr(importlib.import_module('cgal4py.delaunay.'+modname),clsname)
+    except:
+        raise
 
 def Delaunay(pts, use_double=False, periodic=False,
              left_edge=None, right_edge=None):
@@ -126,8 +149,10 @@ def Delaunay(pts, use_double=False, periodic=False,
             else:
                 T = Delaunay3()
         else:
-            raise NotImplementedError("Only 2D & 3D triangulations are " +
-                                      "currently supported.")
+            DelaunayD = get_DelaunayD(ndim, use_double=use_double)
+            T = DelaunayD()
+            # raise NotImplementedError("Only 2D & 3D triangulations are " +
+            #                           "currently supported.")
     # Insert points into tessellation
     if npts > 0:
         T.insert(pts)

@@ -62,14 +62,14 @@ cdef class DelaunayD_vertex:
     @property
     def num_dims(self):
         r"""int: Number of dimensions."""
-        return self.T.num_dims()
+        return D
 
     def __repr__(self):
         cdef str out = "DelaunayD_vertex[{} at ".format(self.index)
         cdef np.ndarray[np.float64_t] p = self.point
-        for i in range(self.num_dims):
+        for i in range(self.num_dims-1):
             out += "{:+7.2e},".format(p[i])
-        out[-1] = "]"
+        out += "{:+7.2e}]".format(p[self.num_dims-1])
         return out
 
     def __richcmp__(DelaunayD_vertex self, DelaunayD_vertex solf, int op):
@@ -115,7 +115,7 @@ cdef class DelaunayD_vertex:
         vertex."""
         def __get__(self):
             cdef np.ndarray[np.float64_t] out
-            out = np.zeros(self.num_dims, 'float64')
+            out = np.zeros(D, 'float64')
             if self.is_infinite():
                 out[:] = np.float('inf')
             else:
@@ -393,9 +393,9 @@ cdef class DelaunayD_face:
     def __repr__(self):
         cdef str out = "DelaunayD_face[{}d: ".format(self.dim)
         cdef int i
-        for i in range(self.nverts):
+        for i in range(self.nverts-1):
             out += "{},".format(repr(self.vertex(i)))
-        out[-1] = "]"
+        out += "{}]".format(repr(self.vertex(self.nverts-1)))
         return out
 
     # def __richcmp__(DelaunayD_face self, DelaunayD_face solf, int op):
@@ -443,6 +443,20 @@ cdef class DelaunayD_face:
         x = self.x.vertex(i)
         cdef DelaunayD_vertex out = DelaunayD_vertex()
         out.assign(self.T, x)
+        return out
+
+    def index(self, int i):
+        r"""Get the index in the cell of the ith vertex on this face.
+
+        Args:
+            i (int): Index of vertex on this face to get index for.
+        
+        Returns:
+            int: Index of ith vertex on this face within the reference cell.
+
+        """
+        cdef int out
+        out = self.x.ind(i)
         return out
 
     property cell:
@@ -603,14 +617,13 @@ cdef class DelaunayD_facet:
     def dim(self):
         r"""int: Number of dimensions that the facet covers (one less than
         overall domain)."""
-        cdef int out = <int>self.T.num_dims() - 1
-        return out
+        return D - 1
 
     @property
     def nverts(self):
         r"""int: Number of vertices in the facet (same as number of dimensions
         in the domain."""
-        return self.T.num_dims()
+        return D
 
     @staticmethod
     def from_cell(DelaunayD_cell c, int i):
@@ -634,9 +647,9 @@ cdef class DelaunayD_facet:
     def __repr__(self):
         cdef str out = "DelaunayD_facet["
         cdef int i
-        for i in range(self.nverts):
+        for i in range(self.nverts-1):
             out += "{},".format(repr(self.vertex(i)))
-        out[-1] = "]"
+        out += "{}]".format(repr(self.vertex(self.nverts-1)))
         return out
 
     # def __richcmp__(DelaunayD_facet self, DelaunayD_facet solf, int op):
@@ -817,9 +830,9 @@ cdef class DelaunayD_cell:
     def __repr__(self):
         cdef str out = "Delaunay2_cell["
         cdef int i
-        for i in range(self.nverts):
+        for i in range(self.nverts-1):
             out += "{},".format(repr(self.vertex(i)))
-        out[-1] = "]"
+        out += "{}]".format(repr(self.vertex(self.nverts-1)))
         return out
 
     def __richcmp__(DelaunayD_cell self, DelaunayD_cell solf, int op):
@@ -1675,7 +1688,7 @@ cdef class DelaunayD:
         Nnew, m = pts.shape[0], pts.shape[1]
         if Nnew == 0:
             return
-        assert(m == self.num_dims)
+        assert(m == D)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
         with nogil:
@@ -1762,6 +1775,7 @@ cdef class DelaunayD:
         cdef DelaunayD_face f = DelaunayD_face()
         cdef DelaunayD_facet ft = DelaunayD_facet()
         cdef DelaunayD_cell c = DelaunayD_cell()
+        cdef int ind
         if start is not None:
             c.assign(self.T, self.T.locate(&pos[0], lt, f.x, ft.x, start.x))
         else:
@@ -1769,10 +1783,12 @@ cdef class DelaunayD:
         print(lt)
         assert(lt != 999)
         if lt == 0: # vertex
-            return f.vertex(0)
+            return c.vertex(f.index(0))
         elif lt == 1: # face
             return f
         elif lt == 2: # facet
+            ind = ft.ind
+            ft = c.facet(ind)
             return ft
         elif lt == 3: # cell
             return c

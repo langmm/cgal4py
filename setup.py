@@ -37,21 +37,20 @@ if not RTDFLAG:
 
 # Set generic extension options
 ext_options = dict(language="c++",
-                   include_dirs=[numpy.get_include(),"/usr/include/boost"],
+                   include_dirs=[numpy.get_include()],
                    extra_compile_args=["-std=c++14"],# "-std=gnu++11",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
                                   ("NPY_NO_DEPRECATED_API", None)])
 if eigen3_exists:
     ext_options['define_macros'].append(("CGAL_EIGEN3_ENABLED",'1'))
-    # ("EIGEN3_INC_DIR","/usr/include/eigen3/Eigen/")])
 
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
 else:
     ext_options_cgal = copy.deepcopy(ext_options)
-    ext_options_cgal['libraries'] = ['gmp','CGAL'] #,'eigen3']
+    ext_options_cgal['libraries'] = ['gmp','CGAL']
     ext_options_cgal['extra_link_args'] = ["-lgmp"]
 
 def delaunay_filename(ftype, ver, periodic=False, bit64=False):
@@ -150,26 +149,6 @@ def make_64bit(ver,periodic=False):
         ["ctypedef np.uint32_t np_info_t","ctypedef np.uint64_t np_info_t"]]
     insert = [["ctypedef np.uint32_t np_info_t", import_line]]
     make_alt_ext(fname32, fname64, replace=replace, insert=insert)
-    # if (not os.path.isfile(fname32)):
-    #     print("Cannot create 64bit version of {} ".format(fname32) +
-    #           "as it dosn't exist.".format(fname32))
-    #     return
-    # if (not os.path.isfile(fname64)) or (os.path.getmtime(fname64) < os.path.getmtime(fname32)):
-    #     print("Creating 64bit version of {}...".format(fname32))
-    #     if os.path.isfile(fname64):
-    #         os.remove(fname64)
-    #     with open(fname64,'w') as new_file:
-    #         with open(fname32,'r') as old_file:
-    #             for line in old_file:
-    #                 if replace[0][0] in line:
-    #                     new_file.write(line.replace(replace[0][0],replace[0][1]))
-    #                 elif replace[1][0] in line:
-    #                     new_file.write(line.replace(replace[1][0],replace[1][1]))
-    #                 elif replace[2][0] in line:
-    #                     new_file.write(line.replace(replace[2][0],replace[2][1]))
-    #                     new_file.write(import_line)
-    #                 else:
-    #                     new_file.write(line)
 
 # Add Delaunay cython extensions
 def add_delaunay(ext_modules, ver, periodic=False, bit64=False):

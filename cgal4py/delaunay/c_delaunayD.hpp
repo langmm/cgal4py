@@ -110,7 +110,7 @@ public:
 
   Point pos2point(double* pos) const {
     std::vector<double> vp;
-    for (uint32_t i = 0; i < num_dims(); i++)
+    for (uint32_t i = 0; i < D; i++)
       vp.push_back(pos[i]);
     return Point(vp.begin(), vp.end());
   }
@@ -120,35 +120,38 @@ public:
     updated = true;
     uint32_t i;
     Vertex_handle v;
-    std::vector<Info> vp;
     for (i = 0; i < n; i++) {
-      v = T.insert(pos2point(pts+(num_dims()*i)));
+      v = T.insert(pos2point(pts+(D*i)));
       v->data() = val[i];
     }
   }
   void remove(Vertex v) { updated = true; T.remove(v._x); }
   void clear() { updated = true; T.clear(); }
 
-  Vertex get_vertex(Info index) const {
-    Finite_vertex_const_iterator it = T.finite_vertices_begin();
+  Vertex get_vertex(Info index) {
+    // Finite_vertex_const_iterator it = T.finite_vertices_begin();
+    Finite_vertex_iterator it = T.finite_vertices_begin();
     for ( ; it != T.finite_vertices_end(); it++) {
       if (it->data() == index)
-	return Vertex(non_const_handle(it.base()));
+	return Vertex(it.base());
+	// return Vertex(non_const_handle(it.base()));
     }
     return Vertex(T.infinite_vertex());
   }
 
-  Cell locate(double* pos, int& lt, Face f, Facet ft) const {
+  Cell locate(double* pos, int& lt, Face &f, Facet &ft) const {
     Point p = pos2point(pos);
     Locate_type lt_out = Locate_type(0);
     Cell out = Cell(T.locate(p, lt_out, f._x, ft._x));
     lt = (int)lt_out;
     return out;
   }
-  Cell locate(double* pos, int& lt, Face f, Facet ft, Cell c) const {
+  Cell locate(double* pos, int& lt, Face &f, Facet &ft, Cell c) const {
     Point p = pos2point(pos);
     Locate_type lt_out = Locate_type(0);
-    Cell out = Cell(T.locate(p, lt_out, f._x, ft._x, c._x));
+    Facet_handle fth;
+    Cell out = Cell(T.locate(p, lt_out, f._x, fth, c._x));
+    ft = Facet(Facet_handle(fth.full_cell(), fth.index_of_covertex()));
     lt = (int)lt_out;
     return out;
   }
@@ -212,8 +215,8 @@ public:
       Cartesian_const_iterator_d it;
       int i = 0;
       for (it = p.cartesian_begin(); it != p.cartesian_end(); ++it) {
-  	out[i] = *it;
-  	i++;
+      	out[i] = (double)(*it);
+      	i++;
       }
     }
     Info info() { return _x->data(); }
@@ -242,7 +245,7 @@ public:
     Face(Face_handle x) { _x = x; }
     // bool operator==(Face other) { return (_x == other._x); }
     // bool operator!=(Face other) { return (_x != other._x); }
-    Vertex vertex(int i) const { return Vertex(_x.vertex(i)); }
+    Vertex vertex(int i) const { return Vertex(_x.vertex(i % (dim()+1))); }
     int ind(int i) const { return _x.index(i); }
     Cell cell() const { return Cell(_x.full_cell()); }
     int dim() const { return _x.face_dimension(); }
@@ -270,7 +273,7 @@ public:
     Cell cell() const { return Cell(_x.full_cell()); }
     int ind() const { return _x.index_of_covertex(); }
     Vertex vertex(int i) const {
-      return Vertex(cell().vertex(ind() + 1 + i));
+      return Vertex(_x.full_cell()->vertex(i));//(ind() + 1 + i)%(D+1)));
     }
   };
 
@@ -307,16 +310,19 @@ public:
     bool operator==(Cell other) const { return (_x == other._x); }
     bool operator!=(Cell other) const { return (_x != other._x); }
   
-    Vertex vertex(int i) const { return Vertex(_x->vertex(i)); }
+    Vertex vertex(int i) const { return Vertex(_x->vertex(i%(D+1))); }
     bool has_vertex(Vertex v) const { return _x->has_vertex(v._x); }
     bool has_vertex(Vertex v, int *i) const { return _x->has_vertex(v._x, *i); }
     int ind(Vertex v) const { return _x->index(v._x); }
     std::vector<Vertex> vertices() const {
       std::vector<Vertex> out;
-      Vertex_iterator it;
-      for (it = _x->vertices_begin(); it != _x->vertices_end(); ++it) {
-  	out.push_back(Vertex((Vertex_handle)(it)));
+      for (int i = 0; i < (D+1); i++) {
+	out.push_back(vertex(i));
       }
+      // Vertex_iterator it;
+      // for (it = _x->vertices_begin(); it != _x->vertices_end(); ++it) {
+      // 	out.push_back(Vertex((Vertex_handle)(it)));
+      // }
       return out;
     }
 
@@ -326,10 +332,13 @@ public:
     int ind(Cell c) const { return _x->index(c._x); }
     std::vector<Cell> neighbors() const {
       std::vector<Cell> out;
-      Vertex_iterator it;
-      for (it = _x->vertices_begin(); it != _x->vertices_end(); ++it) {
-  	out.push_back(Cell((Cell_handle)(_x->neighbor(_x->index(it)))));
+      for (int i = 0; i < (D+1); i++) {
+	out.push_back(neighbor(i));
       }
+      // Vertex_iterator it;
+      // for (it = _x->vertices_begin(); it != _x->vertices_end(); ++it) {
+      // 	out.push_back(Cell((Cell_handle)(_x->neighbor(_x->index(it)))));
+      // }
       return out;
     }
 
@@ -361,10 +370,10 @@ public:
     int i1, i2;
     Vertex v1;
     int ndim = num_dims();
-    for (i1 = 0; i1 < (ndim+1); i1++) {
+    for (i1 = 0; i1 < (ndim); i1++) {
       bool match = false;
       v1 = f1.vertex(i1);
-      for (i2 = 0; i2 < (ndim+1); i2++) {
+      for (i2 = 0; i2 < (ndim); i2++) {
   	if (v1 == f2.vertex(i2)) {
   	  match = true;
   	  break;
@@ -536,6 +545,9 @@ public:
     std::vector<Point> centers;
     std::vector<Point> pts;
     for (i = 0; i < edges.size(); i++) {
+      if (T.is_infinite(edges[i]._x))
+	return -1.0;
+
       midp = T.geom_traits().midpoint_d_object()(edges[i].vertex(0)._x->point(),
                                                  edges[i].vertex(1)._x->point());
 

@@ -7,6 +7,7 @@ from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
 
 cdef extern from "c_delaunayD.hpp":
     cdef int VALID
+    cdef int D
 
     cdef cppclass Delaunay_with_info_D[Info] nogil:
         Delaunay_with_info_D() except +
@@ -55,8 +56,8 @@ cdef extern from "c_delaunayD.hpp":
                                     I* cells, I* neighbors, I idx_inf)
 
         Vertex get_vertex(Info index) except +
-        Cell locate(double* pos, int& lt, Face f, Facet ft)
-        Cell locate(double* pos, int& lt, Face f, Facet ft, Cell c)
+        Cell locate(double* pos, int& lt, Face &f, Facet &ft)
+        Cell locate(double* pos, int& lt, Face &f, Facet &ft, Cell c)
 
         void info_ordered_vertices(double* pos)
         void vertex_info(Info* verts)
