@@ -124,6 +124,8 @@ public:
       v = T.insert(pos2point(pts+(D*i)));
       v->data() = val[i];
     }
+    v = T.infinite_vertex();
+    v->data() = std::numeric_limits<Info>::max();
   }
   void remove(Vertex v) { updated = true; T.remove(v._x); }
   void clear() { updated = true; T.clear(); }
@@ -210,6 +212,9 @@ public:
     Vertex(All_verts_iter x) { _x = static_cast<Vertex_handle>(x._x); }
     bool operator==(Vertex other) { return (_x == other._x); }
     bool operator!=(Vertex other) { return (_x != other._x); }
+    bool operator< (const Vertex other) const {
+      return (_x->data() < other._x->data());
+    }
     void point(double* out) {
       Point p = _x->point();
       Cartesian_const_iterator_d it;
@@ -243,8 +248,7 @@ public:
     Face_handle _x = Face_handle(D);
     Face() { _x = Face_handle(D); }
     Face(Face_handle x) { _x = x; }
-    // bool operator==(Face other) { return (_x == other._x); }
-    // bool operator!=(Face other) { return (_x != other._x); }
+    Face(Cell x) { _x = Face_handle(x._x); }
     Vertex vertex(int i) const { return Vertex(_x.vertex(i % (dim()+1))); }
     int ind(int i) const { return _x.index(i); }
     Cell cell() const { return Cell(_x.full_cell()); }
@@ -258,7 +262,40 @@ public:
   	out.push_back(vertex(i));
       return out;
     }
+    std::vector<Info> unique_vect() const {
+      std::vector<Info> out;
+      Vertex v;
+      for (int i = 0; i <= dim(); i ++) {
+	v = vertex(i);
+	out.push_back(v.info());
+      }
+      std::sort(out.begin(), out.end());
+      return out;
+    }
+    bool operator==(const Face& other) const {
+      return (unique_vect() == other.unique_vect());
+    }
+    bool operator!=(const Face& other) const { return !(*this == other); }
+    bool operator< (const Face& other) const {
+      std::vector<Info> v1 = unique_vect();
+      std::vector<Info> v2 = other.unique_vect();
+      return std::lexicographical_compare(v1.begin(), v1.end(),
+					  v2.begin(), v2.end());
+    }
+    bool operator> (const Face& other) const { return other < *this; }
+    bool operator<=(const Face& other) const { return !(*this > other); }
+    bool operator>=(const Face& other) const { return !(*this < other); }
   };
+  // bool operator< (const Face& f1, const Face& f2) {
+  //   std::vector<Info> v1 = f1.unique_vect();
+  //   std::vector<Info> v2 = f2.unique_vect();
+  //   return std::lexicographical_compare(v1.begin(), v1.end(),
+  // 					v2.begin(), v2.end());
+  // }
+  // bool operator> (const Face& f1, const Face& f2) { return f2 < f1; }
+  // bool operator<=(const Face& f1, const Face& f2) { return !(f1 > f2); }
+  // bool operator>=(const Face& f1, const Face& f2) { return !(f1 < f2); }
+
 
   // Facet construct
   class Facet {
@@ -395,6 +432,7 @@ public:
 
   // Constructs incident
   std::vector<Vertex> incident_vertices(Vertex x) {
+    std::set<Vertex> sout;
     std::vector<Vertex> out;
     std::vector<Face> faces = incident_faces(x, 1);
     Vertex v;
@@ -402,10 +440,12 @@ public:
     for (i = 0; i < faces.size(); i++) {
       for (j = 0; j < 2; j++) {
   	v = faces[i].vertex(j);
-  	if (v != x)
-  	  out.push_back(v);
+  	if (v.info() != x.info())
+	  sout.insert(v);
+  	  // out.push_back(v);
       }
     }
+    std::copy(sout.begin(),sout.end(),std::back_inserter(out));
     return out;
   }
   std::vector<Vertex> incident_vertices(Face x) const {
@@ -422,39 +462,115 @@ public:
     T.tds().incident_faces(x._x, i, wrap_insert_iterator<Face,Face_handle>(out));
     return out;
   }
-  std::vector<Face> incident_faces(Face x, int i) {
-    // TODO: sout should be set, but need lexogrpahical comparison of faces
-    std::vector<Face> sout;
-    std::vector<Vertex> verts = incident_vertices(x);
-    std::vector<Face> faces;
-    std::size_t j, k;
-    for (j = 0; j < verts.size(); j++) {
-      faces = incident_faces(verts[j], i);
-      for (k = 0; k < faces.size(); k++) {
-  	if (!are_equal(faces[k], x))
-	  sout.push_back(faces[k]);
-  	  // sout.insert(faces[k]);
-      }
-    }
+  std::vector<Face> incident_faces(Face x, int face_dim) {
+    // Using combinatorics for seleting K from a set of N
+    // http://stackoverflow.com/questions/12991758/creating-all-possible-k-combinations-of-n-items-in-c
     std::vector<Face> out;
-    std::copy(sout.begin(),sout.end(),std::back_inserter(out));
+    int i, j, k, l;
+    int K, N;
+    Face f;
+    Cell c;
+    int idx = 0;
+    if (face_dim < x.dim()) {
+      K = face_dim+1;
+      N = x.dim()+1;
+      c = x.cell();
+      std::string bitmask(K, 1); // K leading 1's
+      bitmask.resize(N, 0); // N-K trailing 0's
+      do {
+	f = Face(c);
+	for (i = 0, j = 0; i < N; ++i) { // [0..N-1] integers
+	  if (bitmask[i]) {
+	    f.set_index(j, x.ind(i));
+	    j++;
+	  }
+	}
+	out.push_back(f);
+      } while (std::prev_permutation(bitmask.begin(), bitmask.end()));
+    } else {
+      std::string cellmask(D+1, 0);
+      std::set<Face> sout;
+      std::vector<Cell> cells = incident_cells(x);
+      // std::vector<Vertex> verts = incident_vertices(x);
+      std::vector<Face> faces;
+      K = std::max(1, face_dim-x.dim());
+      N = D - x.dim();
+      for (i = 0; i < (int)(cells.size()); i++) {
+	c = cells[i];
+	std::string facemask(x.dim()+1, 1);
+	if (face_dim == x.dim())
+	  facemask[0] = 0;
+	do {
+	  for (j = 0; j < (D+1); j++)
+	    cellmask[j] = 1;
+	  for (j = 0; j < (x.dim()+1); j++) {
+	    if (c.has_vertex(x.vertex(j), &idx))
+	      cellmask[idx] = 0;
+	  }
+	  std::string bitmask(K, 1); // K leading 1's
+	  bitmask.resize(N, 0); // N-K trailing 0's
+	  do {
+	    f = Face(c);
+	    l = 0;
+	    for (j = 0; j < (x.dim()+1); j++) {
+	      if (facemask[j])
+		if (c.has_vertex(x.vertex(j), &idx))
+		  f.set_index(l, idx);
+	    }
+	    for (j = 0, k = 0; j < (D+1); j++) {
+	      if (cellmask[j]) {
+		if (bitmask[k]) {
+		  f.set_index(l, j);
+		  l++;
+		}
+		k++;
+	      }
+	    }
+	    sout.insert(f);
+	  } while (std::prev_permutation(bitmask.begin(), bitmask.end()));
+	} while (std::prev_permutation(facemask.begin(), facemask.end()));
+      }
+      std::copy(sout.begin(),sout.end(),std::back_inserter(out));
+    }
     return out;
   }
-  std::vector<Face> incident_faces(Cell x, int i) {
-    // TODO: sout should be set, but need lexogrpahical comparison of faces
-    std::vector<Face> sout;
-    std::vector<Vertex> verts = incident_vertices(x);
-    std::vector<Face> faces;
-    std::size_t j, k;
-    for (j = 0; j < verts.size(); j++) {
-      faces = incident_faces(verts[j], i);
-      for (k = 0; k < faces.size(); k++) {
-	sout.push_back(faces[k]);
-  	// sout.insert(faces[k]);
-      }
-    }
+  // std::vector<Face> incident_faces(Face x, int i) {
+  //   std::set<Face> sout;
+  //   std::vector<Vertex> verts = incident_vertices(x);
+  //   std::vector<Face> faces;
+  //   std::size_t j, k;
+  //   for (j = 0; j < verts.size(); j++) {
+  //     faces = incident_faces(verts[j], i);
+  //     for (k = 0; k < faces.size(); k++) {
+  // 	if (faces[i] != x)
+  // 	// if (!are_equal(faces[k], x))
+  // 	  sout.insert(faces[k]);
+  //     }
+  //   }
+  //   std::vector<Face> out;
+  //   std::copy(sout.begin(),sout.end(),std::back_inserter(out));
+  //   return out;
+  // }
+  std::vector<Face> incident_faces(Cell x, int face_dim) {
+    // Using combinatorics for seleting K from a set of N
+    // http://stackoverflow.com/questions/12991758/creating-all-possible-k-combinations-of-n-items-in-c
+    int K = face_dim+1; // Number of vertices in face of dim face_dim
+    int N = D+1; // Number of vertices in cell of dim D
     std::vector<Face> out;
-    std::copy(sout.begin(),sout.end(),std::back_inserter(out));
+    std::string bitmask(K, 1); // K leading 1's
+    bitmask.resize(N, 0); // N-K trailing 0's
+    int i, j;
+    Face f;
+    do {
+      f = Face(x);
+      for (i = 0, j = 0; i < N; ++i) { // [0..N-1] integers
+	if (bitmask[i]) {
+	  f.set_index(j, i);
+	  j++;
+	}
+      }
+      out.push_back(f);
+    } while (std::prev_permutation(bitmask.begin(), bitmask.end()));
     return out;
   }
 

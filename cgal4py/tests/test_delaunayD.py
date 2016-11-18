@@ -10,6 +10,7 @@ import numpy as np
 import os
 import itertools
 from cgal4py.delaunay import get_DelaunayD
+from nose.tools import nottest
 
 ndim = 4
 DelaunayD = get_DelaunayD(ndim)
@@ -27,6 +28,14 @@ nverts = nverts_fin + nverts_inf
 ncells_fin = 51
 ncells_inf = 51
 ncells = ncells_fin + ncells_inf
+
+
+@nottest
+def count_faces_per_cell(face_dim):
+    N = ndim+1
+    K = face_dim+1
+    return np.math.factorial(N)/(np.math.factorial(N-K)*np.math.factorial(K))
+
 
 def test_create():
     T = DelaunayD()
@@ -366,6 +375,8 @@ def test_vert_incident_verts():
     T.insert(pts)
     count = 0
     for v in T.all_verts:
+        # if v.is_infinite():
+        #     continue
         c0 = 0
         for c in v.incident_vertices():
             c0 += 1
@@ -417,8 +428,9 @@ def test_vert_incident_cells():
             c0 += 1
             count += 1
         print(v.index, c0)
-    print(count, (ndim+1)*T.num_cells)  # 4*T.num_cells)
-    assert(count == (ndim+1)*T.num_cells)  # 4*T.num_cells)
+    expected = count_faces_per_cell(0)*T.num_cells
+    print(count, expected)
+    assert(count == expected)
 
 
 # def test_edge_incident_verts():
@@ -543,8 +555,9 @@ def test_cell_incident_verts():
             c0 += 1
             count += 1
         print(c0)
-    print(count, (ndim+1)*T.num_cells)
-    assert(count == (ndim+1)*T.num_cells)
+    expected = count_faces_per_cell(0)*T.num_cells
+    print(count, expected)
+    assert(count == expected)
 
 
 def test_cell_incident_edges():
@@ -557,8 +570,9 @@ def test_cell_incident_edges():
             c0 += 1
             count += 1
         print(c0)
-    print(count, 6032)  # 2*ndim*T.num_cells)
-    assert(count == 6032)  # 2*ndim*T.num_cells)
+    expected = count_faces_per_cell(1)*T.num_cells
+    print(count, expected)
+    assert(count == expected)
 
 
 def test_cell_incident_facets():
@@ -571,8 +585,9 @@ def test_cell_incident_facets():
             c0 += 1
             count += 1
         print(c0)
-    print(count, 32548)  # (ndim+1)*T.num_cells)
-    assert(count == 32548)  # (ndim+1)*T.num_cells)
+    expected = count_faces_per_cell(ndim-1)*T.num_cells
+    print(count, expected)
+    assert(count == expected)
 
 def test_cell_incident_cells():
     T = DelaunayD()
