@@ -5,7 +5,8 @@ r"""Routines for running triangulations in paralle.
    * parallelism using MPI
 
 """
-from cgal4py.delaunay import Delaunay, tools
+from cgal4py.delaunay import Delaunay, tools, _get_Delaunay
+from cgal4py.domain_decomp import GenericTree
 import numpy as np
 import os
 import time
@@ -13,7 +14,17 @@ import copy
 import struct
 from datetime import datetime
 import multiprocessing as mp
+from mpi4py import MPI
 import ctypes
+
+
+def _tess_filename(unique_str=None):
+    if isinstance(unique_str, str):
+        fname = '{}_tess.dat'.format(unique_str)
+    else:
+        print type(unique_str)
+        fname = 'tess.dat'
+    return fname
 
 
 def _leaf_tess_filename(leaf_id, unique_str=None):
@@ -23,6 +34,132 @@ def _leaf_tess_filename(leaf_id, unique_str=None):
         fname = 'leaf{}.dat'.format(leaf_id)
     return fname
 
+
+def write_mpi_script(fname, read_func, taskname, unique_str=None,
+                     use_double=False, overwrite=False):
+    r"""Write an MPI script for calling MPI parallelized triangulation.
+
+    Args:
+        fname (str): Full path to file where MPI script will be saved.
+        read_func (func): Function for reading in points. The function should
+            return a dictionary with 'pts' key at a minimum corresponding to
+            the 2D array of points that should be triangulated. Additional
+            optional keys include:
+                periodic (bool): True if the domain is periodic.
+                left_edge (np.ndarray of float64): Left edges of the domain.
+                right_edge (np.ndarray of float64): Right edges of the domain.
+            A list of lines resulting in the above mentioned dictionary is also
+            accepted.
+        taskname (str): Name of task to be apssed to 
+            :class:`cgal4py.parallel.DelaunayProcessMPI`.
+        unique_str (str, optional): Unique string identifying the domain
+            decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
+            file naming. Defaults to None.
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        overwrite (bool): If True, any existing script with the same name is
+            overwritten. Defaults to False.
+
+    """
+    if os.path.isfile(fname):
+        if overwrite:
+            os.remove(fname)
+        else:
+            return
+    if isinstance(read_func, list):
+        readcmds = True
+    else:
+        readcmds = False
+    lines = [
+        "import numpy as np",
+        "from mpi4py import MPI",
+        "from cgal4py import domain_decomp, parallel"]
+    if not readcmds:
+        lines.append(
+            "from {} import {} as load_func".format(read_func.__module__,
+                                                    read_func.__name__))
+    lines += [
+        "",
+        "comm = MPI.COMM_WORLD",
+        "size = comm.Get_size()",
+        "rank = comm.Get_rank()",
+        "",
+        "use_double = {}".format(use_double),
+        "unique_str = '{}'".format(unique_str),
+        "",
+        "if rank == 0:"]
+    if readcmds:
+        lines += ["    "+l for l in read_func]
+    else:
+        lines.append(
+            "    load_dict = load_func()")
+    lines += [
+        "    pts = load_dict['pts']",
+        "    left_edge = load_dict.get('left_edge', np.min(pts, axis=0))",
+        "    right_edge = load_dict.get('right_edge', np.max(pts, axis=0))",
+        "    periodic = load_dict.get('periodic', False)",
+        "    tree = domain_decomp.tree('kdtree', pts, left_edge, right_edge,",
+        "                              periodic=periodic, nleaves=size)",
+        "else:",
+        "    pts = None",
+        "    tree = None",
+        "",
+        "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
+        "                                pts, tree,",
+        "                                use_double=use_double,",
+        "                                unique_str=unique_str)",
+        "p.run()"]
+    with open(fname, 'w') as f:
+        for l in lines:
+            f.write(l+"\n")
+
+
+def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
+                              in_memory=False):
+    r"""Return the voronoi cell volumes after constructing triangulation in
+    parallel using MPI.
+
+    Args:
+        read_func (func): Function for reading in points. The function should
+            return a dictionary with 'pts' key at a minimum corresponding to
+            the 2D array of points that should be triangulated. Additional
+            optional keys include:
+                periodic (bool): True if the domain is periodic.
+                left_edge (np.ndarray of float64): Left edges of the domain.
+                right_edge (np.ndarray of float64): Right edges of the domain.
+            A list of lines resulting in the above mentioned dictionary is also
+            accepted.
+        ndim (int): Number of dimension in the domain.
+        nproc (int): Number of processors that should be used.
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        in_memory (bool, optional): If True, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. Otherwise, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to True.
+
+    Returns:
+        :class:`cgal4py.delaunay.Delaunay2` or
+            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
+            triangulation object.
+
+    """
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    fscript = '{}_mpi.py'.format(unique_str)
+    write_mpi_script(fscript, read_func, 'volumes',
+                     unique_str=unique_str, use_double=use_double)
+    os.system('mpiexec -np {} python {}'.format(nproc, fscript))
+    os.remove(fscript)
+    T = _get_Delaunay(ndim=ndim)()
+    ftess = _tess_filename(unique_str=unique_str)
+    T.read_from_file(ftess)
+    os.remove(ftess)
+    return T
 
 def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
@@ -102,6 +239,51 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
         p.join()
     return vol
 
+
+def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
+                        in_memory=False):
+    r"""Return a triangulation that is constructed in parallel using MPI.
+
+    Args:
+        read_func (func): Function for reading in points. The function should
+            return a dictionary with 'pts' key at a minimum corresponding to
+            the 2D array of points that should be triangulated. Additional
+            optional keys include:
+                periodic (bool): True if the domain is periodic.
+                left_edge (np.ndarray of float64): Left edges of the domain.
+                right_edge (np.ndarray of float64): Right edges of the domain.
+            A list of lines resulting in the above mentioned dictionary is also
+            accepted.
+        ndim (int): Number of dimension in the domain.
+        nproc (int): Number of processors that should be used.
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        in_memory (bool, optional): If True, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. Otherwise, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to True.
+
+    Returns:
+        :class:`cgal4py.delaunay.Delaunay2` or
+            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
+            triangulation object.
+
+    """
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    fscript = '{}_mpi.py'.format(unique_str)
+    write_mpi_script(fscript, read_func, 'triangulate',
+                     unique_str=unique_str, use_double=use_double)
+    os.system('mpiexec -np {} python {}'.format(nproc, fscript))
+    os.remove(fscript)
+    T = _get_Delaunay(ndim=ndim)()
+    ftess = _tess_filename(unique_str=unique_str)
+    T.read_from_file(ftess)
+    os.remove(ftess)
+    return T
+    
 
 def ParallelDelaunay(pts, tree, nproc, use_double=False, in_memory=False):
     r"""Return a triangulation that is constructed in parallel.
@@ -302,6 +484,161 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
     T.deserialize_with_info(pts, tree.idx.astype(cells.dtype),
                             cells, neigh, idx_inf)
     return T
+
+
+class DelaunayProcessMPI(object):
+    r"""Class for coordinating MPI operations.
+
+    Args:
+        taskname (str): Key for the task that should be parallelized. Options:
+              'triangulate': Perform triangulation and put serialized info in
+                  the output queue.
+              'volumes': Perform triangulation and put volumes in output queue.
+        pts (np.ndarray of float64): Array of coordinates to triangulate.
+        tree (Tree): Decomain decomposition tree.
+        unique_str (str, optional): Unique string identifying the domain
+            decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
+            file naming. Defaults to None.
+        use_double (bool, optional): If True, 64 bit integers will be used for
+            the triangulation. Defaults to False.
+
+    Raises:
+        ValueError: if `task` is not one of the accepted values listed above.
+
+    """
+    def __init__(self, taskname, pts, tree0, unique_str=None,
+                 use_double=False):
+        task_list = ['triangulate', 'volumes']
+        if taskname not in task_list:
+            raise ValueError('{} is not a valid task.'.format(taskname))
+        comm = MPI.COMM_WORLD
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+        # Get info for leaves
+        if rank == 0:
+            tree = GenericTree.from_tree(tree0)
+            task2leaves = [[] for _ in xrange(size)]
+            for leaf in tree.leaves:
+                leaf.pts = pts[tree.idx[leaf.start_idx:leaf.stop_idx]]
+                task = leaf.id % size
+                task2leaves[task].append(leaf)
+            left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+            right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        else:
+            tree = None
+        # Communicate points
+        if rank == 0:
+            for p in range(1, size):
+                pkg = [task2leaves[p], left_edges, right_edges, unique_str] 
+                comm.send(pkg, dest=p, tag=0)
+            leaves = task2leaves[0]
+        else:
+            pkg = comm.recv(source=0, tag=0)
+            leaves, left_edges, right_edges, unique_str = pkg
+        nleaves = len(leaves) 
+        # Set attributes
+        self._task = taskname
+        self._pts = pts
+        self._tree = tree
+        self._unique_str = unique_str
+        self._use_double = use_double
+        self._comm = comm
+        self._num_proc = size
+        self._proc_idx = rank
+        self._leaves = [ParallelLeaf(leaf, left_edges, right_edges,
+                                     unique_str=unique_str) for leaf in leaves]
+        ndim = left_edges.shape[1]
+        self._ndim = ndim
+        self._local_leaves = len(leaves)
+        if self._local_leaves == 0:
+            self._total_leaves = 0
+        else:
+            self._total_leaves = leaves[0].num_leaves
+        self._done = False
+        self._task2leaf = {i:[] for i in range(size)}
+        for i in range(self._total_leaves):
+            task = i % size
+            self._task2leaf[task].append(i)
+
+    def tessellate_leaves(self):
+        r"""Performs the tessellation for each leaf on this process."""
+        for leaf in self._leaves:
+            leaf.tessellate(leaf.pts)
+
+    def outgoing_points(self):
+        r"""Enqueues points at edges of each leaf's boundaries."""
+
+        tot_send = [{k:{} for k in self._task2leaf[i]} for
+                    i in range(self._num_proc)]
+        for leaf in self._leaves:
+            hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
+            for i in xrange(self._total_leaves):
+                task = i % self._num_proc
+                if hvall[i] is None:
+                    tot_send[task][i][leaf.id] = None
+                else:
+                    tot_send[task][i][leaf.id] = (hvall[i], n, le, re,
+                                                  ptall[i])
+        self._tot_recv = self._comm.alltoall(sendobj=tot_send)
+        del tot_send
+
+    def incoming_points(self):
+        r"""Takes points from the queue and adds them to the triangulation."""
+        nrecv = 0
+        for leaf in self._leaves:
+            for k in range(self._total_leaves):
+                task = k % self._num_proc
+                if k not in self._tot_recv[task][leaf.id]:
+                    continue
+                if self._tot_recv[task][leaf.id][k] is None:
+                    continue
+                leaf.incoming_points(k, *self._tot_recv[task][leaf.id][k])
+                nrecv += self._tot_recv[task][leaf.id][k][0].size
+        del self._tot_recv
+        return nrecv
+
+    def enqueue_triangulation(self):
+        r"""Enqueue resulting tessellation."""
+        out = [(leaf.id, leaf.serialize()) for leaf in self._leaves]
+        out = self._comm.gather(out, root=0)
+        if self._proc_idx == 0:
+            serial = [None for i in range(self._total_leaves)]
+            for i in range(self._num_proc):
+                for iid, s in out[i]:
+                    serial[iid] = s
+            T = consolidate_tess(self._tree, serial, self._pts,
+                                 use_double=self._use_double,
+                                 unique_str=self._unique_str)
+                                 # in_memory=in_memory)
+            ftess = _tess_filename(unique_str=self._unique_str)
+            T.write_to_file(ftess)
+
+    def enqueue_volumes(self):
+        r"""Enqueue resulting voronoi volumes."""
+        out = [(leaf.id, leaf.voronoi_volumes()) for leaf in self._leaves]
+        out = self._comm.gather(out, root=0)
+
+    def run(self):
+        r"""Performs tessellation and communication for each leaf on this
+        process."""
+        if self._task in ['triangulate', 'volumes']:
+            self.tessellate_leaves()
+            self._comm.Barrier()
+            # Continue exchanges until there are not any particles that need to
+            # be exchanged.
+            nrecv_tot = -1
+            while nrecv_tot != 0:
+                self.outgoing_points()
+                nrecv = self.incoming_points()
+                nrecv = self._comm.gather(nrecv, root=0)
+                if self._proc_idx == 0:
+                    nrecv_tot = sum(nrecv)
+                nrecv_tot = self._comm.bcast(nrecv_tot, root=0)
+            if self._task == 'triangulate':
+                self.enqueue_triangulation()
+            elif self._task == 'volumes':
+                self.enqueue_volumes()
+        self._done = True
 
 
 class DelaunayProcess(mp.Process):
@@ -616,8 +953,24 @@ class ParallelLeaf(object):
         """
         self.T = Delaunay(pts)
 
-    def outgoing_points(self):
-        r"""Get indices of points that should be sent to each neighbor."""
+    def outgoing_points(self, return_pts=False):
+        r"""Get indices of points that should be sent to each neighbor.
+
+        Args:
+            return_pts (bool, optional): If True, the associated positions of
+                the points are also returned. Defaults to False.
+        
+        Returns:
+            tuple: Containing
+                hvall (list): List of tree indices that should be sent to each
+                    process.
+                n (list): Indices of neighbor leaves.
+                left_edges (np.ndarray of float64): Left edges of neighbor
+                    leaves.
+                right_edges (np.ndarray of float64): Right edges of neighbor
+                    leaves.
+
+        """
         n = self.neighbors
         le = self.left_edges
         re = self.right_edges
@@ -635,7 +988,14 @@ class ParallelLeaf(object):
         self.neighbors = []
         self.left_edges = np.zeros((0, self.ndim), 'float64')
         self.right_edges = np.zeros((0, self.ndim), 'float64')
-        return hvall, n, le, re
+        # Return correct structure
+        if return_pts:
+            ptall = [None for k in xrange(self.num_leaves)]
+            for i, k in enumerate(n):
+                ptall[k] = self.pts[idx_enq[i]]
+            return hvall, n, le, re, ptall
+        else:
+            return hvall, n, le, re
 
     def outgoing_points_boundary(self):
         r"""Get indices of points that should be sent to each neighbor."""

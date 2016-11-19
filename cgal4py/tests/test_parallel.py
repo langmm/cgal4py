@@ -1,7 +1,8 @@
 r"""Tests for parallel implementation of triangulations."""
 import numpy as np
+from nose.tools import nottest
 from cgal4py import parallel, delaunay
-from test_cgal4py import make_test
+from test_cgal4py import make_points, make_test
 from test_delaunay2 import pts as pts2
 np.random.seed(10)
 
@@ -363,6 +364,73 @@ def test_ParallelDelaunay_periodic_3D():
     #           T.num_infinite_edges)
     #     print('\t facets', T.num_facets, T.num_finite_facets,
     #           T.num_infinite_facets
+
+
+@nottest
+def lines_load_test(npts, ndim, periodic=False):
+    lines = [
+        "from cgal4py.tests.test_cgal4py import make_points",
+        "pts, le, re = make_points({}, {})".format(npts, ndim),
+        "load_dict = dict(pts=pts, left_edge=le, right_edge=re,",
+        "                 periodic={})".format(periodic)]
+    return lines
+
+
+def test_ParallelDelaunayMPI_2D():
+    # Small test with known solution
+    pts, tree = make_test(0, 2)
+    T_seri = delaunay.Delaunay(pts)
+    T_para = parallel.ParallelDelaunayMPI(lines_load_test(0, 2), 2, 2)
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    assert(np.all(c_seri == c_para))
+    assert(np.all(n_seri == n_para))
+    assert(T_para.is_equivalent(T_seri))
+    # # Larger random test on 2 processors
+    # pts, tree = make_test(1000, 2, nleaves=2)
+    # assert(tree.num_leaves == 2)
+    # T_para = parallel.ParallelDelaunayMPI(pts, tree, 2)
+    # T_seri = delaunay.Delaunay(pts)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
+    # # Medium test on 4 processors
+    # pts, tree = make_test(4*4*2, 2, leafsize=8)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunayMPI(pts, tree, 4)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # assert(T_para.is_equivalent(T_seri))
+    # # Large test on 8 processors
+    # pts, tree = make_test(1e5, 2, nleaves=8)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunayMPI(pts, tree, 8)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(T_para.is_equivalent(T_seri))
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # # Large test on 8 processors
+    # pts, tree = make_test(1e7, 2, nleaves=10)
+    # T_seri = delaunay.Delaunay(pts)
+    # T_para = parallel.ParallelDelaunayMPI(pts, tree, 10)
+    # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    # c_para, n_para, inf_para = T_para.serialize(sort=True)
+    # assert(T_para.is_equivalent(T_seri))
+    # assert(np.all(c_seri == c_para))
+    # assert(np.all(n_seri == n_para))
+    # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+    #     print(name)
+    #     print('\t verts', T.num_verts, T.num_finite_verts,
+    #           T.num_infinite_verts)
+    #     print('\t cells', T.num_cells, T.num_finite_cells,
+    #           T.num_infinite_cells)
+    #     print('\t edges', T.num_edges, T.num_finite_edges,
+    #           T.num_infinite_edges)
 
 # def test_DelaunayProcess2():
 #     pts, tree = make_test(0, 2)

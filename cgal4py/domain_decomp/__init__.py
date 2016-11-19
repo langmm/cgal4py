@@ -66,6 +66,27 @@ class GenericLeaf(object):
         self.left_edge = left_edge
         self.right_edge = right_edge
 
+    @classmethod
+    def from_leaf(cls, leaf):
+        r"""Construct a GenericLeaf from a non-generic leaf.
+
+        Args:
+            leaf (Leaf): A leaf object.
+       
+        Returns:
+            :class:`cgal4py.domain_decomp.GenericLeaf`: Generic version of the
+                input leaf.
+
+        """
+        out = cls(leaf.npts, leaf.left_edge, leaf.right_edge)
+        other_attr = ['id', 'ndim', 'num_leaves', 'start_idx', 'stop_idx',
+                      'domain_width', 'periodic_left', 'periodic_right',
+                      'left_neighbors', 'right_neighbors', 'neighbors']
+        for k in other_attr:
+            if hasattr(leaf, k):
+                setattr(out, k, getattr(leaf, k))
+        return out
+
 
 class GenericTree(object):
     def __init__(self, idx, leaves, left_edge, right_edge, periodic):
@@ -106,6 +127,27 @@ class GenericTree(object):
         self.domain_width = right_edge - left_edge
         self.num_leaves = len(leaves)
         self.leaves = process_leaves(leaves, left_edge, right_edge, periodic)
+
+    @classmethod
+    def from_tree(cls, tree):
+        r"""Construct a GenericTree from a non-generic tree.
+
+        Args:
+            tree (Tree): A tree object.
+       
+        Returns:
+            :class:`cgal4py.domain_decomp.GenericTree`: Generic version of the
+                input tree.
+
+        """
+        leaves = [GenericLeaf.from_leaf(leaf) for leaf in tree.leaves]
+        out = cls(tree.idx, leaves, tree.left_edge, tree.right_edge,
+                  tree.periodic)
+        other_attr = []
+        for k in other_attr:
+            if hasattr(leaf, k):
+                setattr(out, k, getattr(leaf, k))
+        return out
 
 
 def process_leaves(leaves, left_edge, right_edge, periodic):
@@ -248,6 +290,13 @@ def process_leaves(leaves, left_edge, right_edge, periodic):
                                     leaf.periodic_left[i]):
                                 leaf.left_neighbors[i].append(prev.id)
                                 prev.right_neighbors[i].append(leaf.id)
+    if getattr(leaves[0], 'neighbors', None) is None:
+        for leaf in leaves:
+            neighbors = [leaf.id]
+            for i in range(ndim):
+                neighbors += leaf.left_neighbors[i]
+                neighbors += leaf.right_neighbors[i]
+            leaf.neighbors = list(set(neighbors))
     # Return leaves
     return leaves
 
