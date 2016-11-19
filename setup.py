@@ -12,12 +12,8 @@ except ImportError:
 else:
     use_cython = True
 
-eigen3_exists = True
-
 # Versions of Delaunay triangulation that ahve been wrapped
-delaunay_ver = ['2','3',4]
-# if eigen3_exists:
-#     delaunay_ver.append('D')
+delaunay_ver = ['2','3']
 
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
@@ -42,9 +38,6 @@ ext_options = dict(language="c++",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
                                   ("NPY_NO_DEPRECATED_API", None)])
-if eigen3_exists:
-    ext_options['define_macros'].append(("CGAL_EIGEN3_ENABLED",'1'))
-
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
@@ -53,113 +46,13 @@ else:
     ext_options_cgal['libraries'] = ['gmp','CGAL']
     ext_options_cgal['extra_link_args'] = ["-lgmp"]
 
-def delaunay_filename(ftype, ver, periodic=False, bit64=False):
-    perstr = '' ; bitstr = ''
-    if periodic:
-        perstr = 'periodic_'
-    if bit64:
-        bitstr = '_64bit'
-    if ftype == 'ext':
-        fname = "cgal4py/delaunay/{}delaunay{}{}".format(perstr,ver,bitstr)
-    elif ftype == 'pyx':
-        fname = "cgal4py/delaunay/{}delaunay{}{}.pyx".format(perstr,ver,bitstr)
-    elif ftype == 'pxd':
-        fname = "cgal4py/delaunay/{}delaunay{}{}.pxd".format(perstr,ver,bitstr)
-    elif ftype == 'cpp':
-        fname = "cgal4py/delaunay/c_{}delaunay{}{}.cpp".format(perstr,ver,
-                                                               bitstr)
-    elif ftype == 'hpp':
-        fname = "cgal4py/delaunay/c_{}delaunay{}{}.hpp".format(perstr,ver,
-                                                               bitstr)
-    elif ftype == 'import':
-        fname = '\nfrom cgal4py.delaunay.{}delaunay{} '.format(perstr,ver) + \
-                'cimport {}Delaunay_with_info_{},VALID\n'.format(
-                    perstr.title().rstrip('_'),ver)
-    else:
-        raise ValueError("Unsupported file type {}.".format(ftype))
-    return fname
-
-def make_alt_ext(fname0, fname1, replace=[], insert=[]):
-    ext = os.path.splitext(fname0)[1]
-    if ext in [".pxd", ".pyx"]:
-        comment = '#'
-    elif ext in [".hpp", ".cpp", ".h", ".c"]:
-        comment = '//'
-    else:
-        raise Exception("Unsupported extension {}".format(ext))
-    
-    gen_file_warn = (comment + " WARNING: This file was automatically " +
-                     "generated. Do NOT edit it directly.\n")
-    if (not os.path.isfile(fname0)):
-        print("Cannot create {} because original ".format(fname1) +
-              "({}). dosn't exist".format(fname0))
-        return
-    if (not os.path.isfile(fname1)) or (os.path.getmtime(fname1) < os.path.getmtime(fname0)):
-        print("Creating alterate version of {}...".format(fname0))
-        if os.path.isfile(fname1):
-            os.remove(fname1)
-        with open(fname1,'w') as new_file:
-            with open(fname0,'r') as old_file:
-                new_file.write(gen_file_warn)
-                for line in old_file:
-                    # Make replacements
-                    match = False
-                    for r0,r1 in replace:
-                        if r0 in line:
-                            new_file.write(line.replace(r0,r1))
-                            match = True
-                            break
-                    if not match:
-                        new_file.write(line)
-                    # Insert new lines
-                    for i0,i1 in insert:
-                        if i0 in line:
-                            new_file.write(i1)
-
-def make_nD(dim):
-    # hpp
-    fnameD = delaunay_filename('hpp', 'D')
-    fnameN = delaunay_filename('hpp', str(dim))
-    if os.path.isfile(fnameN): os.remove(fnameN)
-    replace = [['Delaunay_with_info_D', 'Delaunay_with_info_{}'.format(dim)],
-               ['const int D = 4; // REPLACE', 'const int D = {}; // REPLACE'.format(dim)]]
-    make_alt_ext(fnameD, fnameN, replace=replace)
-    # pxd
-    fnameD = delaunay_filename('pxd', 'D')
-    fnameN = delaunay_filename('pxd', str(dim))
-    if os.path.isfile(fnameN): os.remove(fnameN)
-    replace = [['c_delaunayD.hpp', 'c_delaunay{}.hpp'.format(dim)],
-               ['Delaunay_with_info_D', 'Delaunay_with_info_{}'.format(dim)]]
-    make_alt_ext(fnameD, fnameN, replace=replace)
-    # pyx
-    fnameD = delaunay_filename('pyx', 'D')
-    fnameN = delaunay_filename('pyx', str(dim))
-    if os.path.isfile(fnameN): os.remove(fnameN)
-    replace = [['DelaunayD', 'Delaunay{}'.format(dim)],
-               ['Delaunay_with_info_D', 'Delaunay_with_info_{}'.format(dim)]]
-    make_alt_ext(fnameD, fnameN, replace=replace)
-
-def make_64bit(ver,periodic=False):
-    fname32 = delaunay_filename('pyx', ver, periodic=periodic)
-    fname64 = delaunay_filename('pyx', ver, periodic=periodic, bit64=True)
-    import_line = delaunay_filename('import', ver, periodic=periodic)
-    replace = [
-        ["ctypedef uint32_t info_t","ctypedef uint64_t info_t"],
-        ["cdef object np_info = np.uint32","cdef object np_info = np.uint64"],
-        ["ctypedef np.uint32_t np_info_t","ctypedef np.uint64_t np_info_t"]]
-    insert = [["ctypedef np.uint32_t np_info_t", import_line]]
-    make_alt_ext(fname32, fname64, replace=replace, insert=insert)
-
 # Add Delaunay cython extensions
+from cgal4py.delaunay import _delaunay_filename
 def add_delaunay(ext_modules, ver, periodic=False, bit64=False):
     ver = int(ver)
-    if bit64:
-        make_64bit(ver, periodic=periodic)
-    if ver > 3:
-        make_nD(ver)
-    ext_name = delaunay_filename('ext', ver, periodic=periodic, bit64=bit64)
-    pyx_file = delaunay_filename('pyx', ver, periodic=periodic, bit64=bit64)
-    cpp_file = delaunay_filename('cpp', ver, periodic=periodic, bit64=bit64)
+    ext_name = _delaunay_filename('ext', ver, periodic=periodic, bit64=bit64)
+    pyx_file = _delaunay_filename('pyx', ver, periodic=periodic, bit64=bit64)
+    cpp_file = _delaunay_filename('cpp', ver, periodic=periodic, bit64=bit64)
     if not os.path.isfile(pyx_file):
         print("Extension {} does not exist and will not be compiled".format(ext_name))
         return
@@ -179,10 +72,7 @@ ext_modules = [ ]
 
 for ver in delaunay_ver:
     add_delaunay(ext_modules, ver)
-    if ver <= 3:
-        add_delaunay(ext_modules, ver, periodic=True)
-        add_delaunay(ext_modules, ver, bit64=True)
-        add_delaunay(ext_modules, ver, bit64=True, periodic=True)
+    add_delaunay(ext_modules, ver, periodic=True)
 
 # Add other packages
 if use_cython:

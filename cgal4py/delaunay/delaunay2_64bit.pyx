@@ -1,3 +1,4 @@
+# WARNING: This file was automatically generated. Do NOT edit it directly.
 """
 delaunay2.pyx
 
@@ -30,7 +31,7 @@ ctypedef np.uint64_t np_info_t
 
 from cgal4py.delaunay.delaunay2 cimport Delaunay_with_info_2,VALID
 
-cdef class Delaunay2_vertex:
+cdef class Delaunay2_64bit_vertex:
     r"""Wrapper class for a triangulation vertex.
 
     Attributes:
@@ -58,10 +59,10 @@ cdef class Delaunay2_vertex:
         self.x = x
 
     def __repr__(self):
-        return "Delaunay2_vertex[{} at {:+7.2e},{:+7.2e}]".format(
+        return "Delaunay2_64bit_vertex[{} at {:+7.2e},{:+7.2e}]".format(
             self.index, *list(self.point))
 
-    def __richcmp__(Delaunay2_vertex self, Delaunay2_vertex solf, int op):
+    def __richcmp__(Delaunay2_64bit_vertex self, Delaunay2_64bit_vertex solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -89,11 +90,11 @@ cdef class Delaunay2_vertex:
         assert(len(pos) == 2)
         self.x.set_point(&pos[0])
 
-    def set_cell(self, Delaunay2_cell c):
+    def set_cell(self, Delaunay2_64bit_cell c):
         r"""Assign this vertex's designated cell.
 
         Args:
-            c (Delaunay2_cell): Cell that will be assigned as designated cell.
+            c (Delaunay2_64bit_cell): Cell that will be assigned as designated cell.
 
         """
         self.T.updated = <cbool>True
@@ -128,11 +129,11 @@ cdef class Delaunay2_vertex:
             return out
 
     property cell:
-        r"""Delaunay2_cell: The cell assigned to this vertex."""
+        r"""Delaunay2_64bit_cell: The cell assigned to this vertex."""
         def __get__(self):
             cdef Delaunay_with_info_2[info_t].Cell c
             c = self.x.cell()
-            cdef Delaunay2_cell out = Delaunay2_cell()
+            cdef Delaunay2_64bit_cell out = Delaunay2_64bit_cell()
             out.assign(self.T, c)
             return out
 
@@ -140,13 +141,13 @@ cdef class Delaunay2_vertex:
         r"""Find vertices that are incident to this vertex.
 
         Returns:
-            Delaunay2_vertex_vector: Iterator over vertices incident to this 
+            Delaunay2_64bit_vertex_vector: Iterator over vertices incident to this 
                 vertex.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
+        cdef Delaunay2_64bit_vertex_vector out = Delaunay2_64bit_vertex_vector()
         out.assign(self.T, it)
         return out
         
@@ -154,12 +155,12 @@ cdef class Delaunay2_vertex:
         r"""Find edges that are incident to this vertex.
 
         Returns:
-            Delaunay2_edge_vector: Iterator over edges incident to this vertex.
+            Delaunay2_64bit_edge_vector: Iterator over edges incident to this vertex.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        cdef Delaunay2_64bit_edge_vector out = Delaunay2_64bit_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -167,21 +168,21 @@ cdef class Delaunay2_vertex:
         r"""Find cells that are incident to this vertex.
 
         Returns:
-            Delaunay2_cell_vector: Iterator over cells incident to this vertex.
+            Delaunay2_64bit_cell_vector: Iterator over cells incident to this vertex.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        cdef Delaunay2_64bit_cell_vector out = Delaunay2_64bit_cell_vector()
         out.assign(self.T, it)
         return out
 
 
-cdef class Delaunay2_vertex_iter:
+cdef class Delaunay2_64bit_vertex_iter:
     r"""Wrapper class for a triangulation vertex iterator.
 
     Args:
-        T (Delaunay2): Triangulation that this vertex belongs to.
+        T (Delaunay2_64bit): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include:
                 'all_begin': The first vertex in an iteration over all vertices.
@@ -198,14 +199,14 @@ cdef class Delaunay2_vertex_iter:
     cdef Delaunay_with_info_2[info_t] *T
     cdef Delaunay_with_info_2[info_t].All_verts_iter x
     
-    def __cinit__(self, Delaunay2 T, str vert = None):
+    def __cinit__(self, Delaunay2_64bit T, str vert = None):
         self.T = T.T
         if vert == 'all_begin':
             self.x = self.T.all_verts_begin()
         elif vert == 'all_end':
             self.x = self.T.all_verts_end()
 
-    def __richcmp__(Delaunay2_vertex_iter self, Delaunay2_vertex_iter solf, int op):
+    def __richcmp__(Delaunay2_64bit_vertex_iter self, Delaunay2_64bit_vertex_iter solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -222,13 +223,13 @@ cdef class Delaunay2_vertex_iter:
         predecrement(self.x)
 
     property vertex:
-        r"""Delaunay2_vertex: The corresponding vertex object."""
+        r"""Delaunay2_64bit_vertex: The corresponding vertex object."""
         def __get__(self):
-            cdef Delaunay2_vertex out = Delaunay2_vertex()
+            cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
             out.assign(self.T, Delaunay_with_info_2[info_t].Vertex(self.x))
             return out
 
-cdef class Delaunay2_vertex_vector:
+cdef class Delaunay2_64bit_vertex_vector:
     r"""Wrapper class for a vector of vertices. 
 
     Attributes: 
@@ -265,9 +266,9 @@ cdef class Delaunay2_vertex_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay2_vertex out
+        cdef Delaunay2_64bit_vertex out
         if self.i < self.n:
-            out = Delaunay2_vertex()
+            out = Delaunay2_64bit_vertex()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -275,37 +276,37 @@ cdef class Delaunay2_vertex_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay2_vertex out
+        cdef Delaunay2_64bit_vertex out
         if isinstance(i, int):
-            out = Delaunay2_vertex()
+            out = Delaunay2_64bit_vertex()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay2_vertex_vector indices must be itegers, "+
+            raise TypeError("Delaunay2_64bit_vertex_vector indices must be itegers, "+
                             "not {}".format(type(i)))
 
 
-cdef class Delaunay2_vertex_range:
+cdef class Delaunay2_64bit_vertex_range:
     r"""Wrapper class for iterating over a range of triangulation vertices
     
     Args:
-        vstart (Delaunay2_vertex_iter): The starting vertex.
-        vstop (Delaunay2_vertex_iter): Final vertex that will end the iteration.
+        vstart (Delaunay2_64bit_vertex_iter): The starting vertex.
+        vstop (Delaunay2_64bit_vertex_iter): Final vertex that will end the iteration.
         finite (:obj:`bool`, optional): If True, only finite verts are
             iterated over. Otherwise, all verts are iterated over. Defaults 
             to False.
 
     Attributes:
-        x (Delaunay2_vertex_iter): The current vertex.
-        xstop (Delaunay2_vertex_iter): Final vertex that will end the iteration.
+        x (Delaunay2_64bit_vertex_iter): The current vertex.
+        xstop (Delaunay2_64bit_vertex_iter): Final vertex that will end the iteration.
         finite (bool): If True, only finite verts are iterater over. Otherwise 
             all verts are iterated over.
 
     """
-    cdef Delaunay2_vertex_iter x
-    cdef Delaunay2_vertex_iter xstop
+    cdef Delaunay2_64bit_vertex_iter x
+    cdef Delaunay2_64bit_vertex_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay2_vertex_iter xstart, Delaunay2_vertex_iter xstop,
+    def __cinit__(self, Delaunay2_64bit_vertex_iter xstart, Delaunay2_64bit_vertex_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -318,7 +319,7 @@ cdef class Delaunay2_vertex_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_vertex out
+        cdef Delaunay2_64bit_vertex out
         if self.x != self.xstop:
             out = self.x.vertex
             self.x.increment()
@@ -327,7 +328,7 @@ cdef class Delaunay2_vertex_range:
             raise StopIteration()
 
 
-cdef class Delaunay2_edge:
+cdef class Delaunay2_64bit_edge:
     r"""Wrapper class for a triangulation edge.
 
     Attributes:
@@ -355,29 +356,29 @@ cdef class Delaunay2_edge:
         self.x = x
 
     @staticmethod
-    def from_cell(Delaunay2_cell c, int i):
+    def from_cell(Delaunay2_64bit_cell c, int i):
         r"""Construct an edges from a cell and index of the vertex opposite the 
         edge.
 
         Args:
-            c (Delaunay2_cell): Cell
+            c (Delaunay2_64bit_cell): Cell
             i (int): Index of vertex opposite the desired edge in c.
 
         Returns:
-            Delaunay2_edge: Edge incident to c and opposite vertex i of c.
+            Delaunay2_64bit_edge: Edge incident to c and opposite vertex i of c.
 
         """
-        cdef Delaunay2_edge out = Delaunay2_edge()
+        cdef Delaunay2_64bit_edge out = Delaunay2_64bit_edge()
         cdef Delaunay_with_info_2[info_t].Edge e
         e = Delaunay_with_info_2[info_t].Edge(c.x, i)
         out.assign(c.T, e)
         return out
 
     def __repr__(self):
-        return "Delaunay2_edge[{},{}]".format(repr(self.vertex1), 
+        return "Delaunay2_64bit_edge[{},{}]".format(repr(self.vertex1), 
                                               repr(self.vertex2))
 
-    def __richcmp__(Delaunay2_edge self, Delaunay2_edge solf, int op):
+    def __richcmp__(Delaunay2_64bit_edge self, Delaunay2_64bit_edge solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -402,7 +403,7 @@ cdef class Delaunay2_edge:
             i (int): Index of vertex incident to this edge.
 
         Returns:
-            Delaunay2_vertex: Vertex i of this edge.
+            Delaunay2_64bit_vertex: Vertex i of this edge.
 
         """
         if (i % 2) == 0:
@@ -411,18 +412,18 @@ cdef class Delaunay2_edge:
             return self.vertex2
 
     property vertex1:
-        r"""Delaunay2_vertex: The first vertex in the edge."""
+        r"""Delaunay2_64bit_vertex: The first vertex in the edge."""
         def __get__(self):
             cdef Delaunay_with_info_2[info_t].Vertex x = self.x.v1()
-            cdef Delaunay2_vertex out = Delaunay2_vertex()
+            cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
             out.assign(self.T, x)
             return out
 
     property vertex2:
-        r"""Delaunay2_vertex: The second vertex in the edge."""
+        r"""Delaunay2_64bit_vertex: The second vertex in the edge."""
         def __get__(self):
             cdef Delaunay_with_info_2[info_t].Vertex x = self.x.v2()
-            cdef Delaunay2_vertex out = Delaunay2_vertex()
+            cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
             out.assign(self.T, x)
             return out
 
@@ -446,12 +447,12 @@ cdef class Delaunay2_edge:
             return out
 
     property mirror:
-        r"""Delaunay2_edge: The same edge, but represented using the other 
+        r"""Delaunay2_64bit_edge: The same edge, but represented using the other 
         incident cell."""
         def __get__(self):
             cdef Delaunay_with_info_2[info_t].Edge ec
             ec = self.T.mirror_edge(self.x)
-            cdef Delaunay2_edge out = Delaunay2_edge()
+            cdef Delaunay2_64bit_edge out = Delaunay2_64bit_edge()
             out.assign(self.T, ec)
             return out
 
@@ -459,7 +460,7 @@ cdef class Delaunay2_edge:
         r"""Find vertices that are incident to this edge.
 
         Returns:
-            Delaunay2_vertex_vector: Iterator over vertices incident to this 
+            Delaunay2_64bit_vertex_vector: Iterator over vertices incident to this 
                 edge.
 
         """
@@ -467,7 +468,7 @@ cdef class Delaunay2_edge:
         it = self.T.incident_vertices(self.x)
         # it.push_back(self.x.v1())
         # it.push_back(self.x.v2())
-        cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
+        cdef Delaunay2_64bit_vertex_vector out = Delaunay2_64bit_vertex_vector()
         out.assign(self.T, it)
         return out
 
@@ -475,12 +476,12 @@ cdef class Delaunay2_edge:
         r"""Find edges that are incident to this edge.
 
         Returns:
-            Delaunay2_edge_vector: Iterator over edges incident to this edge.
+            Delaunay2_64bit_edge_vector: Iterator over edges incident to this edge.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        cdef Delaunay2_64bit_edge_vector out = Delaunay2_64bit_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -488,12 +489,12 @@ cdef class Delaunay2_edge:
         r"""Find cells that are incident to this edge.
 
         Returns:
-            Delaunay2_cell_vector: Iterator over cells incident to this edge.
+            Delaunay2_64bit_cell_vector: Iterator over cells incident to this edge.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        cdef Delaunay2_64bit_cell_vector out = Delaunay2_64bit_cell_vector()
         out.assign(self.T, it)
         return out
 
@@ -517,11 +518,11 @@ cdef class Delaunay2_edge:
         self.T.updated = <cbool>True
         self.T.flip_flippable(self.x)
 
-cdef class Delaunay2_edge_iter:
+cdef class Delaunay2_64bit_edge_iter:
     r"""Wrapper class for a triangulation edge iterator.
 
     Args:
-        T (Delaunay2): Triangulation that this edge belongs to.
+        T (Delaunay2_64bit): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include:
                 'all_begin': The first edge in an iteration over all edges.
@@ -538,14 +539,14 @@ cdef class Delaunay2_edge_iter:
     cdef Delaunay_with_info_2[info_t] *T
     cdef Delaunay_with_info_2[info_t].All_edges_iter x
     
-    def __cinit__(self, Delaunay2 T, str edge = None):
+    def __cinit__(self, Delaunay2_64bit T, str edge = None):
         self.T = T.T
         if edge == 'all_begin':
             self.x = self.T.all_edges_begin()
         elif edge == 'all_end':
             self.x = self.T.all_edges_end()
 
-    def __richcmp__(Delaunay2_edge_iter self, Delaunay2_edge_iter solf, int op):
+    def __richcmp__(Delaunay2_64bit_edge_iter self, Delaunay2_64bit_edge_iter solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -562,13 +563,13 @@ cdef class Delaunay2_edge_iter:
         predecrement(self.x)
 
     property edge:
-        r"""Delaunay2_edge: The corresponding edge object."""
+        r"""Delaunay2_64bit_edge: The corresponding edge object."""
         def __get__(self):
-            cdef Delaunay2_edge out = Delaunay2_edge()
+            cdef Delaunay2_64bit_edge out = Delaunay2_64bit_edge()
             out.assign(self.T, Delaunay_with_info_2[info_t].Edge(self.x))
             return out
 
-cdef class Delaunay2_edge_vector:
+cdef class Delaunay2_64bit_edge_vector:
     r"""Wrapper class for a vector of edges.
 
     Attributes: 
@@ -605,9 +606,9 @@ cdef class Delaunay2_edge_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay2_edge out
+        cdef Delaunay2_64bit_edge out
         if self.i < self.n:
-            out = Delaunay2_edge()
+            out = Delaunay2_64bit_edge()
             out.assign(self.T, self.v[self.i])
             self.i += 1
             return out
@@ -615,37 +616,37 @@ cdef class Delaunay2_edge_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay2_edge out
+        cdef Delaunay2_64bit_edge out
         if isinstance(i, int):
-            out = Delaunay2_edge()
+            out = Delaunay2_64bit_edge()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay2_edge_vector indices must be itegers, "+
+            raise TypeError("Delaunay2_64bit_edge_vector indices must be itegers, "+
                             "not {}".format(type(i)))
 
 
-cdef class Delaunay2_edge_range:
+cdef class Delaunay2_64bit_edge_range:
     r"""Wrapper class for iterating over a range of triangulation edges.
     
     Args:
-        vstart (Delaunay2_edge_iter): The starting edge.
-        vstop (Delaunay2_edge_iter): Final edge that will end the iteration.
+        vstart (Delaunay2_64bit_edge_iter): The starting edge.
+        vstop (Delaunay2_64bit_edge_iter): Final edge that will end the iteration.
         finite (:obj:`bool`, optional): If True, only finite edges are
             iterated over. Otherwise, all edges are iterated over. Defaults 
             to False.
 
     Attributes:
-        x (Delaunay2_edge_iter): The current edge.
-        xstop (Delaunay2_edge_iter): Final edge that will end the iteration.
+        x (Delaunay2_64bit_edge_iter): The current edge.
+        xstop (Delaunay2_64bit_edge_iter): Final edge that will end the iteration.
         finite (bool): If True, only finite edges are iterater over. Otherwise 
             all edges are iterated over.
 
     """
-    cdef Delaunay2_edge_iter x
-    cdef Delaunay2_edge_iter xstop
+    cdef Delaunay2_64bit_edge_iter x
+    cdef Delaunay2_64bit_edge_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay2_edge_iter xstart, Delaunay2_edge_iter xstop,
+    def __cinit__(self, Delaunay2_64bit_edge_iter xstart, Delaunay2_64bit_edge_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -658,7 +659,7 @@ cdef class Delaunay2_edge_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_edge out
+        cdef Delaunay2_64bit_edge out
         if self.x != self.xstop:
             out = self.x.edge
             self.x.increment()
@@ -667,7 +668,7 @@ cdef class Delaunay2_edge_range:
             raise StopIteration()
 
 
-cdef class Delaunay2_cell:
+cdef class Delaunay2_64bit_cell:
     r"""Wrapper class for a triangulation cell.
 
     Attributes:
@@ -694,7 +695,7 @@ cdef class Delaunay2_cell:
         self.T = T
         self.x = x
 
-    def __richcmp__(Delaunay2_cell self, Delaunay2_cell solf, int op):
+    def __richcmp__(Delaunay2_64bit_cell self, Delaunay2_64bit_cell solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -703,7 +704,7 @@ cdef class Delaunay2_cell:
             raise NotImplementedError
 
     def __repr__(self):
-        return "Delaunay2_cell[{},{},{}]".format(repr(self.vertex(0)),
+        return "Delaunay2_64bit_cell[{},{},{}]".format(repr(self.vertex(0)),
                                                  repr(self.vertex(1)),
                                                  repr(self.vertex(2)))
 
@@ -740,13 +741,13 @@ cdef class Delaunay2_cell:
                 mirrored vertex.
 
         Returns:
-            Delaunay2_vertex: Vertex in the ith neighboring cell of this cell 
+            Delaunay2_64bit_vertex: Vertex in the ith neighboring cell of this cell 
                 that is opposite to this cell.
 
         """
         cdef Delaunay_with_info_2[info_t].Vertex vc
         vc = self.T.mirror_vertex(self.x, i)
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
         out.assign(self.T, vc)
         return out
 
@@ -758,10 +759,10 @@ cdef class Delaunay2_cell:
                 returned.
 
         Returns:
-            Delaunay2_edge: Edge incident to this cell and opposite vertex i.
+            Delaunay2_64bit_edge: Edge incident to this cell and opposite vertex i.
 
         """
-        return Delaunay2_edge.from_cell(self, i)
+        return Delaunay2_64bit_edge.from_cell(self, i)
 
     def vertex(self, int i):
         r"""Find the ith vertex that is incident to this cell.
@@ -770,20 +771,20 @@ cdef class Delaunay2_cell:
             i (int): The index of the vertex that should be returned.
 
         Returns:
-            Delaunay2_vertex: The ith vertex incident to this cell.
+            Delaunay2_64bit_vertex: The ith vertex incident to this cell.
 
         """
         cdef Delaunay_with_info_2[info_t].Vertex v
         v = self.x.vertex(i)
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
         out.assign(self.T, v)
         return out
 
-    def has_vertex(self, Delaunay2_vertex v, pybool return_index = False):
+    def has_vertex(self, Delaunay2_64bit_vertex v, pybool return_index = False):
         r"""Determine if a vertex belongs to this cell.
 
         Args:
-            v (Delaunay2_vertex): Vertex to test ownership for.
+            v (Delaunay2_64bit_vertex): Vertex to test ownership for.
             return_index (:obj:`bool`, optional): If True, the index of the 
                 vertex within the cell is returned in the event that it is a 
                 vertex of the cell. Otherwise, the index is not returned.
@@ -804,11 +805,11 @@ cdef class Delaunay2_cell:
             out = self.x.has_vertex(v.x)
             return <pybool>out
 
-    def ind_vertex(self, Delaunay2_vertex v):
+    def ind_vertex(self, Delaunay2_64bit_vertex v):
         r"""Determine the index of a vertex within a cell.
 
         Args:
-            v (Delaunay2_vertex): Vertex to find index for.
+            v (Delaunay2_64bit_vertex): Vertex to find index for.
         
         Returns:
             int: Index of vertex within the cell.
@@ -823,20 +824,20 @@ cdef class Delaunay2_cell:
             i (int): The index of the neighboring cell that should be returned.
 
         Returns:
-            Delaunay2_cell: The neighboring cell opposite the ith vertex.
+            Delaunay2_64bit_cell: The neighboring cell opposite the ith vertex.
 
         """
         cdef Delaunay_with_info_2[info_t].Cell v
         v = self.x.neighbor(i)
-        cdef Delaunay2_cell out = Delaunay2_cell()
+        cdef Delaunay2_64bit_cell out = Delaunay2_64bit_cell()
         out.assign(self.T, v)
         return out
 
-    def has_neighbor(self, Delaunay2_cell v, pybool return_index = False):
+    def has_neighbor(self, Delaunay2_64bit_cell v, pybool return_index = False):
         r"""Determine if a cell is a neighbor to this cell.
 
         Args:
-            v (Delaunay2_cell): Cell to test as a neighbor.
+            v (Delaunay2_64bit_cell): Cell to test as a neighbor.
             return_index (:obj:`bool`, optional): If True, the index of the 
                 neighbor within the cell is returned in the event that it is a 
                 neighbor of the cell. Otherwise, the index is not returned.
@@ -855,11 +856,11 @@ cdef class Delaunay2_cell:
         else:
             return <pybool>out
 
-    def ind_neighbor(self, Delaunay2_cell v):
+    def ind_neighbor(self, Delaunay2_64bit_cell v):
         r"""Determine the index of a neighboring cell.
 
         Args:
-            v (Delaunay2_cell): Neighboring cell to find index for.
+            v (Delaunay2_64bit_cell): Neighboring cell to find index for.
         
         Returns:
             int: Index of vertex opposite to neighboring cell.
@@ -867,7 +868,7 @@ cdef class Delaunay2_cell:
         """
         return self.x.ind(v.x)
 
-    def set_vertex(self, int i, Delaunay2_vertex v):
+    def set_vertex(self, int i, Delaunay2_64bit_vertex v):
         r"""Set the ith vertex of this cell.
 
         Args:
@@ -878,14 +879,14 @@ cdef class Delaunay2_cell:
         self.T.updated = <cbool>True
         self.x.set_vertex(i, v.x)
 
-    def set_vertices(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
-                     Delaunay2_vertex v3):
+    def set_vertices(self, Delaunay2_64bit_vertex v1, Delaunay2_64bit_vertex v2, 
+                     Delaunay2_64bit_vertex v3):
         r"""Set this cell's vertices.
 
         Args:
-            v1 (Delaunay2_vertex): 1st vertex of cell.
-            v2 (Delaunay2_vertex): 2nd vertex of cell.
-            v3 (Delaunay2_vertex): 3rd vertex of cell.
+            v1 (Delaunay2_64bit_vertex): 1st vertex of cell.
+            v2 (Delaunay2_64bit_vertex): 2nd vertex of cell.
+            v3 (Delaunay2_64bit_vertex): 3rd vertex of cell.
 
         """
         self.T.updated = <cbool>True
@@ -896,25 +897,25 @@ cdef class Delaunay2_cell:
         self.T.updated = <cbool>True
         self.x.set_vertices()
 
-    def set_neighbor(self, int i, Delaunay2_cell n):
+    def set_neighbor(self, int i, Delaunay2_64bit_cell n):
         r"""Set the ith neighboring cell of this cell.
 
         Args:
             i (int): Index of this cell's neighbor that should be set.
-            n (Delaunay2_cell): Cell to set ith neighbor of this cell to.
+            n (Delaunay2_64bit_cell): Cell to set ith neighbor of this cell to.
 
         """
         self.T.updated = <cbool>True
         self.x.set_neighbor(i, n.x)
 
-    def set_neighbors(self, Delaunay2_cell c1, Delaunay2_cell c2, 
-                      Delaunay2_cell c3):
+    def set_neighbors(self, Delaunay2_64bit_cell c1, Delaunay2_64bit_cell c2, 
+                      Delaunay2_64bit_cell c3):
         r"""Set this cell's neighboring cells.
 
         Args:
-            c1 (Delaunay2_cell): 1st neighboring cell.
-            c2 (Delaunay2_cell): 2nd neighboring cell.
-            c3 (Delaunay2_cell): 3rd neighboring cell.
+            c1 (Delaunay2_64bit_cell): 1st neighboring cell.
+            c2 (Delaunay2_64bit_cell): 2nd neighboring cell.
+            c3 (Delaunay2_64bit_cell): 3rd neighboring cell.
 
         """
         self.T.updated = <cbool>True
@@ -966,13 +967,13 @@ cdef class Delaunay2_cell:
         r"""Find vertices that are incident to this cell.
 
         Returns:
-            Delaunay2_vertex_vector: Iterator over vertices incident to this 
+            Delaunay2_64bit_vertex_vector: Iterator over vertices incident to this 
                 cell.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Vertex] it
         it = self.T.incident_vertices(self.x)
-        cdef Delaunay2_vertex_vector out = Delaunay2_vertex_vector()
+        cdef Delaunay2_64bit_vertex_vector out = Delaunay2_64bit_vertex_vector()
         out.assign(self.T, it)
         return out
         
@@ -980,12 +981,12 @@ cdef class Delaunay2_cell:
         r"""Find edges that are incident to this cell.
 
         Returns:
-            Delaunay2_edge_vector: Iterator over edges incident to this cell.
+            Delaunay2_64bit_edge_vector: Iterator over edges incident to this cell.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Edge] it
         it = self.T.incident_edges(self.x)
-        cdef Delaunay2_edge_vector out = Delaunay2_edge_vector()
+        cdef Delaunay2_64bit_edge_vector out = Delaunay2_64bit_edge_vector()
         out.assign(self.T, it)
         return out
 
@@ -993,12 +994,12 @@ cdef class Delaunay2_cell:
         r"""Find cells that are incident to this cell.
 
         Returns:
-            Delaunay2_cell_vector: Iterator over cells incident to thiscell.
+            Delaunay2_64bit_cell_vector: Iterator over cells incident to thiscell.
 
         """
         cdef vector[Delaunay_with_info_2[info_t].Cell] it
         it = self.T.incident_cells(self.x)
-        cdef Delaunay2_cell_vector out = Delaunay2_cell_vector()
+        cdef Delaunay2_64bit_cell_vector out = Delaunay2_64bit_cell_vector()
         out.assign(self.T, it)
         return out
 
@@ -1030,11 +1031,11 @@ cdef class Delaunay2_cell:
         return self.T.side_of_oriented_circle(self.x, &pos[0])
 
 
-cdef class Delaunay2_cell_iter:
+cdef class Delaunay2_64bit_cell_iter:
     r"""Wrapper class for a triangulation cell.
 
     Args:
-        T (Delaunay2): Triangulation that this cell belongs to.
+        T (Delaunay2_64bit): Triangulation that this cell belongs to.
         cell (:obj:`str`, optional): String specifying the cell that 
             should be referenced. Valid options include:
                 'all_begin': The first cell in an iteration over all cells.
@@ -1050,14 +1051,14 @@ cdef class Delaunay2_cell_iter:
     cdef Delaunay_with_info_2[info_t] *T
     cdef Delaunay_with_info_2[info_t].All_cells_iter x
     
-    def __cinit__(self, Delaunay2 T, str cell = None):
+    def __cinit__(self, Delaunay2_64bit T, str cell = None):
         self.T = T.T
         if cell == 'all_begin':
             self.x = self.T.all_cells_begin()
         elif cell == 'all_end':
             self.x = self.T.all_cells_end()
 
-    def __richcmp__(Delaunay2_cell_iter self, Delaunay2_cell_iter solf, int op):
+    def __richcmp__(Delaunay2_64bit_cell_iter self, Delaunay2_64bit_cell_iter solf, int op):
         if (op == 2): 
             return <pybool>(self.x == solf.x)
         elif (op == 3):
@@ -1074,15 +1075,15 @@ cdef class Delaunay2_cell_iter:
         predecrement(self.x)
 
     property cell:
-        r"""Delaunay2_cell: Corresponding cell object."""
+        r"""Delaunay2_64bit_cell: Corresponding cell object."""
         def __get__(self):
-            cdef Delaunay2_cell out = Delaunay2_cell()
+            cdef Delaunay2_64bit_cell out = Delaunay2_64bit_cell()
             out.T = self.T
             out.x = Delaunay_with_info_2[info_t].Cell(self.x)
             return out
 
 
-cdef class Delaunay2_cell_vector:
+cdef class Delaunay2_64bit_cell_vector:
     r"""Wrapper class for a vector of cells. 
 
     Attributes: 
@@ -1119,9 +1120,9 @@ cdef class Delaunay2_cell_vector:
         return self
 
     def __next__(self):
-        cdef Delaunay2_cell out
+        cdef Delaunay2_64bit_cell out
         if self.i < self.n:
-            out = Delaunay2_cell()
+            out = Delaunay2_64bit_cell()
             out.T = self.T
             out.x = self.v[self.i]
             self.i += 1
@@ -1130,37 +1131,37 @@ cdef class Delaunay2_cell_vector:
             raise StopIteration()
 
     def __getitem__(self, i):
-        cdef Delaunay2_cell out
+        cdef Delaunay2_64bit_cell out
         if isinstance(i, int):
-            out = Delaunay2_cell()
+            out = Delaunay2_64bit_cell()
             out.assign(self.T, self.v[i])
             return out
         else:
-            raise TypeError("Delaunay2_cell_vector indices must be itegers, "+
+            raise TypeError("Delaunay2_64bit_cell_vector indices must be itegers, "+
                             "not {}".format(type(i)))
 
 
-cdef class Delaunay2_cell_range:
+cdef class Delaunay2_64bit_cell_range:
     r"""Wrapper class for iterating over a range of triangulation cells.
     
     Args:
-        xstart (Delaunay2_cell_iter): The starting cell.
-        xstop (Delaunay2_cell_iter): Final cell that will end the iteration.
+        xstart (Delaunay2_64bit_cell_iter): The starting cell.
+        xstop (Delaunay2_64bit_cell_iter): Final cell that will end the iteration.
         finite (:obj:`bool`, optional): If True, only finite cells are
             iterated over. Otherwise, all cells are iterated over. Defaults 
             to False.
 
     Attributes:
-        x (Delaunay2_cell_iter): The current cell.
-        xstop (Delaunay2_cell_iter): Final cell that will end the iteration.
+        x (Delaunay2_64bit_cell_iter): The current cell.
+        xstop (Delaunay2_64bit_cell_iter): Final cell that will end the iteration.
         finite (bool): If True, only finite cells are iterated over. Otherwise, 
             all cells are iterated over.
 
     """
-    cdef Delaunay2_cell_iter x
-    cdef Delaunay2_cell_iter xstop
+    cdef Delaunay2_64bit_cell_iter x
+    cdef Delaunay2_64bit_cell_iter xstop
     cdef pybool finite
-    def __cinit__(self, Delaunay2_cell_iter xstart, Delaunay2_cell_iter xstop,
+    def __cinit__(self, Delaunay2_64bit_cell_iter xstart, Delaunay2_64bit_cell_iter xstop,
                   pybool finite = False):
         self.x = xstart
         self.xstop = xstop
@@ -1173,7 +1174,7 @@ cdef class Delaunay2_cell_range:
         if self.finite:
             while (self.x != self.xstop) and self.x.T.is_infinite(self.x.x):
                 self.x.increment()
-        cdef Delaunay2_cell out
+        cdef Delaunay2_64bit_cell out
         if self.x != self.xstop:
             out = self.x.cell
             self.x.increment()
@@ -1182,7 +1183,7 @@ cdef class Delaunay2_cell_range:
             raise StopIteration()
 
 
-cdef class Delaunay2:
+cdef class Delaunay2_64bit:
     r"""Wrapper class for a 2D Delaunay triangulation.
 
     Attributes:
@@ -1210,13 +1211,13 @@ cdef class Delaunay2:
         self._locked = False
         self._cache_to_clear_on_update = {}
 
-    def is_equivalent(Delaunay2 self, Delaunay2 solf):
+    def is_equivalent(Delaunay2_64bit self, Delaunay2_64bit solf):
         r"""Determine if two triangulations are equivalent. Currently only 
         checks that the triangulations have the same numbers of vertices, cells, 
         and edges.
 
         Args: 
-            solf (:class:`cgal4py.delaunay.Delaunay2`): Triangulation this one 
+            solf (:class:`cgal4py.delaunay.Delaunay2_64bit`): Triangulation this one 
                 should be compared to.
 
         Returns: 
@@ -1233,14 +1234,14 @@ cdef class Delaunay2:
         r"""Create a triangulation from serialized information.
 
         Args:
-            *args: All arguments are passed to :meth:`cgal4py.delaunay.Delaunay2.deserialize`.
+            *args: All arguments are passed to :meth:`cgal4py.delaunay.Delaunay2_64bit.deserialize`.
 
         Returns:
-            :class:`cgal4py.delaunay.Delaunay2`: Triangulation constructed from 
+            :class:`cgal4py.delaunay.Delaunay2_64bit`: Triangulation constructed from 
                 deserialized information.
 
         """
-        T = Delaunay2()
+        T = Delaunay2_64bit()
         T.deserialize(*args)
         return T
 
@@ -1692,11 +1693,11 @@ cdef class Delaunay2:
         return out
         
     @_update_to_tess
-    def remove(self, Delaunay2_vertex x):
+    def remove(self, Delaunay2_64bit_vertex x):
         r"""Remove a vertex from the triangulation.
 
         Args:
-            x (Delaunay2_vertex): Vertex that should be removed.
+            x (Delaunay2_64bit_vertex): Vertex that should be removed.
 
         """
         with nogil:
@@ -1705,62 +1706,62 @@ cdef class Delaunay2:
     @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def move(self, Delaunay2_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
+    def move(self, Delaunay2_64bit_vertex x, np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location. If there is a vertex at the given 
         given coordinates, return that vertex and remove the one that was being 
         moved.
 
         Args:
-            x (Delaunay2_vertex): Vertex that should be moved.
+            x (Delaunay2_64bit_vertex): Vertex that should be moved.
             pos (:obj:`ndarray` of float64): x,y coordinates that the vertex 
                 be moved to.
 
         Returns:
-            Delaunay2_vertex: Vertex at the new position.
+            Delaunay2_64bit_vertex: Vertex at the new position.
 
         """
         assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move(x.x, &pos[0])
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
         out.assign(self.T, v)
         return out
 
     @_update_to_tess
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def move_if_no_collision(self, Delaunay2_vertex x, 
+    def move_if_no_collision(self, Delaunay2_64bit_vertex x, 
                              np.ndarray[np.float64_t, ndim=1] pos):
         r"""Move a vertex to a new location only if there is not already a 
         vertex at the given coordinates. If there is a vertex there, it is 
         returned and the vertex being moved remains at its original location.
 
         Args:
-            x (Delaunay2_vertex): Vertex that should be moved.
+            x (Delaunay2_64bit_vertex): Vertex that should be moved.
             pos (:obj:`ndarray` of float64): x,y coordinates that the vertex 
                 be moved to.
 
         Returns:
-            Delaunay2_vertex: Vertex at the new position.
+            Delaunay2_64bit_vertex: Vertex at the new position.
 
         """
         assert(pos.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.move_if_no_collision(x.x, &pos[0])
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
         out.assign(self.T, v)
         return out
 
     @_update_to_tess
-    def flip(self, Delaunay2_cell x, int i):
+    def flip(self, Delaunay2_64bit_cell x, int i):
         r"""Flip the edge incident to cell x and neighbor i of cell x. The 
         method first checks if the edge can be flipped. (In the 2D case, it 
         can always be flipped).
 
         Args:
-            x (Delaunay2_cell): Cell with edge that should be flipped.
+            x (Delaunay2_64bit_cell): Cell with edge that should be flipped.
             i (int): Integer specifying neighbor of x that is also incident 
                 to the edge that should be flipped.
 
@@ -1775,12 +1776,12 @@ cdef class Delaunay2:
         return <pybool>out
 
     @_update_to_tess
-    def flip_flippable(self, Delaunay2_cell x, int i):
-        r"""Same as :meth:`Delaunay2.flip`, but assumes that facet is flippable 
+    def flip_flippable(self, Delaunay2_64bit_cell x, int i):
+        r"""Same as :meth:`Delaunay2_64bit.flip`, but assumes that facet is flippable 
         and does not check.
 
         Args:
-            x (Delaunay2_cell): Cell with edge that should be flipped.
+            x (Delaunay2_64bit_cell): Cell with edge that should be flipped.
             i (int): Integer specifying neighbor of x that is also incident 
                 to the edge that should be flipped.
 
@@ -1795,35 +1796,35 @@ cdef class Delaunay2:
             index (info_t): Index of vertex that should be found.
 
         Returns:
-            Delaunay2_vertex: Vertex corresponding to the given index. If the 
+            Delaunay2_64bit_vertex: Vertex corresponding to the given index. If the 
                 index is not found, the infinite vertex is returned.
 
         """
         cdef Delaunay_with_info_2[info_t].Vertex v
         with nogil:
             v = self.T.get_vertex(index)
-        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex out = Delaunay2_64bit_vertex()
         out.assign(self.T, v)
         return out
 
     def locate(self, np.ndarray[np.float64_t, ndim=1] pos,
-               Delaunay2_cell start = None):
+               Delaunay2_64bit_cell start = None):
         r"""Get the vertex/cell/edge that a given point is a part of.
         
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
-            start (Delaunay2_cell, optional): Cell to start the search at.
+            start (Delaunay2_64bit_cell, optional): Cell to start the search at.
 
         Returns:
-            :obj:`Delaunay2_vertex`, :obj:`Delaunay2_cell` or 
-                :obj:`Delaunay2_edge`: Vertex, cell or edge that the given point 
+            :obj:`Delaunay2_64bit_vertex`, :obj:`Delaunay2_64bit_cell` or 
+                :obj:`Delaunay2_64bit_edge`: Vertex, cell or edge that the given point 
                 is a part of.
 
         """
         assert(len(pos) == 2)
         cdef int lt, li
         lt = li = 999
-        cdef Delaunay2_cell c = Delaunay2_cell()
+        cdef Delaunay2_64bit_cell c = Delaunay2_64bit_cell()
         if start is not None:
             c.assign(self.T, self.T.locate(&pos[0], lt, li, start.x))
         else:
@@ -1834,7 +1835,7 @@ cdef class Delaunay2:
         if lt == 0:
             return c.vertex(li)
         elif lt == 1:
-            return Delaunay2_edge.from_cell(c, li)
+            return Delaunay2_64bit_edge.from_cell(c, li)
         elif lt == 2:
             return c
         elif lt == 3:
@@ -1848,79 +1849,79 @@ cdef class Delaunay2:
 
     @property
     def all_verts_begin(self):
-        r"""Delaunay2_vertex_iter: Starting vertex for all vertices in the 
+        r"""Delaunay2_64bit_vertex_iter: Starting vertex for all vertices in the 
         triangulation."""
-        return Delaunay2_vertex_iter(self, 'all_begin')
+        return Delaunay2_64bit_vertex_iter(self, 'all_begin')
     @property
     def all_verts_end(self):
-        r"""Delaunay2_vertex_iter: Final vertex for all vertices in the 
+        r"""Delaunay2_64bit_vertex_iter: Final vertex for all vertices in the 
         triangulation."""
-        return Delaunay2_vertex_iter(self, 'all_end')
+        return Delaunay2_64bit_vertex_iter(self, 'all_end')
     @property
     def all_verts(self):
-        r"""Delaunay2_vertex_range: Iterable for all vertices in the 
+        r"""Delaunay2_64bit_vertex_range: Iterable for all vertices in the 
         triangulation."""
-        return Delaunay2_vertex_range(self.all_verts_begin, 
+        return Delaunay2_64bit_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end)
     @property
     def finite_verts(self):
-        r"""Delaunay2_vertex_range: Iterable for finite vertices in the 
+        r"""Delaunay2_64bit_vertex_range: Iterable for finite vertices in the 
         triangulation."""
-        return Delaunay2_vertex_range(self.all_verts_begin, 
+        return Delaunay2_64bit_vertex_range(self.all_verts_begin, 
                                       self.all_verts_end, finite = True)
 
     @property
     def all_edges_begin(self):
-        r"""Delaunay2_edge_iter: Starting edge for all edges in the 
+        r"""Delaunay2_64bit_edge_iter: Starting edge for all edges in the 
         triangulation."""
-        return Delaunay2_edge_iter(self, 'all_begin')
+        return Delaunay2_64bit_edge_iter(self, 'all_begin')
     @property
     def all_edges_end(self):
-        r"""Delaunay2_edge_iter: Final edge for all edges in the 
+        r"""Delaunay2_64bit_edge_iter: Final edge for all edges in the 
         triangulation."""
-        return Delaunay2_edge_iter(self, 'all_end')
+        return Delaunay2_64bit_edge_iter(self, 'all_end')
     @property
     def all_edges(self):
-        r"""Delaunay2_edge_range: Iterable for all edges in the 
+        r"""Delaunay2_64bit_edge_range: Iterable for all edges in the 
         triangulation."""
-        return Delaunay2_edge_range(self.all_edges_begin, 
+        return Delaunay2_64bit_edge_range(self.all_edges_begin, 
                                     self.all_edges_end)
     @property
     def finite_edges(self):
-        r"""Delaunay2_edge_range: Iterable for finite edges in the 
+        r"""Delaunay2_64bit_edge_range: Iterable for finite edges in the 
         triangulation."""
-        return Delaunay2_edge_range(self.all_edges_begin, 
+        return Delaunay2_64bit_edge_range(self.all_edges_begin, 
                                     self.all_edges_end, finite = True)
 
     @property
     def all_cells_begin(self):
-        r"""Delaunay2_cell_iter: Starting cell for all cells in the triangulation."""
-        return Delaunay2_cell_iter(self, 'all_begin')
+        r"""Delaunay2_64bit_cell_iter: Starting cell for all cells in the triangulation."""
+        return Delaunay2_64bit_cell_iter(self, 'all_begin')
     @property
     def all_cells_end(self):
-        r"""Delaunay2_cell_iter: Final cell for all cells in the triangulation."""
-        return Delaunay2_cell_iter(self, 'all_end')
+        r"""Delaunay2_64bit_cell_iter: Final cell for all cells in the triangulation."""
+        return Delaunay2_64bit_cell_iter(self, 'all_end')
     @property
     def all_cells(self):
-        r"""Delaunay2_cell_range: Iterable for all cells in the
+        r"""Delaunay2_64bit_cell_range: Iterable for all cells in the
         triangulation."""
-        return Delaunay2_cell_range(self.all_cells_begin,
+        return Delaunay2_64bit_cell_range(self.all_cells_begin,
                                     self.all_cells_end)
     @property
     def finite_cells(self):
-        r"""Delaunay2_cell_range: Iterable for finite cells in the
+        r"""Delaunay2_64bit_cell_range: Iterable for finite cells in the
         triangulation."""
-        return Delaunay2_cell_range(self.all_cells_begin,
+        return Delaunay2_64bit_cell_range(self.all_cells_begin,
                                     self.all_cells_end, finite = True)
 
-    def is_edge(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
-                Delaunay2_cell c = Delaunay2_cell(), int i = 0):
+    def is_edge(self, Delaunay2_64bit_vertex v1, Delaunay2_64bit_vertex v2, 
+                Delaunay2_64bit_cell c = Delaunay2_64bit_cell(), int i = 0):
         r"""Determine if two vertices form an edge in the triangulation.
 
         Args:
-            v1 (Delaunay2_vertex): First vertex.
-            v2 (Delaunay2_vertex): Second vertex.
-            c (Delaunay2_cell, optional): If provided and the two vertices 
+            v1 (Delaunay2_64bit_vertex): First vertex.
+            v2 (Delaunay2_64bit_vertex): Second vertex.
+            c (Delaunay2_64bit_cell, optional): If provided and the two vertices 
                 form an edge, the cell incident to the edge is stored here.
             i (int, optional): If provided and the two vertices form an edge, 
                 the index of the vertex opposite the edge in cell c is stored 
@@ -1934,15 +1935,15 @@ cdef class Delaunay2:
             out = self.T.is_edge(v1.x, v2.x, c.x, i)
         return <pybool>out
 
-    def is_cell(self, Delaunay2_vertex v1, Delaunay2_vertex v2, 
-                Delaunay2_vertex v3, Delaunay2_cell c = Delaunay2_cell()):
+    def is_cell(self, Delaunay2_64bit_vertex v1, Delaunay2_64bit_vertex v2, 
+                Delaunay2_64bit_vertex v3, Delaunay2_64bit_cell c = Delaunay2_64bit_cell()):
         r"""Determine if three vertices form a cell in the triangulation.
 
         Args:
-            v1 (Delaunay2_vertex): First vertex.
-            v2 (Delaunay2_vertex): Second vertex.
-            v3 (Delaunay2_vertex): Third vertex.
-            c (Delaunay2_cell, optional): If provided and the three vertices 
+            v1 (Delaunay2_64bit_vertex): First vertex.
+            v2 (Delaunay2_64bit_vertex): Second vertex.
+            v3 (Delaunay2_64bit_vertex): Third vertex.
+            c (Delaunay2_64bit_cell, optional): If provided and the three vertices 
                 form a cell, the cell they form is stored here.
 
         Returns:
@@ -1954,18 +1955,18 @@ cdef class Delaunay2:
             out = self.T.is_cell(v1.x, v2.x, v3.x, c.x)
         return <pybool>out
 
-    def includes_edge(self, Delaunay2_vertex va, Delaunay2_vertex vb,
-                      Delaunay2_vertex vbr = Delaunay2_vertex(),
-                      Delaunay2_cell c = Delaunay2_cell(), int i = 0):
+    def includes_edge(self, Delaunay2_64bit_vertex va, Delaunay2_64bit_vertex vb,
+                      Delaunay2_64bit_vertex vbr = Delaunay2_64bit_vertex(),
+                      Delaunay2_64bit_cell c = Delaunay2_64bit_cell(), int i = 0):
         r"""Determine if there is a valid edge along the line between two 
         vertices that is incident to the first vertex.
 
         Args:
-            va (Delaunay2_vertex): Starting vertex.
-            vb (Delaunay2_vertex): Ending vertex.
-            vbr (Delaunay2_vertex, optional): If provided and if there is an 
+            va (Delaunay2_64bit_vertex): Starting vertex.
+            vb (Delaunay2_64bit_vertex): Ending vertex.
+            vbr (Delaunay2_64bit_vertex, optional): If provided and if there is an 
                 edge, the other vertex incident to the edge is stored here.
-            c (Delaunay2_cell, optional): If provided and if there is an edge, 
+            c (Delaunay2_64bit_cell, optional): If provided and if there is an edge, 
                 the cell incident to that edge is stored here.
             i (int, optional): If provided and if there is an edge, the index of 
                 the vertex opposite the edge on the cell is stored here.
@@ -1989,35 +1990,35 @@ cdef class Delaunay2:
             x (:obj:`ndarray` of float64): x,y coordinates.
 
         Returns:
-            Delaunay2_vertex: Vertex closest to x.
+            Delaunay2_64bit_vertex: Vertex closest to x.
 
         """
         assert(x.shape[0] == 2)
         cdef Delaunay_with_info_2[info_t].Vertex vc
         with nogil:
             vc = self.T.nearest_vertex(&x[0])
-        cdef Delaunay2_vertex v = Delaunay2_vertex()
+        cdef Delaunay2_64bit_vertex v = Delaunay2_64bit_vertex()
         v.assign(self.T, vc)
         return v
 
-    def mirror_edge(self, Delaunay2_edge x):
+    def mirror_edge(self, Delaunay2_64bit_edge x):
         r"""Get the same edge as referenced from its other incident cell.
 
         Args:
-            x (Delaunay2_edge): Edge to mirror.
+            x (Delaunay2_64bit_edge): Edge to mirror.
 
         Returns:
-            Delaunay2_edge: The same edge, but referenced from the other cell 
+            Delaunay2_64bit_edge: The same edge, but referenced from the other cell 
                 incident to the edge.
 
         """
         return x.mirror
 
-    def mirror_index(self, Delaunay2_cell x, int i):
+    def mirror_index(self, Delaunay2_64bit_cell x, int i):
         r"""Get the index of a cell with respect to its ith neighbor.
 
         Args:
-            x (Delaunay2_cell): Cell to get index for.
+            x (Delaunay2_64bit_cell): Cell to get index for.
             i (int): Index of neighbor that should be used to determine the 
                 mirrored index.
 
@@ -2027,16 +2028,16 @@ cdef class Delaunay2:
         """
         return x.mirror_index(i)
 
-    def mirror_vertex(self, Delaunay2_cell x, int i):
+    def mirror_vertex(self, Delaunay2_64bit_cell x, int i):
         r"""Get the vertex of a cell's ith neighbor opposite to the cell.
 
         Args:
-            x (Delaunay2_cell): Cell.
+            x (Delaunay2_64bit_cell): Cell.
             i (int): Index of neighbor that should be used to determine the
                 mirrored vertex.
 
         Returns:
-            Delaunay2_vertex: Vertex in the ith neighboring cell of cell x, 
+            Delaunay2_64bit_vertex: Vertex in the ith neighboring cell of cell x, 
                 that is opposite to cell x.
 
         """
@@ -2045,15 +2046,15 @@ cdef class Delaunay2:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_boundary_of_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
-                                  Delaunay2_cell start):
+                                  Delaunay2_64bit_cell start):
         r"""Get the edges of the cell in conflict with a given point.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
-            start (Delaunay2_cell): Cell to start list of edges at.
+            start (Delaunay2_64bit_cell): Cell to start list of edges at.
 
         Returns:
-            :obj:`list` of Delaunay2_edge: Edges of the cell in conflict with 
+            :obj:`list` of Delaunay2_64bit_edge: Edges of the cell in conflict with 
                  pos.
 
         """
@@ -2063,9 +2064,9 @@ cdef class Delaunay2:
             ev = self.T.get_boundary_of_conflicts(&pos[0], start.x)
         cdef object out = []
         cdef np.uint32_t i
-        cdef Delaunay2_edge x
+        cdef Delaunay2_64bit_edge x
         for i in range(ev.size()):
-            x = Delaunay2_edge()
+            x = Delaunay2_64bit_edge()
             x.assign(self.T, ev[i])
             out.append(x)
         return out
@@ -2073,15 +2074,15 @@ cdef class Delaunay2:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_conflicts(self, np.ndarray[np.float64_t, ndim=1] pos,
-                      Delaunay2_cell start):
+                      Delaunay2_64bit_cell start):
         r"""Get the cells that are in conflict with a given point.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates. 
-            start (Delaunay2_cell): Cell to start list of conflicts at.
+            start (Delaunay2_64bit_cell): Cell to start list of conflicts at.
 
         Returns:
-            :obj:`list` of Delaunay2_cell: Cells in conflict with pos.
+            :obj:`list` of Delaunay2_64bit_cell: Cells in conflict with pos.
 
         """
         assert(pos.shape[0] == 2)
@@ -2090,9 +2091,9 @@ cdef class Delaunay2:
             cv = self.T.get_conflicts(&pos[0], start.x)
         cdef object out = []
         cdef np.uint32_t i
-        cdef Delaunay2_cell x
+        cdef Delaunay2_64bit_cell x
         for i in range(cv.size()):
-            x = Delaunay2_cell()
+            x = Delaunay2_64bit_cell()
             x.assign(self.T, cv[i])
             out.append(x)
         return out
@@ -2100,17 +2101,17 @@ cdef class Delaunay2:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
-                                   Delaunay2_cell start):
+                                   Delaunay2_64bit_cell start):
         r"""Get the cells and edges of cells that are in conflict with a given 
             point.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
-            start (Delaunay2_cell): Cell to start list of conflicts at.  
+            start (Delaunay2_64bit_cell): Cell to start list of conflicts at.  
         
         Returns:
-            tuple: :obj:`list` of :obj:`Delaunay2_cell`s in conflict with pos 
-                and :obj:`list` of :obj:`Delaunay2_edge`s bounding the 
+            tuple: :obj:`list` of :obj:`Delaunay2_64bit_cell`s in conflict with pos 
+                and :obj:`list` of :obj:`Delaunay2_64bit_edge`s bounding the 
                 conflicting cells.
 
         """
@@ -2122,14 +2123,14 @@ cdef class Delaunay2:
         cdef object out_cells = []
         cdef object out_edges = []
         cdef np.uint32_t i
-        cdef Delaunay2_cell c
-        cdef Delaunay2_edge e
+        cdef Delaunay2_64bit_cell c
+        cdef Delaunay2_64bit_edge e
         for i in range(cv.first.size()):
-            c = Delaunay2_cell()
+            c = Delaunay2_64bit_cell()
             c.assign(self.T, cv.first[i])
             out_cells.append(c)
         for i in range(cv.second.size()):
-            e = Delaunay2_edge()
+            e = Delaunay2_64bit_edge()
             e.assign(self.T, cv.second[i])
             out_edges.append(e)
         return out_cells, out_edges
@@ -2145,7 +2146,7 @@ cdef class Delaunay2:
             pos2 (np.ndarray of float64): x,y coordinates of stopping point.
 
         Returns:
-            list of Delaunay2_cell: Cells intersected by a line from pos1 to 
+            list of Delaunay2_64bit_cell: Cells intersected by a line from pos1 to 
                 pos2.
 
         """
@@ -2154,11 +2155,11 @@ cdef class Delaunay2:
         cdef object out = []
         cdef np.uint32_t i
         cdef vector[Delaunay_with_info_2[info_t].Cell] cv
-        cdef Delaunay2_cell c
+        cdef Delaunay2_64bit_cell c
         with nogil:
             cv = self.T.line_walk(&pos1[0], &pos2[0])
         for i in range(cv.size()):
-            c = Delaunay2_cell()
+            c = Delaunay2_64bit_cell()
             c.assign(self.T, cv[i])
             out.append(c)
         return out

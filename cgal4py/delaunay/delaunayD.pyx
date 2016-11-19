@@ -1647,6 +1647,14 @@ cdef class DelaunayD:
         r"""int: The number of finite vertices in the triangulation."""
         return self.T.num_finite_verts()
     @_dependent_property
+    def num_finite_edges(self):
+        r"""int: The number of finite edges in the triangulation."""
+        return self.T.num_finite_faces(1)
+    @_dependent_property
+    def num_finite_facets(self):
+        r"""int: The number of finite facets in the triangulation."""
+        return self.T.num_finite_faces(D-1)
+    @_dependent_property
     def num_finite_cells(self):
         r"""int: The number of finite cells in the triangulation."""
         return self.T.num_finite_cells()
@@ -1659,6 +1667,14 @@ cdef class DelaunayD:
         r"""int: The number of infinite cells in the triangulation."""
         return self.T.num_infinite_cells()
     @_dependent_property
+    def num_infinite_edges(self):
+        r"""int: The number of infinite edges in the triangulation."""
+        return self.T.num_infinite_faces(1)
+    @_dependent_property
+    def num_infinite_facets(self):
+        r"""int: The number of infinite facets in the triangulation."""
+        return self.T.num_infinite_faces(D-1)
+    @_dependent_property
     def num_verts(self): 
         r"""int: The total number of vertices (finite + infinite) in the 
         triangulation."""
@@ -1668,6 +1684,55 @@ cdef class DelaunayD:
         r"""int: The total number of cells (finite + infinite) in the 
         triangulation."""
         return self.T.num_cells()
+    @_dependent_property
+    def num_edges(self):
+        r"""int: The total number of edges (finite + infinite) in the 
+        triangulation."""
+        return self.T.num_faces(1)
+    @_dependent_property
+    def num_facets(self):
+        r"""int: The total number of facets (finite + infinite) in the 
+        triangulation."""
+        return self.T.num_faces(D - 1)
+
+    def num_finite_faces(self, int d):
+        r"""The number of finite faces of dimension `d` in the triangulation.
+
+        Args:
+            d (int): Number of dimensions.
+
+        Returns:
+            int: The number of finite faces with dimensionality `d` in the 
+                triangulation.
+
+        """
+        return self.T.num_finite_faces(d)
+
+    def num_infinite_faces(self, int d):
+        r"""The number of infinite faces of dimension `d` in the triangulation.
+
+        Args:
+            d (int): Number of dimensions.
+
+        Returns:
+            int: The number of infinite faces with dimensionality `d` in the 
+                triangulation.
+
+        """
+        return self.T.num_infinite_faces(d)
+
+    def num_faces(self, int d):
+        r"""The total number of faces of dimension `d` in the triangulation.
+
+        Args:
+            d (int): Number of dimensions.
+
+        Returns:
+            int: The number of faces with dimensionality `d` in the 
+                triangulation.
+
+        """
+        return self.T.num_faces(d)
 
     @_update_to_tess
     @cython.boundscheck(False)

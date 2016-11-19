@@ -4,8 +4,16 @@ from nose.tools import assert_equal
 from nose.tools import assert_raises
 from cgal4py.delaunay import Delaunay, VoronoiVolumes, tools
 from test_delaunay2 import pts as pts2
+from test_delaunay2 import left_edge as le2
+from test_delaunay2 import right_edge as re2
 from test_delaunay3 import pts as pts3
+from test_delaunay3 import left_edge as le3
+from test_delaunay3 import right_edge as re3
+from test_cgal4py import make_points
 import copy
+
+
+pts4, le4, re4 = make_points(10, 4)
 
 
 def test_Delaunay():
@@ -13,7 +21,8 @@ def test_Delaunay():
     assert_equal(T2.num_finite_verts, pts2.shape[0])
     T3 = Delaunay(pts3)
     assert_equal(T3.num_finite_verts, pts3.shape[0])
-    assert_raises(NotImplementedError, Delaunay, np.zeros((3, 4)))
+    T4 = Delaunay(pts4)
+    assert_equal(T4.num_finite_verts, pts4.shape[0])
     assert_raises(ValueError, Delaunay, np.zeros((3, 3, 3)))
 
 
@@ -22,8 +31,31 @@ def test_Delaunay_double():
     assert_equal(T2.num_finite_verts, pts2.shape[0])
     T3 = Delaunay(pts3, use_double=True)
     assert_equal(T3.num_finite_verts, pts3.shape[0])
-    assert_raises(NotImplementedError, Delaunay, np.zeros((3, 4)), True)
+    T4 = Delaunay(pts4)
+    assert_equal(T4.num_finite_verts, pts4.shape[0])
     assert_raises(ValueError, Delaunay, np.zeros((3, 3, 3)), True)
+
+
+def test_Delaunay_periodic():
+    T2 = Delaunay(pts2, periodic=True, left_edge=le2, right_edge=re2)
+    assert_equal(T2.num_verts, pts2.shape[0])
+    T3 = Delaunay(pts3, periodic=True, left_edge=le3, right_edge=re3)
+    assert_equal(T3.num_verts, pts3.shape[0])
+    assert_raises(NotImplementedError, Delaunay, np.zeros((3, 4)),
+                  False, True, le4, re4)
+    assert_raises(ValueError, Delaunay, np.zeros((3, 3, 3)))
+
+
+def test_Delaunay_both():
+    T2 = Delaunay(pts2, use_double=True, periodic=True,
+                  left_edge=le2, right_edge=re2)
+    assert_equal(T2.num_verts, pts2.shape[0])
+    T3 = Delaunay(pts3, use_double=True, periodic=True,
+                  left_edge=le3, right_edge=re3)
+    assert_equal(T3.num_verts, pts3.shape[0])
+    assert_raises(NotImplementedError, Delaunay, np.zeros((3, 4)),
+                  True, True, le4, re4)
+    assert_raises(ValueError, Delaunay, np.zeros((3, 3, 3)))
 
 
 def test_VoronoiVolumes():
@@ -31,6 +63,8 @@ def test_VoronoiVolumes():
     assert_equal(T2.shape[0], pts2.shape[0])
     T3 = VoronoiVolumes(pts3)
     assert_equal(T3.shape[0], pts3.shape[0])
+    T4 = VoronoiVolumes(pts4)
+    assert_equal(T4.shape[0], pts4.shape[0])
 
 
 def test_VoronoiVolumes_double():
@@ -38,6 +72,28 @@ def test_VoronoiVolumes_double():
     assert_equal(T2.shape[0], pts2.shape[0])
     T3 = VoronoiVolumes(pts3, use_double=True)
     assert_equal(T3.shape[0], pts3.shape[0])
+    T4 = VoronoiVolumes(pts4, use_double=True)
+    assert_equal(T4.shape[0], pts4.shape[0])
+
+
+def test_VoronoiVolumes_periodic():
+    T2 = VoronoiVolumes(pts2, periodic=True, left_edge=le2, right_edge=re2)
+    assert_equal(T2.shape[0], pts2.shape[0])
+    T3 = VoronoiVolumes(pts3, periodic=True, left_edge=le3, right_edge=re3)
+    assert_equal(T3.shape[0], pts3.shape[0])
+    assert_raises(NotImplementedError, VoronoiVolumes,
+                  np.zeros((3, 4)), False, True, le4, re4)
+
+
+def test_VoronoiVolumes_both():
+    T2 = VoronoiVolumes(pts2, use_double=True, periodic=True,
+                        left_edge=le2, right_edge=re2)
+    assert_equal(T2.shape[0], pts2.shape[0])
+    T3 = VoronoiVolumes(pts3, use_double=True, periodic=True,
+                        left_edge=le3, right_edge=re3)
+    assert_equal(T3.shape[0], pts3.shape[0])
+    assert_raises(NotImplementedError, VoronoiVolumes,
+                  np.zeros((3, 4)), True, True, le4, re4)
 
 
 # Tools

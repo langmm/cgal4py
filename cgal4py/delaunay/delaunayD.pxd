@@ -16,17 +16,14 @@ cdef extern from "c_delaunayD.hpp":
         bool is_valid() const
         uint32_t num_dims() const 
         uint32_t num_finite_verts() const
-        uint32_t num_finite_edges() const
-        uint32_t num_finite_facets() const
         uint32_t num_finite_cells() const
+        uint32_t num_finite_faces(int d)
         uint32_t num_infinite_verts() const
-        uint32_t num_infinite_edges() const
-        uint32_t num_infinite_facets() const
         uint32_t num_infinite_cells() const
+        uint32_t num_infinite_faces(int d)
         uint32_t num_verts() const
-        uint32_t num_edges() const
-        uint32_t num_facets() const
         uint32_t num_cells() const
+        uint32_t num_faces(int d)
 
         bool is_equal(const Delaunay_with_info_D[Info] other) const
 

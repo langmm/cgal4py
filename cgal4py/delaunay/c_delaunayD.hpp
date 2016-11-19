@@ -82,10 +82,37 @@ public:
   uint32_t num_dims() const { return (uint32_t)(T.current_dimension()); }
   uint32_t num_finite_verts() const { return (uint32_t)(T.number_of_vertices()); }
   uint32_t num_finite_cells() const { return (uint32_t)(T.number_of_finite_full_cells()); }
+  uint32_t num_finite_faces(int d) {
+    uint32_t out = 0;
+    typedef std::vector<Face_handle> Faces;
+    Faces faces;
+    std::back_insert_iterator< Faces > face_out(faces);
+    typename Faces::iterator fit;
+    Finite_vertex_iterator it = T.finite_vertices_begin();
+    for ( ; it != T.finite_vertices_end(); ++it) {
+      faces.clear();
+      T.tds().incident_faces(it.base(), d, face_out);
+      fit = faces.begin();
+      for ( ; fit != faces.end(); ++fit) {
+	if (!(T.is_infinite(*fit)))
+	  out++;
+      }
+    }
+    return out/(d + 1);
+  }
   uint32_t num_infinite_verts() const { return 1; }
   uint32_t num_infinite_cells() const { return (num_cells() - num_finite_cells()); }
+  uint32_t num_infinite_faces(int d) {
+    Vertex_handle vh = T.infinite_vertex();
+    typedef std::vector<Face_handle> Faces;
+    Faces faces;
+    std::back_insert_iterator< Faces > face_out(faces);
+    T.tds().incident_faces(vh, d, face_out);
+    return (uint32_t)(faces.size());
+  }
   uint32_t num_verts() const { return (num_finite_verts() + num_infinite_verts()); }
   uint32_t num_cells() const { return (uint32_t)(T.number_of_full_cells()); }
+  uint32_t num_faces(int d) { return (num_finite_faces(d) + num_infinite_faces(d)); }
   bool is_equal(const Delaunay_with_info_D<Info> other) const {
     // Verts
     if (num_verts() != other.num_verts()) return false;

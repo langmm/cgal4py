@@ -1,8 +1,16 @@
-r"""Access to generic triangulation extensions."""
+r"""Access to generic triangulation extensions.
+
+
+..todo::
+   * check for eigen3 library before building nD extensions
+
+"""
 import numpy as np
 import warnings
 import importlib
 import tools
+import os
+import pyximport
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
@@ -19,44 +27,336 @@ else:
     warnings.warn("Could not import the 3D periodic triangulation package. " +
                   "Update CGAL to at least version 3.5 to enable this " +
                   "feature.")
+pyximport.install(setup_args={"include_dirs":np.get_include()},
+                  reload_support=True)
 
-FLAG_DOUBLE_AVAIL = False
-try:
-    from delaunay2_64bit import Delaunay2 as Delaunay2_64bit
-    from delaunay3_64bit import Delaunay3 as Delaunay3_64bit
-    if is_valid_P2():
-        from periodic_delaunay2_64bit import \
-            PeriodicDelaunay2 as PeriodicDelaunay2_64bit
-    if is_valid_P3():
-        from periodic_delaunay3_64bit import \
-            PeriodicDelaunay3 as PeriodicDelaunay3_64bit
-    FLAG_DOUBLE_AVAIL = True
-except:
-    warnings.warn("Could not import packages using long indices. " +
-                  "This feature will be disabled.")
 
-def get_DelaunayD(ndim, use_double=False):
+_delaunay_dir = os.path.dirname(os.path.realpath(__file__))
+
+
+def _create_pyxdep_file(fname, includes=[], overwrite=False):
+    r"""Create a .pyxdep files for an extension.
+
+    Args:
+        fname (str): Full path to file that will be created.
+        includes (list, optional): List of files that should be included
+            by the pyxdep file. Defaults to [].
+        overwrite (bool, optional): If True, generated extension files are
+            re-generated. Defaults to False.
+
+    """
+    assert(fname.endswith('.pyxdep'))
+    if os.path.isfile(fname):
+        if overwrite:
+            os.remove(fname)
+        else:
+            return
+    with open(fname, 'w') as new_file:
+        for incl in includes:
+            new_file.write('{}\n'.format(incl))
+
+def _create_pyxbld_file(fname, sources=[], overwrite=False):
+    r"""Create a .pyxbld files for an extension.
+
+    Args:
+        fname (str): Full path to file that will be created.
+        sources (list, optional): List of source files for extension.
+            Defaults to [].
+        overwrite (bool, optional): If True, generated extension files are
+            re-generated. Defaults to False.
+
+    """
+    assert(fname.endswith('.pyxbld'))
+    if os.path.isfile(fname):
+        if overwrite:
+            os.remove(fname)
+        else:
+            return
+    lines = [
+        "def make_ext(modname, pyxfilename):",
+        "    from distutils.extension import Extension",
+        "    import numpy",
+        "    return Extension(name=modname,",
+        "                     sources=[pyxfilename]+{},".format(sources),
+        "                     include_dirs=[numpy.get_include()],",
+        "                     libraries=['gmp','CGAL'],",
+        "                     language='c++',",
+        "                     extra_compile_args=['-std=c++14'],",
+        "                     extra_link_args=['-lgmp'],",
+        "                     define_macros=[('CGAL_EIGEN3_ENABLED','1')])"]
+    with open(fname, 'w') as new_file:
+        for line in lines:
+            new_file.write('{}\n'.format(line))
+
+def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
+    r"""Create an alternate version of an extension by making the appropriate
+    replacements and insertions.
+
+    Args:
+        fname0 (str): Base extension file on which the new extension should be
+            based.
+        fname1 (str): Name of extension file that will be created.
+        replace (list): List of 2 element tuples where the first element is a
+            string that should be replaced and the second element is the string
+            it should be replaced with. Defautls to [].
+        insert (list): List of 2 element tuples where the first element is a
+            string contained in the line after which the second string should
+            be inserted. Defaults to [].
+        overwrite (bool, optional): If True, generated extension files are
+            re-generated. Defaults to False.
+
+    Raises:
+        ValueError: If `fname0` does not have a supported extension.
+        IOError: If `fname0` does not exist.
+
+    """
+    ext = os.path.splitext(fname0)[1]
+    if ext in [".pxd", ".pyx"]:
+        comment = '#'
+    elif ext in [".hpp", ".cpp", ".h", ".c"]:
+        comment = '//'
+    else:
+        raise ValueError("Unsupported extension {}".format(ext))
+
+    gen_file_warn = (comment + " WARNING: This file was automatically " +
+                     "generated. Do NOT edit it directly.\n")
+    if (not os.path.isfile(fname0)):
+        raise IOError("Cannot create {} because original ".format(fname1) +
+                      "({}). dosn't exist".format(fname0))
+    if ((not os.path.isfile(fname1)) or overwrite or
+            (os.path.getmtime(fname1) < os.path.getmtime(fname0))):
+        print("Creating alterate version of {}...".format(fname0))
+        if os.path.isfile(fname1):
+            os.remove(fname1)
+        with open(fname1,'w') as new_file:
+            with open(fname0,'r') as old_file:
+                new_file.write(gen_file_warn)
+                for line in old_file:
+                    # Make replacements
+                    match = False
+                    for r0,r1 in replace:
+                        if r0 in line:
+                            new_file.write(line.replace(r0,r1))
+                            match = True
+                            break
+                    if not match:
+                        new_file.write(line)
+                    # Insert new lines
+                    for i0,i1 in insert:
+                        if i0 in line:
+                            new_file.write(i1)
+
+
+def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
+    r"""Get a filename for a specific Delaunay extension.
+
+    Args:
+        ftype (str): Type of file for which the filename should be returned.
+            Options include:
+                'ext': The path to the extension.
+                'pyx': The .pyx file for the extension.
+                'pxd': The .pxd file for the extension.
+                'cpp': The .cpp file containing the underlying C++ wrapper.
+                'hpp': The .hpp file containing the underlying C++ wrapper.
+                'import': The import line that must be added to 64bit version
+                    extensions.
+                'module': The full module name starting at 'cgal4py'.
+                'pyclass': The associated triangulation python class name.
+                'cppclass': The associated triangulation C++ class name.
+                'pyxdep': The .pyxdep pyximport dependency file.
+                'pyxbld': The .pyxbld pyximport build file.
+        dim (int): The dimensionality of the requested extension.
+        periodic (bool): If True, the names for the periodic extension are
+            returned.
+        bit64 (bool): If True, the names for the 64bit extension are returned.
+
+    Returns:
+        str: File name replative to cgal4py package directory.
+
+    Raises:
+        ValueError: If `ftype` is not one of the values listed above.
+
+    """
+    relpath = False
+    ver = str(dim)
+    perstr = '' ; bitstr = ''
+    if periodic:
+        perstr = 'periodic_'
+    if bit64:
+        bitstr = '_64bit'
+    if ftype == 'ext':
+        fname = "{}delaunay{}{}".format(perstr, ver, bitstr)
+    elif ftype == 'pyx':
+        relpath = True
+        fname = "{}delaunay{}{}.pyx".format(perstr, ver, bitstr)
+    elif ftype == 'pxd':
+        relpath = True
+        fname = "{}delaunay{}{}.pxd".format(perstr, ver, bitstr)
+    elif ftype == 'cpp':
+        relpath = True
+        fname = "c_{}delaunay{}{}.cpp".format(perstr, ver, bitstr)
+    elif ftype == 'hpp':
+        relpath = True
+        fname = "c_{}delaunay{}{}.hpp".format(perstr, ver, bitstr)
+    elif ftype == 'import':
+        if ver not in ['2','3']:
+            fname = '\nfrom cgal4py.delaunay.{}delaunay{} '.format(
+                perstr, ver) + \
+                    'cimport {}Delaunay_with_info_{},VALID,D\n'.format(
+                        perstr.title().rstrip('_'), ver)
+        else:
+            fname = '\nfrom cgal4py.delaunay.{}delaunay{} '.format(
+                perstr, ver) + \
+                    'cimport {}Delaunay_with_info_{},VALID\n'.format(
+                        perstr.title().rstrip('_'), ver)
+    elif ftype == 'module':
+        fname = 'cgal4py.delaunay.{}delaunay{}{}'.format(perstr, ver, bitstr)
+    elif ftype == 'pyclass':
+        fname = '{}Delaunay{}{}'.format(
+            perstr.title().rstrip('_'), ver, bitstr)
+    elif ftype == 'cppclass':
+        fname = '{}Delaunay_with_info_{}{}'.format(
+            perstr.title().rstrip('_'), ver, bitstr)
+    elif ftype == 'pyxdep':
+        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64)
+        fname += 'dep'
+    elif ftype == 'pyxbld':
+        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64)
+        fname += 'bld'
+    else:
+        raise ValueError("Unsupported file type {}.".format(ftype))
+    if relpath:
+        fname = os.path.join(_delaunay_dir, fname)
+    return fname
+
+
+def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
+    r"""Create the necessary files for an arbitrary Delaunay extension.
+
+    Args:
+        dim (int): Dimensionality of the triangulations supported by the
+            extension.
+        periodic (bool, optional): If True, the periodic version of the base
+            extension is used. This is invalid for dim > 3. Defaults to False.
+        bit64 (bool, optional): If True, the 64bit version of the extension is
+            created. Defaults to False.
+        overwrite (bool, optional): If True, generated extension files are
+            re-generated. Defaults to False.
+
+    Raises:
+        ValueError: If dim < 2.
+        NotImplementedError: If the periodic version of a an extension with
+            greater than 3 dimensions is requested.
+
+    """
+    generated = False
+    # Create base file from nD case for >3 dimensions
+    if dim < 2:
+        raise ValueError("Triangulations are not supported in " +
+                         "{} dimensions".format(dim))
+    if dim not in [2,3]:
+        generated = True
+        if periodic:
+            raise NotImplementedError(
+                "Periodic nD triangulations not currently supported.")
+        # hpp
+        fnameD = _delaunay_filename('hpp', 'D')
+        fnameN = _delaunay_filename('hpp', str(dim))
+        replace = [('Delaunay_with_info_D',
+                    'Delaunay_with_info_{}'.format(dim)),
+                   ('const int D = 4; // REPLACE',
+                    'const int D = {}; // REPLACE'.format(dim))]
+        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+        # pxd
+        fnameD = _delaunay_filename('pxd', 'D')
+        fnameN = _delaunay_filename('pxd', str(dim))
+        replace = [('c_delaunayD.hpp', 'c_delaunay{}.hpp'.format(dim)),
+                   ('Delaunay_with_info_D',
+                    'Delaunay_with_info_{}'.format(dim))]
+        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+        # pyx
+        fnameD = _delaunay_filename('pyx', 'D')
+        fnameN = _delaunay_filename('pyx', str(dim))
+        replace = [('DelaunayD', 'Delaunay{}'.format(dim)),
+                   ('Delaunay_with_info_D',
+                    'Delaunay_with_info_{}'.format(dim))]
+        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+    # Create 64bit version if requested
+    if bit64:
+        generated = True
+        fname32 = _delaunay_filename('pyx', dim, periodic=periodic)
+        fname64 = _delaunay_filename('pyx', dim, periodic=periodic, bit64=True)
+        class32 = _delaunay_filename('pyclass', dim)
+        class64 = _delaunay_filename('pyclass', dim, bit64=True)
+        import_line = _delaunay_filename('import', dim, periodic=periodic)
+        replace = [
+            ("ctypedef uint32_t info_t","ctypedef uint64_t info_t"),
+            ("cdef object np_info = np.uint32",
+             "cdef object np_info = np.uint64"),
+            ("ctypedef np.uint32_t np_info_t",
+             "ctypedef np.uint64_t np_info_t"),
+            (class32, class64)]
+        insert = [("ctypedef np.uint32_t np_info_t", import_line)]
+        _create_ext_file(fname32, fname64, replace=replace, insert=insert,
+                         overwrite=overwrite)
+    # Create pyxdep & pyxbld for generated files
+    if generated:
+        if bit64:
+            includes = [
+                _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64),
+                _delaunay_filename('pxd', dim, periodic=periodic),
+                _delaunay_filename('hpp', dim, periodic=periodic),
+                _delaunay_filename('cpp', dim, periodic=periodic)]
+            sources = [
+                _delaunay_filename('cpp', dim, periodic=periodic)]
+        else:
+            includes = [
+                _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64),
+                _delaunay_filename('pxd', dim, periodic=periodic, bit64=bit64),
+                _delaunay_filename('hpp', dim, periodic=periodic, bit64=bit64),
+                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64)]
+            sources = [
+                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64)]
+        for cpp_file in sources:
+            if not os.path.isfile(cpp_file):
+                open(cpp_file,'a').close()
+            assert(os.path.isfile(cpp_file))
+        dep = _delaunay_filename('pyxdep', dim, periodic=periodic, bit64=bit64)
+        bld = _delaunay_filename('pyxbld', dim, periodic=periodic, bit64=bit64)
+        _create_pyxdep_file(dep, includes=includes, overwrite=overwrite)
+        _create_pyxbld_file(bld, sources=sources, overwrite=overwrite)
+        
+
+def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
     r"""Dynamically import module for nD Delaunay triangulation and return
     the associated class.
 
     Args:
         ndim (int): Dimensionality that module should have.
-        use_double (bool, optional): If True, the 64bit version of the module
-            is imported.
+        periodic (bool, optional): If True, the periodic triangulation class is
+            returned. Defaults to False.
+        bit64 (bool, optional): If True, the 64bit triangulation class is
+            returned. Defaults to False.
+        overwrite (bool, optional): If True, generated extension files are
+            re-generated. Defaults to False.
 
     Returns:
-        class: Class for `ndim`-dimensional Delaunay triangulation.
+        class: Delaunay triangulation class.
 
     """
-    modname = 'delaunay{}'.format(ndim)
-    clsname = 'Delaunay{}'.format(ndim)
-    if use_double:
-        modname += '_64bit'
-        clsname += '_64bit'
-    try:
-        return getattr(importlib.import_module('cgal4py.delaunay.'+modname),clsname)
-    except:
-        raise
+    _make_ext(ndim, periodic=periodic, bit64=bit64, overwrite=overwrite)
+    modname = _delaunay_filename('module', ndim, periodic=periodic,
+                                 bit64=bit64)
+    clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
+                                 bit64=bit64)
+    if (ndim in [2, 3]) and not bit64:
+        return getattr(importlib.import_module(modname),clsname)
+    else:
+        warnings.warn("Extension {} is not a built in. ".format(modname) +
+                      "It will be created and compiled for " +
+                      "import using pyximport.")
+        return getattr(importlib.import_module(modname),clsname)
+
 
 def Delaunay(pts, use_double=False, periodic=False,
              left_edge=None, right_edge=None):
@@ -101,12 +401,9 @@ def Delaunay(pts, use_double=False, periodic=False,
     ndim = pts.shape[1]
     # Check if 64bit integers need/can be used
     if npts >= np.iinfo('uint32').max or use_double:
-        if not FLAG_DOUBLE_AVAIL:
-            raise RuntimeError("The 64bit triangulation package couldn't " +
-                               "be imported and there are " +
-                               "{} points.".format(npts))
         use_double = True
-    # Initialize correct tessellation
+    # Create arguments
+    args = []
     if periodic:
         if left_edge is None:
             left_edge = np.min(pts, axis=0)
@@ -120,62 +417,34 @@ def Delaunay(pts, use_double=False, periodic=False,
             if (right_edge.ndim != 1) or (len(right_edge) != ndim):
                 raise ValueError("right_edge must be a 1D array with " +
                                  "{} elements.".format(ndim))
-        try:
-            if ndim == 2:
-                if use_double:
-                    T = PeriodicDelaunay2_64bit(left_edge, right_edge)
-                else:
-                    T = PeriodicDelaunay2(left_edge, right_edge)
-            elif ndim == 3:
-                if use_double:
-                    T = PeriodicDelaunay3_64bit(left_edge, right_edge)
-                else:
-                    T = PeriodicDelaunay3(left_edge, right_edge)
-            else:
-                raise NotImplementedError("Only 2D & 3D triangulations are " +
-                                          "currently supported.")
-        except NameError:
-            raise NotImplementedError("Periodic triangulation in " +
-                                      "{}D not available.".format(ndim))
-    else:
-        if ndim == 2:
-            if use_double:
-                T = Delaunay2_64bit()
-            else:
-                T = Delaunay2()
-        elif ndim == 3:
-            if use_double:
-                T = Delaunay3_64bit()
-            else:
-                T = Delaunay3()
-        else:
-            DelaunayD = get_DelaunayD(ndim, use_double=use_double)
-            T = DelaunayD()
-            # raise NotImplementedError("Only 2D & 3D triangulations are " +
-            #                           "currently supported.")
+        args = [left_edge, right_edge]
+    # Initialize correct tessellation
+    DelaunayClass = _get_Delaunay(ndim, periodic=periodic,
+                                  bit64=use_double)
+    T = DelaunayClass(*args)
     # Insert points into tessellation
     if npts > 0:
         T.insert(pts)
     return T
 
 
-def VoronoiVolumes(pts, use_double=False):
+def VoronoiVolumes(pts, *args, **kwargs):
     r"""Get the volumes of the voronoi cells associated with a set of points.
 
     Args:
         pts (np.ndarray of float64): (n,m) array of n m-dimensional
             coordinates.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
+        \*args: Additional arguments are passed to
+            :func:`cgal4py.delaunay.Delaunay`.
+        \*\*kwargs: Additional keyword arguments are passed to 
+            :func:`cgal4py.delaunay.Delaunay`.
 
     Returns:
         np.ndarray of float64: Volumes of voronoi cells. Negative values
             indicate infinite cells.
 
     """
-    T = Delaunay(pts, use_double=use_double)
+    T = Delaunay(pts, *args, **kwargs)
     return T.voronoi_volumes()
 
 
@@ -185,10 +454,3 @@ if is_valid_P2():
     __all__.append("PeriodicDelaunay2")
 if is_valid_P3():
     __all__.append("PeriodicDelaunay3")
-
-if FLAG_DOUBLE_AVAIL:
-    __all__ += ["Delaunay2_64bit", "Delaunay3_64bit"]
-    if is_valid_P2():
-        __all__.append("PeriodicDelaunay2_64bit")
-    if is_valid_P3():
-        __all__.append("PeriodicDelaunay3_64bit")
