@@ -11,7 +11,7 @@ from test_delaunay3 import right_edge as right_edge3
 
 
 @nottest
-def make_points(npts, ndim, distrib='uniform'):
+def make_points(npts, ndim, distrib='uniform', seed=0):
     npts = int(npts)
     if npts <= 0:
         if ndim == 2:
@@ -26,6 +26,7 @@ def make_points(npts, ndim, distrib='uniform'):
             raise ValueError("Invalid 'ndim': {}".format(ndim))
         npts = pts.shape[0]
     else:
+        np.random.seed(seed)
         LE = 0.0
         RE = 1.0
         left_edge = LE*np.ones(ndim, 'float64')

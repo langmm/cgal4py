@@ -17,6 +17,31 @@ import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
 
+def _get_mpi_type(np_type):
+    r"""Get the correpsonding MPI data type for a given numpy data type.
+
+    Args:
+        np_type (str, type): String identifying a numpy data type or a numpy
+            data type.
+
+    Returns:
+        int: MPI data type.
+
+    Raises:
+        ValueError: If `np_type` is not supported.
+
+    """
+    if np_type in ('i', 'int32', np.int32):
+        mpi_type = MPI.INT
+    elif np_type in ('l', 'int64', np.int64):
+        mpi_type = MPI.LONG
+    elif np_type in ('f', 'float32', np.float32):
+        mpi_type = MPI.FLOAT
+    elif np_type in ('d', 'float64', np.float64):
+        mpi_type = MPI.DOUBLE
+    else:
+        raise ValueError("Unrecognized type: {}".format(np_type))
+    return mpi_type
 
 def _tess_filename(unique_str=None):
     if isinstance(unique_str, str):
@@ -36,7 +61,7 @@ def _leaf_tess_filename(leaf_id, unique_str=None):
 
 
 def write_mpi_script(fname, read_func, taskname, unique_str=None,
-                     use_double=False, overwrite=False):
+                     use_double=False, use_buffer=False, overwrite=False):
     r"""Write an MPI script for calling MPI parallelized triangulation.
 
     Args:
@@ -59,6 +84,8 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
         overwrite (bool): If True, any existing script with the same name is
             overwritten. Defaults to False.
 
@@ -87,6 +114,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "rank = comm.Get_rank()",
         "",
         "use_double = {}".format(use_double),
+        "use_buffer = {}".format(use_buffer),
         "unique_str = '{}'".format(unique_str),
         "",
         "if rank == 0:"]
@@ -109,6 +137,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
         "                                pts, tree,",
         "                                use_double=use_double,",
+        "                                use_buffer=use_buffer,",
         "                                unique_str=unique_str)",
         "p.run()"]
     with open(fname, 'w') as f:
@@ -117,7 +146,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
 
 
 def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
-                              in_memory=False):
+                              use_buffer=False, in_memory=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
     parallel using MPI.
 
@@ -137,6 +166,8 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
         in_memory (bool, optional): If True, the triangulation results from
             each process are moved to local memory using `multiprocessing`
             pipes. Otherwise, each process writes out tessellation info to
@@ -152,7 +183,8 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     fscript = '{}_mpi.py'.format(unique_str)
     write_mpi_script(fscript, read_func, 'volumes',
-                     unique_str=unique_str, use_double=use_double)
+                     unique_str=unique_str, use_double=use_double,
+                     use_buffer=use_buffer)
     os.system('mpiexec -np {} python {}'.format(nproc, fscript))
     os.remove(fscript)
     T = _get_Delaunay(ndim=ndim)()
@@ -241,7 +273,7 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
 
 
 def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
-                        in_memory=False):
+                        use_buffer=False, in_memory=False):
     r"""Return a triangulation that is constructed in parallel using MPI.
 
     Args:
@@ -260,6 +292,8 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
         in_memory (bool, optional): If True, the triangulation results from
             each process are moved to local memory using `multiprocessing`
             pipes. Otherwise, each process writes out tessellation info to
@@ -275,13 +309,15 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     fscript = '{}_mpi.py'.format(unique_str)
     write_mpi_script(fscript, read_func, 'triangulate',
-                     unique_str=unique_str, use_double=use_double)
+                     unique_str=unique_str, use_double=use_double,
+                     use_buffer=use_buffer)
     os.system('mpiexec -np {} python {}'.format(nproc, fscript))
     os.remove(fscript)
     T = _get_Delaunay(ndim=ndim)()
     ftess = _tess_filename(unique_str=unique_str)
     T.read_from_file(ftess)
-    os.remove(ftess)
+    if os.path.isfile(ftess):
+        os.remove(ftess)
     return T
     
 
@@ -449,18 +485,21 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
         else:
             cons = tools.ConsolidatedLeaves32(ndim, idx_inf, ncells_tot)
         for i, leaf in enumerate(tree.leaves):
-            if isinstance(leaf_output[i][2], np.uint64):
+            leaf_dtype = leaf_output[i][0].dtype
+            if leaf_dtype == np.uint64:
                 sleaf = tools.SerializedLeaf64(
                     leaf.id, ndim, leaf_output[i][0].shape[0],
                     leaf_output[i][2], leaf_output[i][0], leaf_output[i][1],
                     leaf_output[i][3], leaf_output[i][4],
                     leaf.start_idx, leaf.stop_idx)
-            else:
+            elif leaf_dtype == np.uint32:
                 sleaf = tools.SerializedLeaf32(
                     leaf.id, ndim, leaf_output[i][0].shape[0],
                     leaf_output[i][2], leaf_output[i][0], leaf_output[i][1],
                     leaf_output[i][3], leaf_output[i][4],
                     leaf.start_idx, leaf.stop_idx)
+            else:
+                raise TypeError("Unsupported leaf type: {}".format(leaf_dtype))
             cons.add_leaf(sleaf)
     else:
         ncells_tot = leaf_output[0]
@@ -501,13 +540,15 @@ class DelaunayProcessMPI(object):
             file naming. Defaults to None.
         use_double (bool, optional): If True, 64 bit integers will be used for
             the triangulation. Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
 
     Raises:
         ValueError: if `task` is not one of the accepted values listed above.
 
     """
     def __init__(self, taskname, pts, tree0, unique_str=None,
-                 use_double=False):
+                 use_double=False, use_buffer=False):
         task_list = ['triangulate', 'volumes']
         if taskname not in task_list:
             raise ValueError('{} is not a valid task.'.format(taskname))
@@ -542,11 +583,13 @@ class DelaunayProcessMPI(object):
         self._tree = tree
         self._unique_str = unique_str
         self._use_double = use_double
+        self._use_buffer = use_buffer
         self._comm = comm
         self._num_proc = size
         self._proc_idx = rank
         self._leaves = [ParallelLeaf(leaf, left_edges, right_edges,
                                      unique_str=unique_str) for leaf in leaves]
+        self._leafid2idx = {leaf.id:i for i,leaf in enumerate(leaves)}
         ndim = left_edges.shape[1]
         self._ndim = ndim
         self._local_leaves = len(leaves)
@@ -560,52 +603,292 @@ class DelaunayProcessMPI(object):
             task = i % size
             self._task2leaf[task].append(i)
 
+    def get_leaf(self, leafid):
+        return self._leaves[self._leafid2idx[leafid]]
+
     def tessellate_leaves(self):
         r"""Performs the tessellation for each leaf on this process."""
         for leaf in self._leaves:
             leaf.tessellate(leaf.pts)
 
+    def gather_leaf_arrays(self, local_arr, root=0):
+        r"""Gather arrays for all leaves to a single process.
+
+        Args:
+            local_arr (dict): Arrays to be gathered for each leaf ID.
+            root (int, optional): Process to which arrays should be gathered.
+                Defaults to 0.
+
+        Returns:
+            dict: Arrays for each leaf ID.
+        
+        """
+        total_arr = {}
+        if self._use_buffer:
+            leaf_ids = local_arr.keys()
+            np_dtype = local_arr[leaf_ids[0]].dtype
+            mpi_dtype = _get_mpi_type(np_dtype)
+            # Send the number of leaves on each processor
+            scnt = np.array([len(leaf_ids)], 'int64')
+            if self._proc_idx == root:
+                rcnt = np.empty(self._num_proc, scnt.dtype)
+            else:
+                rcnt = np.array([], scnt.dtype)
+            self._comm.Gather((scnt, _get_mpi_type(scnt.dtype)),
+                              (rcnt, _get_mpi_type(rcnt.dtype)), root)
+            tot_nleaves = sum(rcnt)
+            leaf_counts = list(rcnt)
+            leaf_displs = [sum(rcnt[:i]) for i in range(tot_nleaves)]
+            # Send the ids of leaves for each leaf
+            sids = np.array(leaf_ids, 'int64')
+            rids = np.empty(tot_nleaves, sids.dtype)
+            if self._proc_idx == root:
+                recv_buf = (rids, (leaf_counts, leaf_displs),
+                            _get_mpi_type(rids.dtype))
+            else:
+                recv_buf = None
+            self._comm.Gatherv((sids, _get_mpi_type(sids.dtype)),
+                               recv_buf, root)
+            # Send the size of arrays for each leaf
+            ssiz = np.array([local_arr[k].size for k in leaf_ids], 'int64')
+            rsiz = np.empty(tot_nleaves, ssiz.dtype)
+            if self._proc_idx == root:
+                recv_buf = (rsiz, (leaf_counts, leaf_displs),
+                            _get_mpi_type(rsiz.dtype))
+            else:
+                recv_buf = None
+            self._comm.Gatherv((ssiz, _get_mpi_type(ssiz.dtype)),
+                               recv_buf, root)
+            arr_counts = list(rsiz)
+            arr_displs = [sum(rsiz[:i]) for i in range(tot_nleaves)]
+            # Send the arrays for each leaf
+            sarr = np.concatenate([local_arr[k] for k in leaf_ids])
+            if sarr.dtype != np_dtype:
+                sarr = sarr.astype(np_dtype)
+            rarr = np.empty(sum(rsiz), sarr.dtype)
+            if self._proc_idx == root:
+                recv_buf = (rarr, (arr_counts, arr_displs),
+                            _get_mpi_type(rarr.dtype))
+            else:
+                recv_buf = None
+            self._comm.Gatherv((sarr, _get_mpi_type(sarr.dtype)),
+                               recv_buf, root)
+            # Parse out info for each leaf
+            if self._proc_idx == root:
+                curr = 0
+                for i, k in enumerate(rids):
+                    total_arr[k] = rarr[curr:(curr+arr_counts[i])]
+                    curr += arr_counts[i]
+                assert(curr == rarr.size)
+        else:
+            data = self._comm.gather(local_arr, root=root)
+            if self._proc_idx == root:
+                for x in data:
+                    total_arr.update(**x)
+        return total_arr
+
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
-
-        tot_send = [{k:{} for k in self._task2leaf[i]} for
-                    i in range(self._num_proc)]
-        for leaf in self._leaves:
-            hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
-            for i in xrange(self._total_leaves):
-                task = i % self._num_proc
-                if hvall[i] is None:
-                    tot_send[task][i][leaf.id] = None
+        if self._use_buffer:
+            np_int = 'int64'
+            mpi_int = MPI.LONG # Check this
+            np_float = 'float64'
+            mpi_float = MPI.DOUBLE
+            key_info = {
+                'count': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
+                'src': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
+                'dst': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
+                'nn': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
+                'idx': {'len': 'points', 'np': np_int, 'mpi': mpi_int},
+                'pts': {'len': 'points*d', 'np': np_float, 'mpi': mpi_float},
+                'n': {'len': 'neighbors', 'np': np_int, 'mpi': mpi_int},
+                'le': {'len': 'neighbors*d', 'np': np_float, 'mpi': mpi_float},
+                're': {'len': 'neighbors*d', 'np': np_float, 'mpi': mpi_float}}
+            key_order = ['count', 'src', 'dst', 'nn',
+                         'idx', 'pts', 'n', 'le', 're']
+            tot_send = {k: [[] for i in range(self._num_proc)] for
+                        k in key_info.keys()}
+            send_count = {'leaves': np.zeros(self._num_proc, 'int64'),
+                          'points': np.zeros(self._num_proc, 'int64'),
+                          'neighbors': np.zeros(self._num_proc, 'int64')}
+            for leaf in self._leaves:
+                hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
+                for i in xrange(self._total_leaves):
+                    task = i % self._num_proc
+                    if hvall[i] is not None:
+                        send_count['leaves'][task] += 1
+                        send_count['points'][task] += hvall[i].shape[0]
+                        send_count['neighbors'][task] += len(n)
+                        tot_send['count'][task].append(hvall[i].shape[0])
+                        tot_send['src'][task].append(leaf.id)
+                        tot_send['dst'][task].append(i)
+                        tot_send['idx'][task].append(hvall[i].astype('int64'))
+                        tot_send['pts'][task].append(ptall[i].flatten())
+                        tot_send['nn'][task].append(len(n))
+                        tot_send['n'][task].append(np.array(n, 'int64'))
+                        tot_send['le'][task].append(le.flatten())
+                        tot_send['re'][task].append(re.flatten())
+            if np.sum(send_count['leaves']) == 0:
+                self._tot_recv = {}
+                for k in key_order:
+                    self._tot_recv[k] = np.empty(0, key_info[k]['np'])
+            # Ensure information is in arrays
+            for k in key_order:
+                for task in range(self._num_proc):
+                    assert(len(tot_send[k][task]) ==
+                           send_count['leaves'][task])
+                    if len(tot_send[k][task]) == 0:
+                        tot_send[k][task] = np.array([], key_info[k]['np'])
+                        continue
+                    if key_info[k]['len'] == 'leaves':
+                        tot_send[k][task] = np.array(tot_send[k][task],
+                                                     key_info[k]['np'])
+                    else:
+                        tot_send[k][task] = np.concatenate(tot_send[k][task])
+            for k in key_order:
+                tot_send[k] = np.concatenate(tot_send[k])
+            # Send total counts
+            recv_count = {}
+            for k in send_count.keys():
+                recv_count[k] = np.empty(self._num_proc, 'int64')
+                self._comm.Alltoall(send_count[k], recv_count[k])
+            # Send info about leaves
+            tot_recv = {}
+            for k in key_order:
+                len_key = key_info[k]['len']
+                if len_key.endswith('*d'):
+                    len_key = len_key.rstrip('*d')
+                    len_mult = self._ndim
                 else:
-                    tot_send[task][i][leaf.id] = (hvall[i], n, le, re,
-                                                  ptall[i])
-        self._tot_recv = self._comm.alltoall(sendobj=tot_send)
-        del tot_send
+                    len_mult = 1
+                send_cnt = list(send_count[len_key]*len_mult)
+                send_dsp = [np.sum(send_cnt[:i]) for i in range(self._num_proc)]
+                send_arr = tot_send[k]
+                send_buf = (send_arr, (send_cnt, send_dsp), key_info[k]['mpi'])
+                recv_cnt = list(recv_count[len_key]*len_mult)
+                recv_dsp = [np.sum(recv_cnt[:i]) for i in range(self._num_proc)]
+                recv_arr = np.empty(sum(recv_cnt), key_info[k]['np'])
+                recv_buf = (recv_arr, (recv_cnt, recv_dsp), key_info[k]['mpi'])
+                self._comm.Alltoallv(send_buf, recv_buf)
+                tot_recv[k] = recv_arr
+            self._tot_recv = tot_recv
+            del tot_send
+        else:
+            tot_send = [{k:{} for k in self._task2leaf[i]} for
+                        i in range(self._num_proc)]
+            for leaf in self._leaves:
+                hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
+                for i in xrange(self._total_leaves):
+                    task = i % self._num_proc
+                    if hvall[i] is None:
+                        tot_send[task][i][leaf.id] = None
+                    else:
+                        tot_send[task][i][leaf.id] = (hvall[i], n, le, re,
+                                                      ptall[i])
+            self._tot_recv = self._comm.alltoall(sendobj=tot_send)
+            del tot_send
 
     def incoming_points(self):
         r"""Takes points from the queue and adds them to the triangulation."""
-        nrecv = 0
-        for leaf in self._leaves:
-            for k in range(self._total_leaves):
-                task = k % self._num_proc
-                if k not in self._tot_recv[task][leaf.id]:
-                    continue
-                if self._tot_recv[task][leaf.id][k] is None:
-                    continue
-                leaf.incoming_points(k, *self._tot_recv[task][leaf.id][k])
-                nrecv += self._tot_recv[task][leaf.id][k][0].size
-        del self._tot_recv
+        if self._use_buffer:
+            nrecv = 0
+            nn_prev = 0
+            for i in range(len(self._tot_recv['src'])):
+                npts = self._tot_recv['count'][i]
+                src = self._tot_recv['src'][i]
+                dst = self._tot_recv['dst'][i]
+                nn = self._tot_recv['nn'][i]
+                idx = self._tot_recv['idx'][nrecv:(nrecv + npts)]
+                pts = self._tot_recv['pts'][
+                    (self._ndim*nrecv):(self._ndim*(nrecv + npts))].reshape(
+                        (-1, self._ndim))
+                n = self._tot_recv['n'][nn_prev:(nn_prev + nn)]
+                le = self._tot_recv['le'][
+                    (self._ndim*nn_prev):(self._ndim*(nn_prev + nn))].reshape(
+                        (-1, self._ndim))
+                re = self._tot_recv['re'][
+                    (self._ndim*nn_prev):(self._ndim*(nn_prev + nn))].reshape(
+                        (-1, self._ndim))
+                leaf = self.get_leaf(dst)
+                leaf.incoming_points(src, idx, n, le, re, pts)
+                nrecv += npts
+                nn_prev += nn
+            del self._tot_recv
+        else:
+            nrecv = 0
+            for leaf in self._leaves:
+                for k in range(self._total_leaves):
+                    task = k % self._num_proc
+                    if k not in self._tot_recv[task][leaf.id]:
+                        continue
+                    if self._tot_recv[task][leaf.id][k] is None:
+                        continue
+                    leaf.incoming_points(k, *self._tot_recv[task][leaf.id][k])
+                    nrecv += self._tot_recv[task][leaf.id][k][0].size
+            del self._tot_recv
         return nrecv
 
     def enqueue_triangulation(self):
         r"""Enqueue resulting tessellation."""
-        out = [(leaf.id, leaf.serialize()) for leaf in self._leaves]
-        out = self._comm.gather(out, root=0)
+        if self._use_buffer:
+            send_arr = {}
+            for leaf in self._leaves:
+                send_arr[leaf.id] = leaf.serialize(as_single_array=True)
+            recv_arr = self.gather_leaf_arrays(send_arr)
+            if self._proc_idx == 0:
+                serial = [None for i in range(self._total_leaves)]
+                ndim = self._ndim
+                for k, v in recv_arr.items():
+                    ncell = int(v[0])
+                    ncell_tot = int(v[1])
+                    idx_inf = int(v[2])
+                    # Cells
+                    beg = 3
+                    end = beg + ncell*(ndim+1)
+                    cells = v[beg:end].reshape(ncell, ndim+1).astype('uint64')
+                    # Neighbors
+                    beg = end
+                    end = beg + ncell*(ndim+1)
+                    neigh = v[beg:end].reshape(ncell, ndim+1).astype('uint64')
+                    # Sort index for verts
+                    beg = end
+                    end = beg + ncell*(ndim+1)
+                    idx_verts = v[beg:end].reshape(ncell, ndim+1).astype(
+                        'uint32')
+                    # Sort index for cells
+                    beg = end
+                    end = beg + ncell
+                    idx_cells = v[beg:end].astype('uint64')
+                    serial[k] = (cells, neigh, idx_inf, idx_verts, idx_cells,
+                                 ncell_tot)
+                    assert(end == v.size)
+                serial1 = serial
+        else:
+            out = [(leaf.id, leaf.serialize()) for leaf in self._leaves]
+            out = self._comm.gather(out, root=0)
+            if self._proc_idx == 0:
+                serial = [None for i in range(self._total_leaves)]
+                for i in range(self._num_proc):
+                    for iid, s in out[i]:
+                        serial[iid] = s
+                serial2 = serial
         if self._proc_idx == 0:
-            serial = [None for i in range(self._total_leaves)]
-            for i in range(self._num_proc):
-                for iid, s in out[i]:
-                    serial[iid] = s
+            # for i in range(self._total_leaves):
+            #     s1 = serial1[i]
+            #     s2 = serial2[i]
+            #     assert(len(s1) == len(s2))
+            #     for j in range(len(s1)):
+            #         x1 = s1[j]
+            #         x2 = s2[j]
+            #         if isinstance(x1, np.ndarray):
+            #             assert(np.all(x1 == x2))
+            #         else:
+            #             assert(x1 == x2)
+            # print self._use_buffer, serial[0][0]
+            # pstr = '{}: {}, {}, {}, {}, {}, {}'.format(
+            #     self._use_buffer, s[0].dtype, s[1].dtype, type(s[2]), s[3].dtype,
+            #     s[4].dtype, type(s[5]))
+            # print pstr
             T = consolidate_tess(self._tree, serial, self._pts,
                                  use_double=self._use_double,
                                  unique_str=self._unique_str)
@@ -1103,7 +1386,7 @@ class ParallelLeaf(object):
                                  (pos[:, i] - self.right_edge[i]))
                     pos[idx_right, i] -= self.domain_width[i]
         # Concatenate arrays
-        self.idx = np.concatenate([self.idx, idx])
+        self.idx = np.concatenate([self.idx, idx.astype(self.idx.dtype)])
         # Insert points
         self.T.insert(pos)
         # Add neighbors
@@ -1200,12 +1483,14 @@ class ParallelLeaf(object):
     #         leaf.sort_verts, leaf.sort_cells)
     #     return ncells, split_map, inf_map
 
-    def serialize(self, store=False):
+    def serialize(self, store=False, as_single_array=False):
         r"""Get the serialized tessellation for this leaf.
 
         Args:
             store (bool, optional): If True, values are stored as attributes
                 and not returned. Defaults to False.
+            as_single_array (bool, optional): If True, a single array is
+                returned that contains all serialized information.
 
         Returns:
             tuple: Vertices and neighbors for cells in the triangulation.
@@ -1221,6 +1506,12 @@ class ParallelLeaf(object):
             self.sort_cells = idx_cells
         else:
             ncell_tot = self.T.num_cells
+            if as_single_array:
+                out = np.concatenate([
+                    np.array([cells.shape[0], ncell_tot, idx_inf]),
+                    cells.flatten(), neigh.flatten(),
+                    idx_verts.flatten(), idx_cells.flatten()]).astype('int64')
+                return out
             return cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot
 
     def write_tess_to_file(self, fname=None):
