@@ -7,6 +7,90 @@ from test_delaunay2 import pts as pts2
 np.random.seed(10)
 
 
+@nottest
+def lines_load_test(npts, ndim, periodic=False):
+    lines = [
+        "from cgal4py.tests.test_cgal4py import make_points",
+        "pts, le, re = make_points({}, {})".format(npts, ndim),
+        "load_dict = dict(pts=pts, left_edge=le, right_edge=re,",
+        "                 periodic={})".format(periodic)]
+    return lines
+
+
+@nottest
+def runtest_ParallelVoronoiVolumes(npts, ndim, nproc, use_mpi=False,
+                                   use_buffer=False, **kwargs):
+    pts, tree = make_test(npts, ndim, **kwargs)
+    v_seri = delaunay.VoronoiVolumes(pts)
+    if use_mpi:
+        v_para = parallel.ParallelVoronoiVolumesMPI(
+            lines_load_test(npts, ndim), ndim, nproc, use_buffer=use_buffer)
+    else:
+        v_para = parallel.ParallelVoronoiVolumes(pts, tree, nproc)
+    assert(np.allclose(v_seri, v_para))
+
+
+@nottest
+def runtest_ParallelDelaunay(npts, ndim, nproc, use_mpi=False,
+                             use_buffer=False, **kwargs):
+    pts, tree = make_test(npts, ndim, **kwargs)
+    T_seri = delaunay.Delaunay(pts)
+    try:
+        if use_mpi:
+            T_para = parallel.ParallelDelaunayMPI(lines_load_test(npts, ndim),
+                                                  ndim, nproc,
+                                                  use_buffer=use_buffer)
+        else:
+            T_para = parallel.ParallelDelaunay(pts, tree, nproc)
+    except:
+        print(("Test failed with npts={}, ndim={}, nproc={}, use_mpi={}, " +
+               "use_buffer={}").format(npts, ndim, nproc, use_mpi, use_buffer))
+        raise
+    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
+    c_para, n_para, inf_para = T_para.serialize(sort=True)
+    try:
+        assert(np.all(c_seri == c_para))
+        assert(np.all(n_seri == n_para))
+        assert(T_para.is_equivalent(T_seri))
+    except:
+        for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
+            print(name)
+            print('\t verts: {}, {}, {}'.format(
+                T.num_verts, T.num_finite_verts, T.num_infinite_verts))
+            print('\t cells: {}, {}, {}'.format(
+                T.num_cells, T.num_finite_cells, T.num_infinite_cells))
+            print('\t edges: {}, {}, {}'.format(
+                T.num_edges, T.num_finite_edges, T.num_infinite_edges))
+            if ndim == 3:
+                print('\t facets: {}, {}, {}'.format(
+                    T.num_facets, T.num_finite_facets, T.num_infinite_facets))
+        raise
+
+
+@nottest
+def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False):
+    tests = [
+        {'npts':0, 'nproc':2, 'kwargs': {}},
+        {'npts':1000, 'nproc':2, 'kwargs': {'nleaves': 2}},
+        {'npts':4*4*2, 'nproc':4, 'kwargs': {'leafsize': 8}},
+        {'npts':1e5, 'nproc':8, 'kwargs': {'nleaves': 8}},
+        # {'npts':1e7, 'nproc':10, 'kwargs': {'nleaves': 10}},
+    ]
+    if func_name in ['volumes','VoronoiVolumes']:
+        func = runtest_ParallelVoronoiVolumes
+    elif func_name in ['delaunay', 'Delaunay', 'triangulate']:
+        func = runtest_ParallelDelaunay
+    else:
+        raise ValueError("Unrecognized test function: {}".format(func_name))
+    for t in tests:
+        func(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
+             periodic=periodic, **t['kwargs'])
+    if use_mpi:
+        for t in tests:
+            func(t['npts'], ndim, t['nproc'], use_mpi=use_mpi, use_buffer=True,
+                 periodic=periodic, **t['kwargs'])
+
+
 # def test_ParallelLeaf_2D():
 #     pts, tree = make_test(0, 2)
 #     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
@@ -79,346 +163,34 @@ np.random.seed(10)
 #                                out[0][3], pts[out[0][0][0], :])
 
 
-# def test_ParallelVoronoiVolumes_2D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 2)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 2, nleaves=2)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 2, leafsize=8)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
-#     for i in range(pts.shape[0]):
-#         print v_seri[i], v_para[i]
-#     assert(np.allclose(v_seri, v_para))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 2, nleaves=8)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
-#     assert(np.allclose(v_seri, v_para))
+# def test_ParallelVoronoiVolumes():
+#     # 2D
+#     ndim = 2
+#     runtest_ParallelSeries('volumes', ndim)
+#     runtest_ParallelSeries('volumes', ndim, periodic=True)
+#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True)
+#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
+#     # 3D
+#     ndim = 3
+#     runtest_ParallelSeries('volumes', ndim)
+#     runtest_ParallelSeries('volumes', ndim, periodic=True)
+#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True)
+#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
 
 
-# def test_ParallelVoronoiVolumes_3D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 3)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 3, nleaves=2)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 3, leafsize=8)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
-#     assert(np.allclose(v_seri, v_para))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 3, nleaves=8)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
-#     assert(np.allclose(v_seri, v_para))
-
-
-# def test_ParallelVoronoiVolumes_2D_periodic():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 2, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 2, nleaves=2, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 2, leafsize=8, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
-#     assert(np.allclose(v_seri, v_para))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 2, nleaves=8, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
-#     assert(np.allclose(v_seri, v_para))
-
-
-# def test_ParallelVoronoiVolumes_3D_periodic():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 3, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 3, nleaves=2, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 2)
-#     assert(np.allclose(v_seri, v_para))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 3, leafsize=8, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 4)
-#     assert(np.allclose(v_seri, v_para))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 3, nleaves=8, periodic=True)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     v_para = parallel.ParallelVoronoiVolumes(pts, tree, 8)
-#     assert(np.allclose(v_seri, v_para))
-
-
-# def test_ParallelDelaunay_2D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 2)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 2, nleaves=2)
-#     assert(tree.num_leaves == 2)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     T_seri = delaunay.Delaunay(pts)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 2, leafsize=8)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 4)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 2, nleaves=8)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 8)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(T_para.is_equivalent(T_seri))
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     # Large test on 8 processors
-#     # pts, tree = make_test(1e7, 2, nleaves=10)
-#     # T_seri = delaunay.Delaunay(pts)
-#     # T_para = parallel.ParallelDelaunay(pts, tree, 10)
-#     # c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     # c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     # assert(T_para.is_equivalent(T_seri))
-#     # assert(np.all(c_seri == c_para))
-#     # assert(np.all(n_seri == n_para))
-#     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-#     #     print(name)
-#     #     print('\t verts', T.num_verts, T.num_finite_verts,
-#     #           T.num_infinite_verts)
-#     #     print('\t cells', T.num_cells, T.num_finite_cells,
-#     #           T.num_infinite_cells)
-#     #     print('\t edges', T.num_edges, T.num_finite_edges,
-#     #           T.num_infinite_edges)
-
-
-# def test_ParallelDelaunay_3D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 3)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 3)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     T_seri = delaunay.Delaunay(pts)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 3, leafsize=8)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 4)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 3, nleaves=8)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 8)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-#     #     print(name)
-#     #     print('\t verts', T.num_verts, T.num_finite_verts,
-#     #           T.num_infinite_verts)
-#     #     print('\t cells', T.num_cells, T.num_finite_cells,
-#     #           T.num_infinite_cells)
-#     #     print('\t edges', T.num_edges, T.num_finite_edges,
-#     #           T.num_infinite_edges)
-#     #     print('\t facets', T.num_facets, T.num_finite_facets,
-#     #           T.num_infinite_facets
-
-
-# def test_ParallelDelaunay_periodic_2D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 2, periodic=True)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 2, periodic=True)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     T_seri = delaunay.Delaunay(pts)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Medium test on 4 processors
-#     pts, tree = make_test(4*4*2, 2, leafsize=8, periodic=True)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 4)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 2, nleaves=8, periodic=True)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 8)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-#     #     print(name)
-#     #     print('\t verts', T.num_verts, T.num_finite_verts,
-#     #           T.num_infinite_verts)
-#     #     print('\t cells', T.num_cells, T.num_finite_cells,
-#     #           T.num_infinite_cells)
-#     #     print('\t edges', T.num_edges, T.num_finite_edges,
-#     #           T.num_infinite_edges)
-
-
-# def test_ParallelDelaunay_periodic_3D():
-#     # Small test with known solution
-#     pts, tree = make_test(0, 3, periodic=True)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Larger random test on 2 processors
-#     pts, tree = make_test(1000, 3, periodic=True)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 2)
-#     T_seri = delaunay.Delaunay(pts)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # Large test on 8 processors
-#     pts, tree = make_test(1e5, 3, nleaves=8, periodic=True)
-#     T_seri = delaunay.Delaunay(pts)
-#     T_para = parallel.ParallelDelaunay(pts, tree, 8)
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     assert(np.all(c_seri == c_para))
-#     assert(np.all(n_seri == n_para))
-#     assert(T_para.is_equivalent(T_seri))
-#     # for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-#     #     print(name)
-#     #     print('\t verts', T.num_verts, T.num_finite_verts,
-#     #           T.num_infinite_verts)
-#     #     print('\t cells', T.num_cells, T.num_finite_cells,
-#     #           T.num_infinite_cells)
-#     #     print('\t edges', T.num_edges, T.num_finite_edges,
-#     #           T.num_infinite_edges)
-#     #     print('\t facets', T.num_facets, T.num_finite_facets,
-#     #           T.num_infinite_facets
-
-
-@nottest
-def lines_load_test(npts, ndim, periodic=False):
-    lines = [
-        "from cgal4py.tests.test_cgal4py import make_points",
-        "pts, le, re = make_points({}, {})".format(npts, ndim),
-        "load_dict = dict(pts=pts, left_edge=le, right_edge=re,",
-        "                 periodic={})".format(periodic)]
-    return lines
-
-
-@nottest
-def test_ParallelDelaunayMPI(npts, ndim, nproc, use_buffer=False, **kwargs):
-    pts, tree = make_test(npts, ndim, **kwargs)
-    T_seri = delaunay.Delaunay(pts)
-    T_para = parallel.ParallelDelaunayMPI(lines_load_test(npts, ndim),
-                                          ndim, nproc, use_buffer=use_buffer)
-    c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-    c_para, n_para, inf_para = T_para.serialize(sort=True)
-    try:
-        assert(np.all(c_seri == c_para))
-        assert(np.all(n_seri == n_para))
-        assert(T_para.is_equivalent(T_seri))
-    except:
-        for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-            print(name)
-            print('\t verts: {}, {}, {}'.format(
-                T.num_verts, T.num_finite_verts, T.num_infinite_verts))
-            print('\t cells: {}, {}, {}'.format(
-                T.num_cells, T.num_finite_cells, T.num_infinite_cells))
-            print('\t edges: {}, {}, {}'.format(
-                T.num_edges, T.num_finite_edges, T.num_infinite_edges))
-        raise
-
-
-def test_ParallelDelaunayMPI_2D():
+def test_ParallelDelaunay():
+    # 2D
     ndim = 2
-    # Small test with known solution
-    test_ParallelDelaunayMPI(0, ndim, 2, use_buffer=False)
-    test_ParallelDelaunayMPI(0, ndim, 2, use_buffer=True)
-    # Larger random test on 2 processors
-    test_ParallelDelaunayMPI(1000, ndim, 2, use_buffer=False, nleaves=2)
-    test_ParallelDelaunayMPI(1000, ndim, 2, use_buffer=True, nleaves=2)
-    # Medium test on 4 processors
-    test_ParallelDelaunayMPI(4*4*2, ndim, 4, use_buffer=False, leafsize=8)
-    test_ParallelDelaunayMPI(4*4*2, ndim, 4, use_buffer=True, leafsize=8)
-    # Large test on 8 processors
-    test_ParallelDelaunayMPI(1e5, ndim, 8, use_buffer=False, nleaves=8)
-    test_ParallelDelaunayMPI(1e5, ndim, 8, use_buffer=True, nleaves=8)
-    # Large test on 8 processors
-    # test_ParallelDelaunayMPI(1e7, ndim, 10, use_buffer=False, nleaves=10,
-    #                          print_flag=True)
-    # test_ParallelDelaunayMPI(1e7, ndim, 10, use_buffer=True, nleaves=10,
-    #                          print_flag=True)
+    # runtest_ParallelSeries('delaunay', ndim)
+    # runtest_ParallelSeries('delaunay', ndim, periodic=True)
+    runtest_ParallelSeries('delaunay', ndim, use_mpi=True)
+    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
+    # 3D
+    # ndim = 3
+    # runtest_ParallelSeries('delaunay', ndim)
+    # runtest_ParallelSeries('delaunay', ndim, periodic=True)
+    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True)
+    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
 
 
 # def test_DelaunayProcess2():

@@ -639,35 +639,30 @@ class DelaunayProcessMPI(object):
             tot_nleaves = sum(rcnt)
             leaf_counts = list(rcnt)
             leaf_displs = [sum(rcnt[:i]) for i in range(tot_nleaves)]
-            # Send the ids of leaves for each leaf
-            sids = np.array(leaf_ids, 'int64')
-            rids = np.empty(tot_nleaves, sids.dtype)
+            # Send the ids and sizes of leaves
+            sids = np.empty(2*len(leaf_ids), 'int64')
+            for i,k in enumerate(leaf_ids):
+                sids[2*i] = k
+                sids[2*i+1] = local_arr[k].size
+            rids = np.empty(2*tot_nleaves, sids.dtype)
             if self._proc_idx == root:
-                recv_buf = (rids, (leaf_counts, leaf_displs),
+                recv_buf = (rids, list(2*np.array(leaf_counts)),
+                            # list(2*np.array(leaf_displs)),
                             _get_mpi_type(rids.dtype))
             else:
                 recv_buf = None
             self._comm.Gatherv((sids, _get_mpi_type(sids.dtype)),
                                recv_buf, root)
-            # Send the size of arrays for each leaf
-            ssiz = np.array([local_arr[k].size for k in leaf_ids], 'int64')
-            rsiz = np.empty(tot_nleaves, ssiz.dtype)
-            if self._proc_idx == root:
-                recv_buf = (rsiz, (leaf_counts, leaf_displs),
-                            _get_mpi_type(rsiz.dtype))
-            else:
-                recv_buf = None
-            self._comm.Gatherv((ssiz, _get_mpi_type(ssiz.dtype)),
-                               recv_buf, root)
-            arr_counts = list(rsiz)
-            arr_displs = [sum(rsiz[:i]) for i in range(tot_nleaves)]
+            arr_counts = [rids[2*i+1] for i in range(tot_nleaves)]
+            arr_displs = [sum(arr_counts[:i]) for i in range(tot_nleaves)]
+            arr_count_tot = sum(arr_counts)
             # Send the arrays for each leaf
             sarr = np.concatenate([local_arr[k] for k in leaf_ids])
             if sarr.dtype != np_dtype:
                 sarr = sarr.astype(np_dtype)
-            rarr = np.empty(sum(rsiz), sarr.dtype)
+            rarr = np.empty(sum(arr_counts), sarr.dtype)
             if self._proc_idx == root:
-                recv_buf = (rarr, (arr_counts, arr_displs),
+                recv_buf = (rarr, arr_counts, #arr_displs,
                             _get_mpi_type(rarr.dtype))
             else:
                 recv_buf = None
@@ -676,7 +671,8 @@ class DelaunayProcessMPI(object):
             # Parse out info for each leaf
             if self._proc_idx == root:
                 curr = 0
-                for i, k in enumerate(rids):
+                for i in range(tot_nleaves):
+                    k = rids[2*i]
                     total_arr[k] = rarr[curr:(curr+arr_counts[i])]
                     curr += arr_counts[i]
                 assert(curr == rarr.size)
@@ -687,92 +683,146 @@ class DelaunayProcessMPI(object):
                     total_arr.update(**x)
         return total_arr
 
+    def alltoall_leaf_arrays(self, local_arr, dtype=None, return_counts=False,
+                             leaf_counts=None, array_counts=None):
+        r"""Exchange arrays between leaves.
+
+        Args:
+            local_arr (dict): Arrays to be exchanged with other leaves. Keys
+                are 2-element tuples. The first element is the leaf the array
+                came from, the second element is the leaf the array should be 
+                send to.
+
+        Returns:
+            dict: Incoming arrays where the keys are 2-element tuples as
+                described above.
+        
+        """
+        total_arr = {}
+        if self._use_buffer:
+            local_leaf_ids = local_arr.keys()
+            leaf_ids = [[] for i in range(self._num_proc)]
+            local_array_count = 0
+            for k in local_leaf_ids:
+                task = k[1] % self._num_proc
+                leaf_ids[task].append(k)
+                local_array_count += local_arr[k].size
+            # Get data type
+            if len(local_leaf_ids) == 0:
+                if dtype is None:
+                    raise Exception("Nothing being sent from this process. " +
+                                    "Cannot determine type to be recieved.")
+                np_dtype = dtype
+            else:
+                np_dtype = local_arr[local_leaf_ids[0]].dtype
+            mpi_dtype = _get_mpi_type(np_dtype)
+            # Compute things to send
+            scnt = np.array([len(x) for x in leaf_ids], 'int64')
+            nleaves_send = sum(scnt)
+            array_counts_send = np.zeros(self._num_proc, 'int64')
+            sids = np.empty(3*nleaves_send, 'int64')
+            sarr = np.empty(local_array_count, np_dtype)
+            pl = pa = 0  # Entry for previous leaf/array entry
+            for i, x in enumerate(leaf_ids):
+                for k in x:
+                    array_counts_send[i] += local_arr[k].size
+                    sids[pl:(pl+2)] = k
+                    sids[pl+2] = local_arr[k].size
+                    sarr[pa:(pa+local_arr[k].size)] = local_arr[k]
+                    pa += local_arr[k].size
+                    pl += 3
+            # Send the number of leaves on each processor
+            if leaf_counts is None:
+                rcnt = np.empty(self._num_proc, scnt.dtype)
+                self._comm.Alltoall(
+                    (scnt, _get_mpi_type(scnt.dtype)),
+                    (rcnt, 1, _get_mpi_type(rcnt.dtype)))
+            else:
+                assert(len(leaf_counts) == self._num_proc)
+                rcnt = leaf_counts
+            nleaves_recv = sum(rcnt)
+            # Send the ids of leaves for each leaf source/destination
+            rids = np.empty(3*nleaves_recv, sids.dtype)
+            send_buf = (sids, list(3*scnt),
+                        _get_mpi_type(sids.dtype))
+            recv_buf = (rids, list(3*rcnt),
+                        _get_mpi_type(rids.dtype))
+            self._comm.Alltoallv(send_buf, recv_buf)
+            # Send the size of arrays for each leaf
+            array_counts_recv = np.zeros(self._num_proc, 'int64')
+            j = 0
+            for i in range(self._num_proc):
+                for _ in range(rcnt[i]):
+                    array_counts_recv[i] += rids[3*j + 2]
+                    j += 1
+            # Send the arrays for each leaf
+            rarr = np.empty(sum(array_counts_recv), sarr.dtype)
+            send_buf = (sarr, array_counts_send,
+                        _get_mpi_type(sarr.dtype))
+            recv_buf = (rarr, array_counts_recv,
+                        _get_mpi_type(rarr.dtype))
+            self._comm.Alltoallv(send_buf, recv_buf)
+            # Parse out info for each leaf
+            curr = 0
+            for i in range(nleaves_recv):
+                src = rids[3*i]
+                dst = rids[3*i+1]
+                siz = rids[3*i+2]
+                total_arr[(src, dst)] = rarr[curr:(curr+siz)]
+                curr += siz
+            assert(curr == rarr.size)
+        else:
+            return_counts = False
+            local_leaf_ids = local_arr.keys()
+            send_data = [{} for i in range(self._num_proc)]
+            for k in local_leaf_ids:
+                task = k[1] % self._num_proc
+                send_data[task][k] = local_arr[k]
+            recv_data = self._comm.alltoall(send_data)
+            for x in recv_data:
+                total_arr.update(**x)
+        if return_counts:
+            return total_arr, rcnt, array_counts_recv
+        return total_arr
+
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
         if self._use_buffer:
-            np_int = 'int64'
-            mpi_int = MPI.LONG # Check this
-            np_float = 'float64'
-            mpi_float = MPI.DOUBLE
-            key_info = {
-                'count': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
-                'src': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
-                'dst': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
-                'nn': {'len': 'leaves', 'np': np_int, 'mpi': mpi_int},
-                'idx': {'len': 'points', 'np': np_int, 'mpi': mpi_int},
-                'pts': {'len': 'points*d', 'np': np_float, 'mpi': mpi_float},
-                'n': {'len': 'neighbors', 'np': np_int, 'mpi': mpi_int},
-                'le': {'len': 'neighbors*d', 'np': np_float, 'mpi': mpi_float},
-                're': {'len': 'neighbors*d', 'np': np_float, 'mpi': mpi_float}}
-            key_order = ['count', 'src', 'dst', 'nn',
-                         'idx', 'pts', 'n', 'le', 're']
-            tot_send = {k: [[] for i in range(self._num_proc)] for
-                        k in key_info.keys()}
-            send_count = {'leaves': np.zeros(self._num_proc, 'int64'),
-                          'points': np.zeros(self._num_proc, 'int64'),
-                          'neighbors': np.zeros(self._num_proc, 'int64')}
+            send_int = {}
+            send_flt = {}
             for leaf in self._leaves:
+                src = leaf.id
                 hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
-                for i in xrange(self._total_leaves):
-                    task = i % self._num_proc
-                    if hvall[i] is not None:
-                        send_count['leaves'][task] += 1
-                        send_count['points'][task] += hvall[i].shape[0]
-                        send_count['neighbors'][task] += len(n)
-                        tot_send['count'][task].append(hvall[i].shape[0])
-                        tot_send['src'][task].append(leaf.id)
-                        tot_send['dst'][task].append(i)
-                        tot_send['idx'][task].append(hvall[i].astype('int64'))
-                        tot_send['pts'][task].append(ptall[i].flatten())
-                        tot_send['nn'][task].append(len(n))
-                        tot_send['n'][task].append(np.array(n, 'int64'))
-                        tot_send['le'][task].append(le.flatten())
-                        tot_send['re'][task].append(re.flatten())
-            if np.sum(send_count['leaves']) == 0:
-                self._tot_recv = {}
-                for k in key_order:
-                    self._tot_recv[k] = np.empty(0, key_info[k]['np'])
-            # Ensure information is in arrays
-            for k in key_order:
-                for task in range(self._num_proc):
-                    assert(len(tot_send[k][task]) ==
-                           send_count['leaves'][task])
-                    if len(tot_send[k][task]) == 0:
-                        tot_send[k][task] = np.array([], key_info[k]['np'])
-                        continue
-                    if key_info[k]['len'] == 'leaves':
-                        tot_send[k][task] = np.array(tot_send[k][task],
-                                                     key_info[k]['np'])
-                    else:
-                        tot_send[k][task] = np.concatenate(tot_send[k][task])
-            for k in key_order:
-                tot_send[k] = np.concatenate(tot_send[k])
-            # Send total counts
-            recv_count = {}
-            for k in send_count.keys():
-                recv_count[k] = np.empty(self._num_proc, 'int64')
-                self._comm.Alltoall(send_count[k], recv_count[k])
-            # Send info about leaves
+                for dst in xrange(self._total_leaves):
+                    task = dst % self._num_proc
+                    if hvall[dst] is not None:
+                        k = (src, dst)
+                        send_int[k] = np.concatenate(
+                            [np.array([hvall[dst].shape[0]], 'int64'),
+                             hvall[dst], n]).astype('int64')
+                        send_flt[k] = np.concatenate(
+                            [ptall[dst].flatten(),
+                             le.flatten(), re.flatten()]).astype('float64')
+            out_int = self.alltoall_leaf_arrays(send_int, dtype='int64',
+                                                return_counts=True)
+            recv_int, leaf_counts, array_counts_int = out_int
+            recv_flt = self.alltoall_leaf_arrays(send_flt, dtype='float64',
+                                                 return_counts=False,
+                                                 leaf_counts=leaf_counts)
             tot_recv = {}
-            for k in key_order:
-                len_key = key_info[k]['len']
-                if len_key.endswith('*d'):
-                    len_key = len_key.rstrip('*d')
-                    len_mult = self._ndim
-                else:
-                    len_mult = 1
-                send_cnt = list(send_count[len_key]*len_mult)
-                send_dsp = [np.sum(send_cnt[:i]) for i in range(self._num_proc)]
-                send_arr = tot_send[k]
-                send_buf = (send_arr, (send_cnt, send_dsp), key_info[k]['mpi'])
-                recv_cnt = list(recv_count[len_key]*len_mult)
-                recv_dsp = [np.sum(recv_cnt[:i]) for i in range(self._num_proc)]
-                recv_arr = np.empty(sum(recv_cnt), key_info[k]['np'])
-                recv_buf = (recv_arr, (recv_cnt, recv_dsp), key_info[k]['mpi'])
-                self._comm.Alltoallv(send_buf, recv_buf)
-                tot_recv[k] = recv_arr
+            for k in recv_int.keys():
+                npts = int(recv_int[k][0])
+                ndim = self._ndim
+                nn = recv_int[k].size - (npts+1)
+                tot_recv[k] = {
+                    'idx': recv_int[k][1:(npts+1)],
+                    'n': recv_int[k][(npts+1):],
+                    'pts': recv_flt[k][:(ndim*npts)].reshape(npts, ndim),
+                    'le': recv_flt[k][
+                        (ndim*npts):(ndim*(npts+nn))].reshape(nn, ndim),
+                    're': recv_flt[k][
+                        (ndim*(npts+nn)):(ndim*(npts+2*nn))].reshape(nn, ndim)}
             self._tot_recv = tot_recv
-            del tot_send
         else:
             tot_send = [{k:{} for k in self._task2leaf[i]} for
                         i in range(self._num_proc)]
@@ -792,27 +842,12 @@ class DelaunayProcessMPI(object):
         r"""Takes points from the queue and adds them to the triangulation."""
         if self._use_buffer:
             nrecv = 0
-            nn_prev = 0
-            for i in range(len(self._tot_recv['src'])):
-                npts = self._tot_recv['count'][i]
-                src = self._tot_recv['src'][i]
-                dst = self._tot_recv['dst'][i]
-                nn = self._tot_recv['nn'][i]
-                idx = self._tot_recv['idx'][nrecv:(nrecv + npts)]
-                pts = self._tot_recv['pts'][
-                    (self._ndim*nrecv):(self._ndim*(nrecv + npts))].reshape(
-                        (-1, self._ndim))
-                n = self._tot_recv['n'][nn_prev:(nn_prev + nn)]
-                le = self._tot_recv['le'][
-                    (self._ndim*nn_prev):(self._ndim*(nn_prev + nn))].reshape(
-                        (-1, self._ndim))
-                re = self._tot_recv['re'][
-                    (self._ndim*nn_prev):(self._ndim*(nn_prev + nn))].reshape(
-                        (-1, self._ndim))
+            for k, v in self._tot_recv.items():
+                src, dst = k
                 leaf = self.get_leaf(dst)
-                leaf.incoming_points(src, idx, n, le, re, pts)
-                nrecv += npts
-                nn_prev += nn
+                leaf.incoming_points(src, v['idx'], v['n'], 
+                                     v['le'], v['re'], v['pts'])
+                nrecv += v['idx'].size
             del self._tot_recv
         else:
             nrecv = 0
@@ -873,22 +908,6 @@ class DelaunayProcessMPI(object):
                         serial[iid] = s
                 serial2 = serial
         if self._proc_idx == 0:
-            # for i in range(self._total_leaves):
-            #     s1 = serial1[i]
-            #     s2 = serial2[i]
-            #     assert(len(s1) == len(s2))
-            #     for j in range(len(s1)):
-            #         x1 = s1[j]
-            #         x2 = s2[j]
-            #         if isinstance(x1, np.ndarray):
-            #             assert(np.all(x1 == x2))
-            #         else:
-            #             assert(x1 == x2)
-            # print self._use_buffer, serial[0][0]
-            # pstr = '{}: {}, {}, {}, {}, {}, {}'.format(
-            #     self._use_buffer, s[0].dtype, s[1].dtype, type(s[2]), s[3].dtype,
-            #     s[4].dtype, type(s[5]))
-            # print pstr
             T = consolidate_tess(self._tree, serial, self._pts,
                                  use_double=self._use_double,
                                  unique_str=self._unique_str)
