@@ -628,42 +628,43 @@ class DelaunayProcessMPI(object):
             leaf_ids = local_arr.keys()
             np_dtype = local_arr[leaf_ids[0]].dtype
             mpi_dtype = _get_mpi_type(np_dtype)
-            # Send the number of leaves on each processor
+            # Prepare things to send
             scnt = np.array([len(leaf_ids)], 'int64')
+            sids = np.empty(2*len(leaf_ids), 'int64')
+            for i, k in enumerate(leaf_ids):
+                sids[2*i] = k
+                sids[2*i+1] = local_arr[k].size
+            sarr = np.concatenate([local_arr[k] for k in leaf_ids])
+            if sarr.dtype != np_dtype:
+                sarr = sarr.astype(np_dtype)
+            # Send the number of leaves on each processor
             if self._proc_idx == root:
                 rcnt = np.empty(self._num_proc, scnt.dtype)
             else:
                 rcnt = np.array([], scnt.dtype)
             self._comm.Gather((scnt, _get_mpi_type(scnt.dtype)),
                               (rcnt, _get_mpi_type(rcnt.dtype)), root)
-            tot_nleaves = sum(rcnt)
-            leaf_counts = list(rcnt)
-            leaf_displs = [sum(rcnt[:i]) for i in range(tot_nleaves)]
+            tot_nleaves = rcnt.sum()
             # Send the ids and sizes of leaves
-            sids = np.empty(2*len(leaf_ids), 'int64')
-            for i,k in enumerate(leaf_ids):
-                sids[2*i] = k
-                sids[2*i+1] = local_arr[k].size
             rids = np.empty(2*tot_nleaves, sids.dtype)
             if self._proc_idx == root:
-                recv_buf = (rids, list(2*np.array(leaf_counts)),
-                            # list(2*np.array(leaf_displs)),
-                            _get_mpi_type(rids.dtype))
+                recv_buf = (rids, 2*rcnt, _get_mpi_type(rids.dtype))
             else:
                 recv_buf = None
             self._comm.Gatherv((sids, _get_mpi_type(sids.dtype)),
                                recv_buf, root)
-            arr_counts = [rids[2*i+1] for i in range(tot_nleaves)]
-            arr_displs = [sum(arr_counts[:i]) for i in range(tot_nleaves)]
-            arr_count_tot = sum(arr_counts)
-            # Send the arrays for each leaf
-            sarr = np.concatenate([local_arr[k] for k in leaf_ids])
-            if sarr.dtype != np_dtype:
-                sarr = sarr.astype(np_dtype)
-            rarr = np.empty(sum(arr_counts), sarr.dtype)
+            # Count number on each processor
+            arr_counts = np.zeros(self._num_proc, 'int')
             if self._proc_idx == root:
-                recv_buf = (rarr, arr_counts, #arr_displs,
-                            _get_mpi_type(rarr.dtype))
+                j = 1
+                for i in range(self._num_proc):
+                    for _ in range(rcnt[i]):
+                        arr_counts[i] += rids[j]
+                        j += 2
+            # Send the arrays for each leaf
+            rarr = np.empty(arr_counts.sum(), sarr.dtype)
+            if self._proc_idx == root:
+                recv_buf = (rarr, arr_counts, _get_mpi_type(rarr.dtype))
             else:
                 recv_buf = None
             self._comm.Gatherv((sarr, _get_mpi_type(sarr.dtype)),
@@ -672,9 +673,11 @@ class DelaunayProcessMPI(object):
             if self._proc_idx == root:
                 curr = 0
                 for i in range(tot_nleaves):
-                    k = rids[2*i]
-                    total_arr[k] = rarr[curr:(curr+arr_counts[i])]
-                    curr += arr_counts[i]
+                    j = 2*i
+                    k = rids[j]
+                    siz = rids[j + 1]
+                    total_arr[k] = rarr[curr:(curr+siz)]
+                    curr += siz
                 assert(curr == rarr.size)
         else:
             data = self._comm.gather(local_arr, root=root)
@@ -718,7 +721,7 @@ class DelaunayProcessMPI(object):
             mpi_dtype = _get_mpi_type(np_dtype)
             # Compute things to send
             scnt = np.array([len(x) for x in leaf_ids], 'int64')
-            nleaves_send = sum(scnt)
+            nleaves_send = scnt.sum()
             array_counts_send = np.zeros(self._num_proc, 'int64')
             sids = np.empty(3*nleaves_send, 'int64')
             sarr = np.empty(local_array_count, np_dtype)
@@ -740,12 +743,12 @@ class DelaunayProcessMPI(object):
             else:
                 assert(len(leaf_counts) == self._num_proc)
                 rcnt = leaf_counts
-            nleaves_recv = sum(rcnt)
+            nleaves_recv = rcnt.sum()
             # Send the ids of leaves for each leaf source/destination
             rids = np.empty(3*nleaves_recv, sids.dtype)
-            send_buf = (sids, list(3*scnt),
+            send_buf = (sids, 3*scnt,
                         _get_mpi_type(sids.dtype))
-            recv_buf = (rids, list(3*rcnt),
+            recv_buf = (rids, 3*rcnt,
                         _get_mpi_type(rids.dtype))
             self._comm.Alltoallv(send_buf, recv_buf)
             # Send the size of arrays for each leaf
@@ -756,11 +759,9 @@ class DelaunayProcessMPI(object):
                     array_counts_recv[i] += rids[3*j + 2]
                     j += 1
             # Send the arrays for each leaf
-            rarr = np.empty(sum(array_counts_recv), sarr.dtype)
-            send_buf = (sarr, array_counts_send,
-                        _get_mpi_type(sarr.dtype))
-            recv_buf = (rarr, array_counts_recv,
-                        _get_mpi_type(rarr.dtype))
+            rarr = np.empty(array_counts_recv.sum(), sarr.dtype)
+            send_buf = (sarr, array_counts_send, _get_mpi_type(sarr.dtype))
+            recv_buf = (rarr, array_counts_recv, _get_mpi_type(rarr.dtype))
             self._comm.Alltoallv(send_buf, recv_buf)
             # Parse out info for each leaf
             curr = 0
