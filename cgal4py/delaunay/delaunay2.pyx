@@ -1238,7 +1238,7 @@ cdef class Delaunay2:
         r"""Create a triangulation from serialized information.
 
         Args:
-            *args: All arguments are passed to :meth:`cgal4py.delaunay.Delaunay2.deserialize`.
+            See :meth:`cgal4py.delaunay.Delaunay2.deserialize`.
 
         Returns:
             :class:`cgal4py.delaunay.Delaunay2`: Triangulation constructed from 
@@ -1249,6 +1249,22 @@ cdef class Delaunay2:
         T.deserialize(*args)
         return T
 
+    @classmethod
+    def from_serial_buffer(cls, *args, **kwargs):
+        r"""Create a triangulation from serialized information in a buffer.
+
+        Args:
+            See :meth:`cgal4py.delaunay.Delaunay2.deserialize_from_buffer`.
+
+        Returns:
+            :class:`cgal4py.delaunay.Delaunay2`: Triangulation constructed from 
+                deserialized information.
+
+        """
+        T = cls()
+        T.deserialize_from_buffer(*args, **kwargs)
+        return T
+
     def serialize_to_buffer(self, buf, pos=None):
         r"""Write serialized triangulation to a buffer.
 
@@ -1256,7 +1272,7 @@ cdef class Delaunay2:
             buf (file): File buffer.
             pos (np.ndarray, optional): Positions to be written. If not
                 provided, positions are not included and must be provided
-                during any subsequent read.
+                during any subsequent read. Defaults to None.
 
         """
         cdef np.ndarray[np_info_t, ndim=2] cells
@@ -1276,6 +1292,43 @@ cdef class Delaunay2:
         buf.write(struct.pack(2*ifmt, cells.shape[0], cells.shape[1]))
         buf.write(cells.tobytes())
         buf.write(neighbors.tobytes())
+
+    def deserialize_from_buffer(self, buf, pos=None):
+        r"""Read a serialized triangulation from the buffer.
+
+        Args:
+            buf (file): File buffer.
+            pos (np.ndarray, optional): Positions to be used for deserializing
+                the triangulation if the positions are not in the file. If
+                not provided, the file is assumed to contain the positions.
+                Defaults to None.
+
+       """
+        cdef int ndim = 2
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef info_t idx_inf
+        cdef str ifmt, ffmt
+        cdef int isiz, fsiz
+        cdef int nx, ny
+        (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        fsiz = struct.calcsize(ffmt)
+        isiz = struct.calcsize(ifmt)
+        (idx_inf,) = struct.unpack(ifmt, buf.read(isiz))
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == ndim)
+        pos = np.frombuffer(
+            bytearray(buf.read(nx*ny*fsiz)), dtype=np.dtype(ffmt),
+            count=nx*ny).reshape(nx, ny)
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == (ndim+1))
+        cells = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        neigh = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        self.deserialize(pos, cells, neigh, idx_inf)
 
     def _lock(self):
         self._locked = True

@@ -11,6 +11,8 @@ import importlib
 import tools
 import os
 import pyximport
+import delaunay2
+import delaunay3
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
@@ -185,6 +187,7 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
     if bit64:
         bitstr = '_64bit'
     if ftype == 'ext':
+        relpath = True
         fname = "{}delaunay{}{}".format(perstr, ver, bitstr)
     elif ftype == 'pyx':
         relpath = True
@@ -448,7 +451,7 @@ def VoronoiVolumes(pts, *args, **kwargs):
     return T.voronoi_volumes()
 
 
-__all__ = ["tools", "Delaunay", "VoronoiVolumes",
+__all__ = ["tools", "Delaunay", "VoronoiVolumes", "delaunay2", "delaunay3",
            "Delaunay2", "Delaunay3"]
 if is_valid_P2():
     __all__.append("PeriodicDelaunay2")

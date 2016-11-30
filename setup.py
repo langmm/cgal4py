@@ -12,9 +12,6 @@ except ImportError:
 else:
     use_cython = True
 
-# Versions of Delaunay triangulation that ahve been wrapped
-delaunay_ver = ['2','3']
-
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
 # RTDFLAG = True
@@ -46,8 +43,35 @@ else:
     ext_options_cgal['libraries'] = ['gmp','CGAL']
     ext_options_cgal['extra_link_args'] = ["-lgmp"]
 
+
+def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
+    _delaunay_dir = 'cgal4py/delaunay'
+    ver = str(dim)
+    perstr = '' ; bitstr = ''
+    relpath = True
+    if periodic:
+        perstr = 'periodic_'
+    if bit64:
+        bitstr = '_64bit'
+    if ftype == 'ext':
+        fname = "cgal4py.delaunay.{}delaunay{}{}".format(perstr, ver, bitstr)
+        relpath = False
+    elif ftype == 'pyx':
+        fname = "{}delaunay{}{}.pyx".format(perstr, ver, bitstr)
+    elif ftype == 'pxd':
+        fname = "{}delaunay{}{}.pxd".format(perstr, ver, bitstr)
+    elif ftype == 'cpp':
+        fname = "c_{}delaunay{}{}.cpp".format(perstr, ver, bitstr)
+    elif ftype == 'hpp':
+        fname = "c_{}delaunay{}{}.hpp".format(perstr, ver, bitstr)
+    else:
+        raise ValueError("Unsupported file type {}.".format(ftype))
+    if relpath:
+        fname = os.path.join(_delaunay_dir, fname)
+    return fname
+
+
 # Add Delaunay cython extensions
-from cgal4py.delaunay import _delaunay_filename
 def add_delaunay(ext_modules, ver, periodic=False, bit64=False):
     ver = int(ver)
     ext_name = _delaunay_filename('ext', ver, periodic=periodic, bit64=bit64)
@@ -59,48 +83,36 @@ def add_delaunay(ext_modules, ver, periodic=False, bit64=False):
     if not os.path.isfile(cpp_file):
         open(cpp_file,'a').close()
         assert(os.path.isfile(cpp_file))
-    if use_cython:
-        ext_modules += cythonize(Extension(ext_name,sources=[pyx_file,cpp_file],
-                                           **ext_options_cgal))
-    else:
-        ext_modules.append(Extension(ext_name,[cpp_file],**ext_options_cgal))
-                                     # include_dirs=[numpy.get_include()]))
+    ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file],
+                                 **ext_options_cgal))
 
 # Add extensions
 cmdclass = { }
 ext_modules = [ ]
 
-for ver in delaunay_ver:
+# Add delaunay extensions
+for ver in [2, 3]:
     add_delaunay(ext_modules, ver)
     add_delaunay(ext_modules, ver, periodic=True)
 
 # Add other packages
-if use_cython:
-    ext_modules += cythonize(Extension(
-        "cgal4py/delaunay/tools",
-        sources=["cgal4py/delaunay/tools.pyx"],
-        **ext_options))
-    ext_modules += cythonize(Extension(
-        "cgal4py/domain_decomp/kdtree",
-        sources=["cgal4py/domain_decomp/kdtree.pyx",
-                 "cgal4py/domain_decomp/c_kdtree.cpp","cgal4py/c_utils.cpp"],
-        **ext_options))
-    ext_modules += cythonize(Extension(
-        "cgal4py/utils",
-        sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
-        **ext_options))
-    cmdclass.update({ 'build_ext': build_ext })
-else:
-    ext_modules += [
-        Extension("cgal4py.delaunay.tools",
-                  ["cgal4py/delaunay/c_tools.cpp"],
-                  include_dirs=[numpy.get_include()]),
-        Extension("cgal4py.domain_decomp.kdtree",
-                  ["cgal4py/domain_decomp/c_kdtree.cpp"],
-                  include_dirs=[numpy.get_include()]),
-        Extension("cgal4py.utils", ["cgal4py/c_utils.cpp"],
-                  include_dirs=[numpy.get_include()]),
+ext_modules += [
+    Extension("cgal4py.delaunay.tools",
+              sources=["cgal4py/delaunay/tools.pyx"],
+              **ext_options),
+    Extension("cgal4py.domain_decomp.kdtree",
+              sources=["cgal4py/domain_decomp/kdtree.pyx",
+                       "cgal4py/domain_decomp/c_kdtree.cpp",
+                       "cgal4py/c_utils.cpp"],
+              **ext_options),
+    Extension("cgal4py.utils",
+              sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
+              **ext_options)
     ]
+
+
+if use_cython:
+    ext_modules = cythonize(ext_modules)
 
 setup(name = 'cgal4py',
       version = '0.1',
@@ -109,7 +121,7 @@ setup(name = 'cgal4py',
       author = 'Meagan Lang',
       author_email = 'langmm.astro@gmail.com',
       license = 'GPL',
-      packages = ['cgal4py'],
+      packages = ['cgal4py', 'cgal4py.delaunay'],
       zip_safe = False,
       cmdclass = cmdclass,
       ext_modules = ext_modules)

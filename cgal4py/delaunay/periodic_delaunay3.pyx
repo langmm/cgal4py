@@ -8,6 +8,7 @@ import cython
 
 import numpy as np
 cimport numpy as np
+import struct
 
 from cgal4py import plot
 from cgal4py.delaunay.tools cimport sortSerializedTess
@@ -1973,7 +1974,7 @@ cdef class PeriodicDelaunay3:
         return <pybool>(out)
 
     @classmethod
-    def from_serial(*args):
+    def from_serial(cls, *args):
         r"""Create a triangulation from serialized information. 
 
         Args: 
@@ -1985,9 +1986,90 @@ cdef class PeriodicDelaunay3:
                 constructed from deserialized information. 
 
         """
-        T = PeriodicDelaunay3()
+        T = cls()
         T.deserialize(*args)
         return T
+
+    @classmethod
+    def from_serial_buffer(cls, *args, **kwargs):
+        r"""Create a triangulation from serialized information in a buffer.
+
+        Args:
+            See :meth:`cgal4py.delaunay.PeriodicDelaunay3.deserialize_from_buffer`.
+
+        Returns:
+            :class:`cgal4py.delaunay.PeriodicDelaunay3`: Triangulation
+                constructed from deserialized information.
+
+        """
+        T = cls()
+        T.deserialize_from_buffer(*args, **kwargs)
+        return T
+
+    def serialize_to_buffer(self, buf, pos=None):
+        r"""Write serialized triangulation to a buffer.
+
+        Args:
+            buf (file): File buffer.
+            pos (np.ndarray, optional): Positions to be written. If not
+                provided, positions are not included and must be provided
+                during any subsequent read. Defaults to None.
+
+        """
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef info_t idx_inf
+        cells, neighbors, idx_inf = self.serialize()
+        cdef str ifmt, ffmt
+        ifmt = cells.dtype.char
+        ffmt = 'd'
+        if pos is not None:
+            ffmt = pos.dtype.char
+        buf.write(struct.pack('cc', ffmt, ifmt))
+        buf.write(struct.pack(ifmt, idx_inf))
+        if pos is not None:
+            buf.write(struct.pack(2*ifmt, pos.shape[0], pos.shape[1]))
+            buf.write(pos.tobytes())
+        buf.write(struct.pack(2*ifmt, cells.shape[0], cells.shape[1]))
+        buf.write(cells.tobytes())
+        buf.write(neighbors.tobytes())
+
+    def deserialize_from_buffer(self, buf, pos=None):
+        r"""Read a serialized triangulation from the buffer.
+
+        Args:
+            buf (file): File buffer.
+            pos (np.ndarray, optional): Positions to be used for deserializing
+                the triangulation if the positions are not in the file. If
+                not provided, the file is assumed to contain the positions.
+                Defaults to None.
+
+       """
+        cdef int ndim = 3
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef info_t idx_inf
+        cdef str ifmt, ffmt
+        cdef int isiz, fsiz
+        cdef int nx, ny
+        (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        fsiz = struct.calcsize(ffmt)
+        isiz = struct.calcsize(ifmt)
+        (idx_inf,) = struct.unpack(ifmt, buf.read(isiz))
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == ndim)
+        pos = np.frombuffer(
+            bytearray(buf.read(nx*ny*fsiz)), dtype=np.dtype(ffmt),
+            count=nx*ny).reshape(nx, ny)
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == (ndim+1))
+        cells = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        neigh = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        self.deserialize(pos, cells, neigh, idx_inf)
 
     def _lock(self):
         self._locked = True

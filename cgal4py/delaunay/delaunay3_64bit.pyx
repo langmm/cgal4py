@@ -9,6 +9,7 @@ import cython
 
 import numpy as np
 cimport numpy as np
+import struct
 
 from cgal4py import plot
 from cgal4py.delaunay.tools cimport sortSerializedTess
@@ -1742,7 +1743,7 @@ cdef class Delaunay3_64bit:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __cinit__(self):
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T = new Delaunay_with_info_3[info_t]()
         self.n = 0
         self.n_per_insert = []
@@ -1763,12 +1764,12 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_equal(dereference(solf.T))
         return <pybool>(out)
 
     @classmethod
-    def from_serial(*args):
+    def from_serial(cls, *args):
         r"""Create a triangulation from serialized information. 
 
         Args: 
@@ -1779,9 +1780,90 @@ cdef class Delaunay3_64bit:
                 deserialized information. 
 
         """
-        T = Delaunay3_64bit()
+        T = cls()
         T.deserialize(*args)
         return T
+
+    @classmethod
+    def from_serial_buffer(cls, *args, **kwargs):
+        r"""Create a triangulation from serialized information in a buffer.
+
+        Args:
+            See :meth:`cgal4py.delaunay.Delaunay3_64bit.deserialize_from_buffer`.
+
+        Returns:
+            :class:`cgal4py.delaunay.Delaunay3_64bit`: Triangulation constructed from
+                deserialized information.
+
+        """
+        T = cls()
+        T.deserialize_from_buffer(*args, **kwargs)
+        return T
+
+    def serialize_to_buffer(self, buf, pos=None):
+        r"""Write serialized triangulation to a buffer.
+
+        Args:
+            buf (file): File buffer.
+            pos (np.ndarray, optional): Positions to be written. If not
+                provided, positions are not included and must be provided
+                during any subsequent read. Defaults to None.
+
+        """
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef info_t idx_inf
+        cells, neighbors, idx_inf = self.serialize()
+        cdef str ifmt, ffmt
+        ifmt = cells.dtype.char
+        ffmt = 'd'
+        if pos is not None:
+            ffmt = pos.dtype.char
+        buf.write(struct.pack('cc', ffmt, ifmt))
+        buf.write(struct.pack(ifmt, idx_inf))
+        if pos is not None:
+            buf.write(struct.pack(2*ifmt, pos.shape[0], pos.shape[1]))
+            buf.write(pos.tobytes())
+        buf.write(struct.pack(2*ifmt, cells.shape[0], cells.shape[1]))
+        buf.write(cells.tobytes())
+        buf.write(neighbors.tobytes())
+
+    def deserialize_from_buffer(self, buf, pos=None):
+        r"""Read a serialized triangulation from the buffer.
+
+        Args:
+            buf (file): File buffer.
+            pos (np.ndarray, optional): Positions to be used for deserializing
+                the triangulation if the positions are not in the file. If
+                not provided, the file is assumed to contain the positions.
+                Defaults to None.
+
+       """
+        cdef int ndim = 3
+        cdef np.ndarray[np_info_t, ndim=2] cells
+        cdef np.ndarray[np_info_t, ndim=2] neighbors
+        cdef info_t idx_inf
+        cdef str ifmt, ffmt
+        cdef int isiz, fsiz
+        cdef int nx, ny
+        (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        fsiz = struct.calcsize(ffmt)
+        isiz = struct.calcsize(ifmt)
+        (idx_inf,) = struct.unpack(ifmt, buf.read(isiz))
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == ndim)
+        pos = np.frombuffer(
+            bytearray(buf.read(nx*ny*fsiz)), dtype=np.dtype(ffmt),
+            count=nx*ny).reshape(nx, ny)
+        nx, ny = struct.unpack(2*ifmt, buf.read(2*isiz))
+        assert(ny == (ndim+1))
+        cells = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        neigh = np.frombuffer(
+            bytearray(buf.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+            count=nx*ny).reshape(nx, ny)
+        self.deserialize(pos, cells, neigh, idx_inf)
 
     def _lock(self):
         self._locked = True
@@ -1826,7 +1908,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_valid()
         return <pybool>out
 
@@ -1839,7 +1921,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef char* cfname = fname
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.write_to_file(cfname)
 
     @_update_to_tess
@@ -1852,7 +1934,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef char* cfname = fname
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.read_from_file(cfname)
         self.n = self.T.num_finite_verts()
         self.n_per_insert.append(self.n)
@@ -1892,12 +1974,12 @@ cdef class Delaunay3_64bit:
         neighbors = np.zeros((m, d+1), np_info)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_idxinfo[info_t](
                 n, m, d, &cells[0,0], &neighbors[0,0])
         # Sort if desired
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
@@ -1917,13 +1999,13 @@ cdef class Delaunay3_64bit:
         cells = np.zeros((m, d+1), 'int32')
         neighbors = np.zeros((m, d+1), 'int32')
         cdef int32_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[int32_t](
                 n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[int32_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
@@ -1943,13 +2025,13 @@ cdef class Delaunay3_64bit:
         cells = np.zeros((m, d+1), 'uint32')
         neighbors = np.zeros((m, d+1), 'uint32')
         cdef uint32_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[uint32_t](
                 n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[uint32_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
@@ -1969,13 +2051,13 @@ cdef class Delaunay3_64bit:
         cells = np.zeros((m, d+1), 'int64')
         neighbors = np.zeros((m, d+1), 'int64')
         cdef int64_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[int64_t](
                 n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[int64_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
@@ -1995,13 +2077,13 @@ cdef class Delaunay3_64bit:
         cells = np.zeros((m, d+1), 'uint64')
         neighbors = np.zeros((m, d+1), 'uint64')
         cdef uint64_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[uint64_t](
                 n, m, d, &cells[0,0], &neighbors[0,0], max_info, &idx[0])
         cells.resize(m, d+1, refcheck=False)
         neighbors.resize(m, d+1, refcheck=False)
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[uint64_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return cells, neighbors, idx_inf
 
@@ -2064,7 +2146,7 @@ cdef class Delaunay3_64bit:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.deserialize_idxinfo[info_t](n, m, d, &pos[0,0], 
                                                &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
@@ -2096,7 +2178,7 @@ cdef class Delaunay3_64bit:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.deserialize[info_t](n, m, d, &pos[0,0], &info[0],
                                        &cells[0,0], &neighbors[0,0], idx_inf)
         self.n = n
@@ -2187,7 +2269,7 @@ cdef class Delaunay3_64bit:
         assert(m == 3)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
@@ -2198,7 +2280,7 @@ cdef class Delaunay3_64bit:
     @_update_to_tess
     def clear(self):
         r"""Removes all vertices and cells from the triangulation."""
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.clear()
 
     @_dependent_property
@@ -2210,7 +2292,7 @@ cdef class Delaunay3_64bit:
         out = np.zeros([self.n, 3], 'float64')
         if self.n == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.info_ordered_vertices(&out[0,0])
         return out
 
@@ -2223,7 +2305,7 @@ cdef class Delaunay3_64bit:
         out = np.zeros([self.num_finite_edges, 2], np_info)
         if out.shape[0] == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.edge_info(&out[0,0])
         return out
 
@@ -2237,7 +2319,7 @@ cdef class Delaunay3_64bit:
         out = np.empty(self.num_finite_verts, 'float64')
         if self.n == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.dual_volumes(&out[0])
         return out
 
@@ -2249,7 +2331,7 @@ cdef class Delaunay3_64bit:
             x (Delaunay3_64bit_vertex): Vertex that should be removed. 
 
         """
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.remove(x.x)
 
     @_update_to_tess
@@ -2271,7 +2353,7 @@ cdef class Delaunay3_64bit:
         """
         assert(len(pos) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.move(x.x, &pos[0])
         cdef Delaunay3_64bit_vertex out = Delaunay3_64bit_vertex()
         out.assign(self.T, v)
@@ -2297,7 +2379,7 @@ cdef class Delaunay3_64bit:
         """
         assert(len(pos) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.move_if_no_collision(x.x, &pos[0])
         cdef Delaunay3_64bit_vertex out = Delaunay3_64bit_vertex()
         out.assign(self.T, v)
@@ -2318,7 +2400,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.flip(x.x, i)
         return <pybool>out
 
@@ -2332,7 +2414,7 @@ cdef class Delaunay3_64bit:
             i (int): Integer specifying neighbor that is also incident to the 
                 cell that should be flipped.
         """
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.flip_flippable(x.x, i)
 
     def get_vertex(self, np_info_t index):
@@ -2347,7 +2429,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef Delaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.get_vertex(index)
         cdef Delaunay3_64bit_vertex out = Delaunay3_64bit_vertex()
         out.assign(self.T, v)
@@ -2502,7 +2584,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
         return <pybool>out
 
@@ -2529,7 +2611,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
         return <pybool>out
 
@@ -2560,7 +2642,7 @@ cdef class Delaunay3_64bit:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_cell(v1.x, v2.x, v3.x, v4.x,
                                  c.x, i1, i2, i3, i4)
         return <pybool>out
@@ -2579,7 +2661,7 @@ cdef class Delaunay3_64bit:
         """
         assert(len(x) == 3)
         cdef Delaunay_with_info_3[info_t].Vertex vc
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             vc = self.T.nearest_vertex(&x[0])
         cdef Delaunay3_64bit_vertex v = Delaunay3_64bit_vertex()
         v.assign(self.T, vc)
@@ -2645,7 +2727,7 @@ cdef class Delaunay3_64bit:
         assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef np.uint32_t i
@@ -2673,7 +2755,7 @@ cdef class Delaunay3_64bit:
         assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_cells = []
         cdef np.uint32_t i
@@ -2703,7 +2785,7 @@ cdef class Delaunay3_64bit:
         assert(len(pos) == 3)
         cdef pair[vector[Delaunay_with_info_3[info_t].Cell],
                   vector[Delaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef object out_cells = []
@@ -2742,7 +2824,7 @@ cdef class Delaunay3_64bit:
         cdef uint64_t nbox = <uint64_t>left_edges.shape[0]
         cdef vector[vector[info_t]] vout
         if (nbox > 0):
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 vout = self.T.outgoing_points(nbox,
                                               &left_edges[0,0],
                                               &right_edges[0,0])
@@ -2787,7 +2869,7 @@ cdef class Delaunay3_64bit:
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
         cdef cbool cperiodic = <cbool>periodic
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.boundary_points(&left_edge[0], &right_edge[0], cperiodic,
                                    lx, ly, lz, rx, ry, lz, alln)
         # Get counts to preallocate 

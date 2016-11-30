@@ -19,14 +19,6 @@ import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
 
-_dtype2fmt = {
-    np.dtype('int32'): 'i',
-    np.dtype('uint32'): 'I',
-    np.dtype('int64'): 'l',
-    np.dtype('uint64'): 'L',
-    np.dtype('float32'): 'f',
-    np.dtype('float64'): 'd'
-    }
 
 def _get_mpi_type(np_type):
     r"""Get the correpsonding MPI data type for a given numpy data type.
@@ -319,24 +311,7 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
         # T = _get_Delaunay(ndim=ndim)()
         # T.read_from_file(ftess)
         with open(ftess, 'rb') as fd:
-            (ffmt, ifmt) = struct.unpack('cc', fd.read(struct.calcsize('cc')))
-            fsiz = struct.calcsize(ffmt)
-            isiz = struct.calcsize(ifmt)
-            (idx_inf,) = struct.unpack(ifmt, fd.read(isiz))
-            nx, ny = struct.unpack(2*ifmt, fd.read(2*isiz))
-            assert(ny == ndim)
-            pos = np.frombuffer(
-                bytearray(fd.read(nx*ny*fsiz)), dtype=np.dtype(ffmt),
-                count=nx*ny).reshape(nx, ny)
-            nx, ny = struct.unpack(2*ifmt, fd.read(2*isiz))
-            assert(ny == (ndim+1))
-            cells = np.frombuffer(
-                bytearray(fd.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
-                count=nx*ny).reshape(nx, ny)
-            neigh = np.frombuffer(
-                bytearray(fd.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
-                count=nx*ny).reshape(nx, ny)
-        T = _get_Delaunay(ndim=ndim).from_serial(pos, cells, neigh, idx_inf)
+            T = _get_Delaunay(ndim=ndim).from_serial_buffer(fd)
         os.remove(ftess)
         return T
     else:
@@ -393,7 +368,9 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
     os.remove(fscript)
     fvols = _vols_filename(unique_str=unique_str)
     if os.path.isfile(fvols):
-        vols = np.load(fvols)
+        # vols = np.load(fvols)
+        with open(fvols, 'rb') as fd:
+            vols = np.frombuffer(bytearray(fd.read()), dtype='d')
         os.remove(fvols)
         return vols
     else:
@@ -1070,24 +1047,27 @@ class DelaunayProcessMPI(object):
                                  # limit_mem=limit_mem)
             ftess = _tess_filename(unique_str=self._unique_str)
             # T.write_to_file(ftess)
-            cells, neighbors, idx_inf = T.serialize()
-            ffmt = _dtype2fmt[self._pts.dtype]
-            ifmt = _dtype2fmt[cells.dtype]
             with open(ftess, 'wb') as fd:
-                fd.write(struct.pack('cc', ffmt, ifmt))
-                fd.write(struct.pack(ifmt, idx_inf))
-                fd.write(struct.pack(2*ifmt, *self._pts.shape))
-                fd.write(self._pts.tobytes())
-                fd.write(struct.pack(2*ifmt, *cells.shape))
-                fd.write(cells.tobytes())
-                fd.write(neighbors.tobytes())
+                T.serialize_to_buffer(fd, self._pts)
                 
 
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
         local = {leaf.id: leaf.voronoi_volumes() for leaf in self._leaves}
-        if False:#self._use_buffer:
-            pass
+        if self._use_buffer:
+            total = self.gather_leaf_arrays(local)
+            if self._proc_idx == 0:
+                # Preallocate
+                tot = 0
+                dtype = 'float64'
+                for k in total.values():
+                    tot += k.size
+                vol = np.empty(tot, dtype)
+                # Transfer values
+                tree = self._tree
+                for k in total.keys():
+                    leaf = tree.leaves[k]
+                    vol[tree.idx[leaf.start_idx:leaf.stop_idx]] = total[k]
         else:
             out = self._comm.gather(local, root=0)
             if self._proc_idx == 0:
@@ -1104,11 +1084,12 @@ class DelaunayProcessMPI(object):
                     for k in x.keys():
                         leaf = self._tree.leaves[k]
                         vol[self._tree.idx[leaf.start_idx:leaf.stop_idx]] = x[k]
-                # Save volumes
-                fvols = _vols_filename(unique_str=self._unique_str)
-                # np.save(fvols, vol)
-                with open(fvols, 'wb') as fd:
-                    fd.write(vol.tobytes())
+        if self._proc_idx == 0:
+            # Save volumes
+            fvols = _vols_filename(unique_str=self._unique_str)
+            # np.save(fvols, vol)
+            with open(fvols, 'wb') as fd:
+                fd.write(vol.tobytes())
 
 
     def run(self):

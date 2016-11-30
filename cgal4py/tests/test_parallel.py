@@ -87,91 +87,91 @@ def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False,
         {'npts':0, 'nproc':2, 'kwargs': {}},
         {'npts':1000, 'nproc':2, 'kwargs': {'nleaves': 2}},
         {'npts':4*4*2, 'nproc':4, 'kwargs': {'leafsize': 8}},
-        {'npts':1e5, 'nproc':8, 'kwargs': {'nleaves': 8}},
+        # {'npts':1e5, 'nproc':8, 'kwargs': {'nleaves': 8}},
         # {'npts':1e7, 'nproc':10, 'kwargs': {'nleaves': 10}},
     ]
     if ndim > 2:
         tests = tests[1:-1]
     for t in tests:
-        runtest(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
+        runtest(func_name, t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
                 periodic=periodic, profile=profile, **t['kwargs'])
     if use_mpi:
         for t in tests:
-            runtest(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
+            runtest(func_name, t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
                     use_buffer=True, periodic=periodic, profile=profile,
                     **t['kwargs'])
 
 
-# def test_ParallelLeaf_2D():
-#     pts, tree = make_test(0, 2)
-#     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-#     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-#     out = []
-#     pleaves = []
-#     for i, leaf in enumerate(tree.leaves):
-#         assert(leaf.id == i)
-#         pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
-#         pleaf.tessellate(pts2)
-#         pleaves.append(pleaf)
-#         out.append(pleaf.outgoing_points())
-#     pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
-#                                out[1][3], pts[out[1][0][0], :])
-#     pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
-#                                out[0][3], pts[out[0][0][0], :])
+def test_ParallelLeaf_2D():
+    pts, tree = make_test(0, 2)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+    out = []
+    pleaves = []
+    for i, leaf in enumerate(tree.leaves):
+        assert(leaf.id == i)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
+        pleaf.tessellate(pts2)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
+                               out[1][3], pts[out[1][0][0], :])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
+                               out[0][3], pts[out[0][0][0], :])
 
 
-# def test_ParallelLeaf_3D():
-#     pts, tree = make_test(0, 3)
-#     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-#     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-#     out = []
-#     pleaves = []
-#     for i, leaf in enumerate(tree.leaves):
-#         assert(leaf.id == i)
-#         pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
-#         pleaf.tessellate(pts)
-#         pleaves.append(pleaf)
-#         out.append(pleaf.outgoing_points())
-#     pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
-#                                out[1][3], pts[out[1][0][0], :])
-#     pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
-#                                out[0][3], pts[out[0][0][0], :])
+def test_ParallelLeaf_3D():
+    pts, tree = make_test(0, 3)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+    out = []
+    pleaves = []
+    for i, leaf in enumerate(tree.leaves):
+        assert(leaf.id == i)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
+                               out[1][3], pts[out[1][0][0], :])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
+                               out[0][3], pts[out[0][0][0], :])
 
 
-# def test_ParallelLeaf_periodic_2D():
-#     pts, tree = make_test(0, 2, periodic=True)
-#     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-#     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-#     out = []
-#     pleaves = []
-#     for i, leaf in enumerate(tree.leaves):
-#         assert(leaf.id == i)
-#         pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
-#         pleaf.tessellate(pts)
-#         pleaves.append(pleaf)
-#         out.append(pleaf.outgoing_points())
-#     pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
-#                                out[1][3], pts[out[1][0][0], :])
-#     pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
-#                                out[0][3], pts[out[0][0][0], :])
+def test_ParallelLeaf_periodic_2D():
+    pts, tree = make_test(0, 2, periodic=True)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+    out = []
+    pleaves = []
+    for i, leaf in enumerate(tree.leaves):
+        assert(leaf.id == i)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
+                               out[1][3], pts[out[1][0][0], :])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
+                               out[0][3], pts[out[0][0][0], :])
 
 
-# def test_ParallelLeaf_periodic_3D():
-#     pts, tree = make_test(0, 3, periodic=True)
-#     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-#     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-#     out = []
-#     pleaves = []
-#     for i, leaf in enumerate(tree.leaves):
-#         assert(leaf.id == i)
-#         pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
-#         pleaf.tessellate(pts)
-#         pleaves.append(pleaf)
-#         out.append(pleaf.outgoing_points())
-#     pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
-#                                out[1][3], pts[out[1][0][0], :])
-#     pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
-#                                out[0][3], pts[out[0][0][0], :])
+def test_ParallelLeaf_periodic_3D():
+    pts, tree = make_test(0, 3, periodic=True)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+    out = []
+    pleaves = []
+    for i, leaf in enumerate(tree.leaves):
+        assert(leaf.id == i)
+        pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
+        pleaf.tessellate(pts)
+        pleaves.append(pleaf)
+        out.append(pleaf.outgoing_points())
+    pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
+                               out[1][3], pts[out[1][0][0], :])
+    pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
+                               out[0][3], pts[out[0][0][0], :])
 
 
 def test_ParallelVoronoiVolumes():
@@ -187,6 +187,12 @@ def test_ParallelVoronoiVolumes():
     runtest_ParallelSeries('volumes', ndim, periodic=True)
     runtest_ParallelSeries('volumes', ndim, use_mpi=True)
     runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
+    # 4D
+    # ndim = 4
+    # runtest_ParallelSeries('volumes', ndim)
+    # runtest_ParallelSeries('volumes', ndim, periodic=True)
+    # runtest_ParallelSeries('volumes', ndim, use_mpi=True)
+    # runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
 
 
 def test_ParallelDelaunay():
