@@ -1947,7 +1947,7 @@ cdef class PeriodicDelaunay3:
         else:
             domain[:3] = left_edge
             domain[3:] = right_edge
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T = new PeriodicDelaunay_with_info_3[info_t](&domain[0])
         self.n = 0
         self.n_per_insert = []
@@ -1968,7 +1968,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_equal(dereference(solf.T))
         return <pybool>(out)
 
@@ -2035,7 +2035,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_valid()
         return <pybool>out
 
@@ -2048,7 +2048,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef char* cfname = fname
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.write_to_file(cfname)
 
     @_update_to_tess
@@ -2061,7 +2061,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef char* cfname = fname
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.read_from_file(cfname)
         self.n = self.T.num_finite_verts()
         self.n_per_insert.append(self.n)
@@ -2113,14 +2113,14 @@ cdef class PeriodicDelaunay3:
         offsets = np.zeros((m, d+1), np.int32)
         # Serialize and convert to original vertex order
         cdef info_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_idxinfo[info_t](
                 n, m, d, &domain[0], &cover[0],
                 &cells[0,0], &neighbors[0,0], &offsets[0,0])
         # Sort if desired
         # TODO: Sort offsets?
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[info_t](&cells[0,0], &neighbors[0,0], m, d+1)
         return domain, cover, cells, neighbors, offsets, idx_inf
 
@@ -2146,7 +2146,7 @@ cdef class PeriodicDelaunay3:
         neighbors = np.zeros((m, d+1), 'int32')
         offsets = np.zeros((m, d+1), 'int32')
         cdef int32_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[int32_t](
                 n, m, d, &domain[0], &cover[0],
                 &cells[0,0], &neighbors[0,0], &offsets[0,0], 
@@ -2156,7 +2156,7 @@ cdef class PeriodicDelaunay3:
         offsets.resize(m, d+1, refcheck=False)
         # TODO: sort offsets
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[int32_t](&cells[0,0], &neighbors[0,0], 
                                             m, d+1)
         return domain, cover, cells, neighbors, offsets, idx_inf
@@ -2183,7 +2183,7 @@ cdef class PeriodicDelaunay3:
         neighbors = np.zeros((m, d+1), 'uint32')
         offsets = np.zeros((m, d+1), 'int32')
         cdef uint32_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[uint32_t](
                 n, m, d, &domain[0], &cover[0],
                 &cells[0,0], &neighbors[0,0], &offsets[0,0],
@@ -2193,7 +2193,7 @@ cdef class PeriodicDelaunay3:
         offsets.resize(m, d+1, refcheck=False)
         # TODO: sort offsets
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[uint32_t](&cells[0,0], &neighbors[0,0], 
                                              m, d+1)
         return domain, cover, cells, neighbors, offsets, idx_inf
@@ -2220,7 +2220,7 @@ cdef class PeriodicDelaunay3:
         neighbors = np.zeros((m, d+1), 'int64')
         offsets = np.zeros((m, d+1), 'int32')
         cdef int64_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[int64_t](
                 n, m, d, &domain[0], &cover[0],
                 &cells[0,0], &neighbors[0,0], &offsets[0,0],
@@ -2230,7 +2230,7 @@ cdef class PeriodicDelaunay3:
         offsets.resize(m, d+1, refcheck=False)
         # TODO: sort offsets
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[int64_t](&cells[0,0], &neighbors[0,0], 
                                             m, d+1)
         return domain, cover, cells, neighbors, offsets, idx_inf
@@ -2257,7 +2257,7 @@ cdef class PeriodicDelaunay3:
         neighbors = np.zeros((m, d+1), 'uint64')
         offsets = np.zeros((m, d+1), 'int32')
         cdef uint64_t idx_inf
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             idx_inf = self.T.serialize_info2idx[uint64_t](
                 n, m, d, &domain[0], &cover[0],
                 &cells[0,0], &neighbors[0,0], &offsets[0,0],
@@ -2267,7 +2267,7 @@ cdef class PeriodicDelaunay3:
         offsets.resize(m, d+1, refcheck=False)
         # TODO: sort offsets
         if sort:
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 sortSerializedTess[uint64_t](&cells[0,0], &neighbors[0,0], 
                                              m, d+1)
         return domain, cover, cells, neighbors, offsets, idx_inf
@@ -2347,7 +2347,7 @@ cdef class PeriodicDelaunay3:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.deserialize_idxinfo[info_t](n, m, d, &domain[0], &cover[0],
                                                &pos[0,0], &cells[0,0], 
                                                &neighbors[0,0], &offsets[0,0], 
@@ -2390,7 +2390,7 @@ cdef class PeriodicDelaunay3:
         cdef int32_t d = neighbors.shape[1]-1
         if (n == 0) or (m == 0):
             return
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.deserialize[info_t](n, m, d, &domain[0], &cover[0],
                                        &pos[0,0], &info[0],
                                        &cells[0,0], &neighbors[0,0], 
@@ -2539,7 +2539,7 @@ cdef class PeriodicDelaunay3:
         assert(m == 3)
         cdef np.ndarray[np_info_t, ndim=1] idx
         idx = np.arange(Nold, Nold+Nnew).astype(np_info)
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.insert(&pts[0,0], &idx[0], <info_t>Nnew)
         self.n += Nnew
         self.n_per_insert.append(Nnew)
@@ -2547,7 +2547,7 @@ cdef class PeriodicDelaunay3:
     @_update_to_tess
     def clear(self):
         r"""Removes all vertices and cells from the triangulation."""
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.clear()
 
     @_dependent_property
@@ -2559,7 +2559,7 @@ cdef class PeriodicDelaunay3:
         out = np.zeros([self.n, 3], 'float64')
         if self.n == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.info_ordered_vertices(&out[0,0])
         return out
 
@@ -2572,7 +2572,7 @@ cdef class PeriodicDelaunay3:
         out = np.zeros([self.num_finite_edges, 2], np_info)
         if out.shape[0] == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.edge_info(&out[0,0])
         return out
 
@@ -2586,7 +2586,7 @@ cdef class PeriodicDelaunay3:
         out = np.empty(self.num_finite_verts, 'float64')
         if self.n == 0:
             return out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.dual_volumes(&out[0])
         return out
 
@@ -2598,7 +2598,7 @@ cdef class PeriodicDelaunay3:
             x (PeriodicDelaunay3_vertex): Vertex that should be removed. 
 
         """
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.remove(x.x)
 
     @_update_to_tess
@@ -2621,7 +2621,7 @@ cdef class PeriodicDelaunay3:
         """
         assert(len(pos) == 3)
         cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.move(x.x, &pos[0])
         cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
@@ -2647,7 +2647,7 @@ cdef class PeriodicDelaunay3:
         """
         assert(len(pos) == 3)
         cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.move_if_no_collision(x.x, &pos[0])
         cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
@@ -2665,7 +2665,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef PeriodicDelaunay_with_info_3[info_t].Vertex v
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             v = self.T.get_vertex(index)
         cdef PeriodicDelaunay3_vertex out = PeriodicDelaunay3_vertex()
         out.assign(self.T, v)
@@ -2828,7 +2828,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_edge(v1.x, v2.x, c.x, i1, i2)
         return <pybool>out
 
@@ -2857,7 +2857,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_facet(v1.x, v2.x, v3.x, c.x, i1, i2, i3)
         return <pybool>out
 
@@ -2888,7 +2888,7 @@ cdef class PeriodicDelaunay3:
 
         """
         cdef cbool out
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_cell(v1.x, v2.x, v3.x, v4.x,
                                  c.x, i1, i2, i3, i4)
         return <pybool>out
@@ -2907,7 +2907,7 @@ cdef class PeriodicDelaunay3:
         """
         assert(len(x) == 3)
         cdef PeriodicDelaunay_with_info_3[info_t].Vertex vc
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             vc = self.T.nearest_vertex(&x[0])
         cdef PeriodicDelaunay3_vertex v = PeriodicDelaunay3_vertex()
         v.assign(self.T, vc)
@@ -2973,7 +2973,7 @@ cdef class PeriodicDelaunay3:
         assert(len(pos) == 3)
         cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
                   vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef np.uint32_t i
@@ -3001,7 +3001,7 @@ cdef class PeriodicDelaunay3:
         assert(len(pos) == 3)
         cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
                   vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_cells = []
         cdef np.uint32_t i
@@ -3032,7 +3032,7 @@ cdef class PeriodicDelaunay3:
         assert(len(pos) == 3)
         cdef pair[vector[PeriodicDelaunay_with_info_3[info_t].Cell],
                   vector[PeriodicDelaunay_with_info_3[info_t].Facet]] cv
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             cv = self.T.find_conflicts(&pos[0], start.x)
         cdef object out_facets = []
         cdef object out_cells = []
@@ -3071,7 +3071,7 @@ cdef class PeriodicDelaunay3:
         cdef uint64_t nbox = <uint64_t>left_edges.shape[0]
         cdef vector[vector[info_t]] vout
         if (nbox > 0):
-            with nogil:
+            with nogil, cython.boundscheck(False), cython.wraparound(False):
                 vout = self.T.outgoing_points(nbox,
                                               &left_edges[0,0],
                                               &right_edges[0,0])
@@ -3116,7 +3116,7 @@ cdef class PeriodicDelaunay3:
         cdef int i, j, k
         cdef vector[info_t] lr, lx, ly, lz, rx, ry, rz, alln
         cdef cbool cperiodic = <cbool>periodic
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.boundary_points(&left_edge[0], &right_edge[0], cperiodic,
                                    lx, ly, lz, rx, ry, lz, alln)
         # Get counts to preallocate 

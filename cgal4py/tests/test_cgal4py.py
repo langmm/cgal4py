@@ -1,5 +1,9 @@
 r"""Tests for package level methods."""
 import numpy as np
+from datetime import datetime
+import cProfile
+import pstats
+import time
 from nose.tools import assert_raises, nottest
 from cgal4py import triangulate, voronoi_volumes, domain_decomp
 from test_delaunay2 import pts as pts2
@@ -59,6 +63,48 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
                               periodic=periodic, leafsize=leafsize,
                               nleaves=nleaves)
     return pts, tree
+
+
+@nottest
+def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
+             profile=False, use_mpi=False, use_buffer=False, **kwargs):
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    pts, left_edge, right_edge = make_points(npts, ndim, distrib=distrib)
+    if func_name.lower() in ['tess', 'delaunay', 'triangulate']:
+        func = triangulate
+    elif func_name.lower() in ['vols', 'volumes', 'voronoivolumes']:
+        func = voronoi_volumes
+    else:
+        raise ValueError("Unsupported function: {}".format(func_name))
+    # Set keywords for multiprocessing version
+    if nproc > 1:
+        kwargs['use_mpi'] = use_mpi
+        if use_mpi:
+            kwargs['use_buffer'] = use_buffer
+            if profile:
+                kwargs['profile'] = '{}_mpi_profile.dat'.format(unique_str)
+    # Run
+    if profile:
+        pr = cProfile.Profile()
+        t0 = time.time()
+        pr.enable()
+    out = func(pts, left_edge=left_edge, right_edge=right_edge,
+               nproc=nproc, **kwargs)
+    if profile:
+        pr.disable()
+        t1 = time.time()
+        ps = pstats.Stats(pr)
+        if kwargs.get('use_mpi', False):
+            ps.add(kwargs['profile'])
+        if isinstance(profile, str):
+            ps.dump_stats(profile)
+            print("Stats saved to {}".format(profile))
+        else:
+            sort_key = 'tottime'
+            ps.sort_stats(sort_key).print_stats(25)
+            # ps.sort_stats(sort_key).print_callers(5)
+            print("{} s according to 'time'".format(t1-t0))
+        return ps
 
 
 def test_triangulate():

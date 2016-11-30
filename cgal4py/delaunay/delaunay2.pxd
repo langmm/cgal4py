@@ -197,8 +197,3 @@ cdef extern from "c_delaunay2.hpp":
                              vector[Info]& rx, vector[Info]& ry,
                              vector[Info]& alln) const
 
-# cdef class Delaunay2:
-#     cdef int n
-#     cdef void *_T
-#     # cdef Delaunay_with_info_2[info_t] *T
-#     cdef void _insert(self, np.ndarray[double, ndim=2, mode="c"] pts)

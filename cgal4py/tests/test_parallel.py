@@ -19,12 +19,13 @@ def lines_load_test(npts, ndim, periodic=False):
 
 @nottest
 def runtest_ParallelVoronoiVolumes(npts, ndim, nproc, use_mpi=False,
-                                   use_buffer=False, **kwargs):
+                                   use_buffer=False, profile=False, **kwargs):
     pts, tree = make_test(npts, ndim, **kwargs)
     v_seri = delaunay.VoronoiVolumes(pts)
     if use_mpi:
         v_para = parallel.ParallelVoronoiVolumesMPI(
-            lines_load_test(npts, ndim), ndim, nproc, use_buffer=use_buffer)
+            lines_load_test(npts, ndim), ndim, nproc, use_buffer=use_buffer,
+            profile=profile)
     else:
         v_para = parallel.ParallelVoronoiVolumes(pts, tree, nproc)
     assert(np.allclose(v_seri, v_para))
@@ -32,14 +33,15 @@ def runtest_ParallelVoronoiVolumes(npts, ndim, nproc, use_mpi=False,
 
 @nottest
 def runtest_ParallelDelaunay(npts, ndim, nproc, use_mpi=False,
-                             use_buffer=False, **kwargs):
+                             use_buffer=False, profile=False, **kwargs):
     pts, tree = make_test(npts, ndim, **kwargs)
     T_seri = delaunay.Delaunay(pts)
     try:
         if use_mpi:
             T_para = parallel.ParallelDelaunayMPI(lines_load_test(npts, ndim),
                                                   ndim, nproc,
-                                                  use_buffer=use_buffer)
+                                                  use_buffer=use_buffer,
+                                                  profile=profile)
         else:
             T_para = parallel.ParallelDelaunay(pts, tree, nproc)
     except:
@@ -68,7 +70,19 @@ def runtest_ParallelDelaunay(npts, ndim, nproc, use_mpi=False,
 
 
 @nottest
-def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False):
+def runtest(func_name, *args, **kwargs):
+    if func_name in ['delaunay', 'Delaunay', 'triangulate']:
+        func = runtest_ParallelDelaunay
+    elif func_name in ['volumes','VoronoiVolumes']:
+        func = runtest_ParallelVoronoiVolumes
+    else:
+        raise ValueError("Unrecognized test function: {}".format(func_name))
+    return func(*args, **kwargs)
+
+
+@nottest
+def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False,
+                           profile=False):
     tests = [
         {'npts':0, 'nproc':2, 'kwargs': {}},
         {'npts':1000, 'nproc':2, 'kwargs': {'nleaves': 2}},
@@ -76,19 +90,16 @@ def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False):
         {'npts':1e5, 'nproc':8, 'kwargs': {'nleaves': 8}},
         # {'npts':1e7, 'nproc':10, 'kwargs': {'nleaves': 10}},
     ]
-    if func_name in ['volumes','VoronoiVolumes']:
-        func = runtest_ParallelVoronoiVolumes
-    elif func_name in ['delaunay', 'Delaunay', 'triangulate']:
-        func = runtest_ParallelDelaunay
-    else:
-        raise ValueError("Unrecognized test function: {}".format(func_name))
+    if ndim > 2:
+        tests = tests[1:-1]
     for t in tests:
-        func(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
-             periodic=periodic, **t['kwargs'])
+        runtest(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
+                periodic=periodic, profile=profile, **t['kwargs'])
     if use_mpi:
         for t in tests:
-            func(t['npts'], ndim, t['nproc'], use_mpi=use_mpi, use_buffer=True,
-                 periodic=periodic, **t['kwargs'])
+            runtest(t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
+                    use_buffer=True, periodic=periodic, profile=profile,
+                    **t['kwargs'])
 
 
 # def test_ParallelLeaf_2D():
@@ -163,34 +174,34 @@ def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False):
 #                                out[0][3], pts[out[0][0][0], :])
 
 
-# def test_ParallelVoronoiVolumes():
-#     # 2D
-#     ndim = 2
-#     runtest_ParallelSeries('volumes', ndim)
-#     runtest_ParallelSeries('volumes', ndim, periodic=True)
-#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True)
-#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
-#     # 3D
-#     ndim = 3
-#     runtest_ParallelSeries('volumes', ndim)
-#     runtest_ParallelSeries('volumes', ndim, periodic=True)
-#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True)
-#     # runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
+def test_ParallelVoronoiVolumes():
+    # 2D
+    ndim = 2
+    runtest_ParallelSeries('volumes', ndim)
+    runtest_ParallelSeries('volumes', ndim, periodic=True)
+    runtest_ParallelSeries('volumes', ndim, use_mpi=True)
+    runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
+    # 3D
+    ndim = 3
+    runtest_ParallelSeries('volumes', ndim)
+    runtest_ParallelSeries('volumes', ndim, periodic=True)
+    runtest_ParallelSeries('volumes', ndim, use_mpi=True)
+    runtest_ParallelSeries('volumes', ndim, use_mpi=True, periodic=True)
 
 
 def test_ParallelDelaunay():
     # 2D
     ndim = 2
-    # runtest_ParallelSeries('delaunay', ndim)
-    # runtest_ParallelSeries('delaunay', ndim, periodic=True)
+    runtest_ParallelSeries('delaunay', ndim)
+    runtest_ParallelSeries('delaunay', ndim, periodic=True)
     runtest_ParallelSeries('delaunay', ndim, use_mpi=True)
-    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
+    runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
     # 3D
-    # ndim = 3
-    # runtest_ParallelSeries('delaunay', ndim)
-    # runtest_ParallelSeries('delaunay', ndim, periodic=True)
-    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True)
-    # runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
+    ndim = 3
+    runtest_ParallelSeries('delaunay', ndim)
+    runtest_ParallelSeries('delaunay', ndim, periodic=True)
+    runtest_ParallelSeries('delaunay', ndim, use_mpi=True)
+    runtest_ParallelSeries('delaunay', ndim, use_mpi=True, periodic=True)
 
 
 # def test_DelaunayProcess2():

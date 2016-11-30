@@ -12,10 +12,21 @@ import os
 import time
 import copy
 import struct
+import pstats
+import cPickle
 from datetime import datetime
 import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
+
+_dtype2fmt = {
+    np.dtype('int32'): 'i',
+    np.dtype('uint32'): 'I',
+    np.dtype('int64'): 'l',
+    np.dtype('uint64'): 'L',
+    np.dtype('float32'): 'f',
+    np.dtype('float64'): 'd'
+    }
 
 def _get_mpi_type(np_type):
     r"""Get the correpsonding MPI data type for a given numpy data type.
@@ -43,25 +54,34 @@ def _get_mpi_type(np_type):
         raise ValueError("Unrecognized type: {}".format(np_type))
     return mpi_type
 
-def _tess_filename(unique_str=None):
+
+def _generate_filename(name, unique_str=None, ext='.dat'):
+    fname = '{}{}'.format(name, ext)
     if isinstance(unique_str, str):
-        fname = '{}_tess.dat'.format(unique_str)
-    else:
-        print type(unique_str)
-        fname = 'tess.dat'
+        fname = '{}_{}'.format(unique_str, fname)
     return fname
+
+
+def _prof_filename(unique_str=None):
+    return _generate_filename('prof', unique_str=unique_str, ext='.dat')
+
+
+def _tess_filename(unique_str=None):
+    return _generate_filename('tess', unique_str=unique_str, ext='.dat')
+
+
+def _vols_filename(unique_str=None):
+    return _generate_filename('vols', unique_str=unique_str, ext='.npy')
 
 
 def _leaf_tess_filename(leaf_id, unique_str=None):
-    if isinstance(unique_str, str):
-        fname = '{}_leaf{}.dat'.format(unique_str, leaf_id)
-    else:
-        fname = 'leaf{}.dat'.format(leaf_id)
-    return fname
+    return _generate_filename('leaf{}'.format(leaf_id),
+                              unique_str=unique_str, ext='.dat')
 
 
 def write_mpi_script(fname, read_func, taskname, unique_str=None,
-                     use_double=False, use_buffer=False, overwrite=False):
+                     use_double=False, use_buffer=False, overwrite=False,
+                     profile=False):
     r"""Write an MPI script for calling MPI parallelized triangulation.
 
     Args:
@@ -88,6 +108,10 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             buffers rather than pickling python objects. Defaults to False.
         overwrite (bool): If True, any existing script with the same name is
             overwritten. Defaults to False.
+        profile (bool, optional): If True, cProfile is used to profile the code
+            and output is printed to the screen. This can also be a string
+            specifying the full path to the file where the output should be
+            saved. Defaults to False.
 
     """
     if os.path.isfile(fname):
@@ -95,10 +119,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             os.remove(fname)
         else:
             return
-    if isinstance(read_func, list):
-        readcmds = True
-    else:
-        readcmds = False
+    readcmds = isinstance(read_func, list)
     lines = [
         "import numpy as np",
         "from mpi4py import MPI",
@@ -118,6 +139,11 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "unique_str = '{}'".format(unique_str),
         "",
         "if rank == 0:"]
+    if profile:
+        lines += [
+            "    import cProfile",
+            "    import pstats",
+            ""]
     if readcmds:
         lines += ["    "+l for l in read_func]
     else:
@@ -128,25 +154,199 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "    left_edge = load_dict.get('left_edge', np.min(pts, axis=0))",
         "    right_edge = load_dict.get('right_edge', np.max(pts, axis=0))",
         "    periodic = load_dict.get('periodic', False)",
-        "    tree = domain_decomp.tree('kdtree', pts, left_edge, right_edge,",
-        "                              periodic=periodic, nleaves=size)",
+        "    tree = load_dict.get('tree', None)",
+        "    if tree is None:",
+        "        tree = domain_decomp.tree('kdtree', pts, ",
+        "                                  left_edge, right_edge,",
+        "                                  periodic=periodic, nleaves=size)",
         "else:",
         "    pts = None",
         "    tree = None",
-        "",
+        ""]
+    if profile:
+        lines += [
+            "if (rank == 0):",
+            "    pr = cProfile.Profile()",
+            "    pr.enable()",
+            ""]
+    lines += [
         "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
         "                                pts, tree,",
         "                                use_double=use_double,",
         "                                use_buffer=use_buffer,",
         "                                unique_str=unique_str)",
         "p.run()"]
+    if profile:
+        lines += [
+            "",
+            "if (rank == 0):",
+            "    pr.disable()"]
+        if isinstance(profile, str):
+            lines.append(
+                "    pr.dump_stats('{}')".format(profile))
+        else:
+            lines.append(
+                "    pstats.Stats(pr).sort_stats('time').print_stats(25)")
     with open(fname, 'w') as f:
-        for l in lines:
-            f.write(l+"\n")
+        f.write("\n".join(lines))
+        # for l in lines:
+        #     f.write(l+"\n")
 
+
+def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
+    r"""Return a triangulation that is constructed in parallel.
+
+    Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional
+            coordinates.
+        tree (object): Domain decomposition tree for splitting points among the
+            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        nproc (int): Number of processors that should be used.
+        use_mpi (bool, optional): If True, `mpi4py` is used for communications.
+            Otherwise `multiprocessing` is used.
+        \*\*kwargs: Additional keywords arguments are passed to the correct
+            parallel implementation of the triangulation.
+
+    Returns:
+        :class:`cgal4py.delaunay.Delaunay2` or
+            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
+            triangulation object.
+
+    """
+    if use_mpi:
+        unique_str = datetime.today().strftime("%Y%j%H%M%S")
+        fpick = _generate_filename("dict", unique_str=unique_str)
+        out = dict(pts=pts, tree=GenericTree.from_tree(tree))
+        with open(fpick, 'wb') as fd:
+            cPickle.dump(out, fd, cPickle.HIGHEST_PROTOCOL)
+        assert(os.path.isfile(fpick))
+        read_lines = ["import cPickle",
+                      "with open('{}', 'rb') as fd:".format(fpick),
+                      "    load_dict = cPickle.load(fd)"]
+        ndim = tree.ndim
+        out = ParallelDelaunayMPI(read_lines, ndim, nproc, **kwargs)
+        os.remove(fpick)
+    else:
+        out = ParallelDelaunayMulti(pts, tree, nproc, **kwargs)
+    return out
+
+
+def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
+    r"""Return a triangulation that is constructed in parallel.
+
+    Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional
+            coordinates.
+        tree (object): Domain decomposition tree for splitting points among the
+            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        nproc (int): Number of processors that should be used.
+        use_mpi (bool, optional): If True, `mpi4py` is used for communications.
+            Otherwise `multiprocessing` is used.
+        \*\*kwargs: Additional keywords arguments are passed to the correct
+            parallel implementation of the triangulation.
+
+    Returns:
+        np.ndarray of float64: (n,) array of n voronoi volumes for the provided
+            points.
+
+    """
+    if use_mpi:
+        unique_str = datetime.today().strftime("%Y%j%H%M%S")
+        fpick = _generate_filename("dict", unique_str=unique_str)
+        out = dict(pts=pts, tree=tree)
+        with open(fpick, 'wb') as fd:
+            pickle.dump(out, fd)
+        assert(os.path.isfile(fpick))
+        read_lines = ["import pickle",
+                      "with open('{}', 'rb') as fd:".format(fpick),
+                      "    load_dict = pickle.load(fd)"]
+        ndim = tree.ndim
+        out = ParallelVoronoiVolumesMPI(read_func, ndim, nproc, **kwargs)
+        os.remove(fpick)
+    else:
+        out = ParallelVoronoiVolumesMulti(pts, tree, nproc, **kwargs)
+    return out
+
+
+def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
+                        use_buffer=False, limit_mem=False, profile=False):
+    r"""Return a triangulation that is constructed in parallel using MPI.
+
+    Args:
+        read_func (func): Function for reading in points. The function should
+            return a dictionary with 'pts' key at a minimum corresponding to
+            the 2D array of points that should be triangulated. Additional
+            optional keys include:
+                periodic (bool): True if the domain is periodic.
+                left_edge (np.ndarray of float64): Left edges of the domain.
+                right_edge (np.ndarray of float64): Right edges of the domain.
+            A list of lines resulting in the above mentioned dictionary is also
+            accepted.
+        ndim (int): Number of dimension in the domain.
+        nproc (int): Number of processors that should be used.
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
+        limit_mem (bool, optional): If False, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. If True, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to False.
+        profile (bool, optional): If True, cProfile is used to profile the code
+            and output is printed to the screen. This can also be a string
+            specifying the full path to the file where the output should be
+            saved. Defaults to False.
+
+    Returns:
+        :class:`cgal4py.delaunay.Delaunay2` or
+            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
+            triangulation object.
+
+    """
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    fscript = '{}_mpi.py'.format(unique_str)
+    write_mpi_script(fscript, read_func, 'triangulate',
+                     unique_str=unique_str, use_double=use_double,
+                     use_buffer=use_buffer, profile=profile)
+    cmd = 'mpiexec -np {} python {}'.format(nproc, fscript)
+    os.system(cmd)
+    os.remove(fscript)
+    ftess = _tess_filename(unique_str=unique_str)
+    if os.path.isfile(ftess):
+        # T = _get_Delaunay(ndim=ndim)()
+        # T.read_from_file(ftess)
+        with open(ftess, 'rb') as fd:
+            (ffmt, ifmt) = struct.unpack('cc', fd.read(struct.calcsize('cc')))
+            fsiz = struct.calcsize(ffmt)
+            isiz = struct.calcsize(ifmt)
+            (idx_inf,) = struct.unpack(ifmt, fd.read(isiz))
+            nx, ny = struct.unpack(2*ifmt, fd.read(2*isiz))
+            assert(ny == ndim)
+            pos = np.frombuffer(
+                bytearray(fd.read(nx*ny*fsiz)), dtype=np.dtype(ffmt),
+                count=nx*ny).reshape(nx, ny)
+            nx, ny = struct.unpack(2*ifmt, fd.read(2*isiz))
+            assert(ny == (ndim+1))
+            cells = np.frombuffer(
+                bytearray(fd.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+                count=nx*ny).reshape(nx, ny)
+            neigh = np.frombuffer(
+                bytearray(fd.read(nx*ny*isiz)), dtype=np.dtype(ifmt),
+                count=nx*ny).reshape(nx, ny)
+        T = _get_Delaunay(ndim=ndim).from_serial(pos, cells, neigh, idx_inf)
+        os.remove(ftess)
+        return T
+    else:
+        raise RuntimeError("The tessellation file does not exist. " +
+                           "There must have been an error while running the " +
+                           "parallel script.")
+    
 
 def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
-                              use_buffer=False, in_memory=False):
+                              use_buffer=False, limit_mem=False, profile=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
     parallel using MPI.
 
@@ -168,11 +368,59 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
             points is <=4294967295. Defaults to False.
         use_buffer (bool, optional): If True, communications are done by way of
             buffers rather than pickling python objects. Defaults to False.
-        in_memory (bool, optional): If True, the triangulation results from
+        limit_mem (bool, optional): If False, the triangulation results from
             each process are moved to local memory using `multiprocessing`
-            pipes. Otherwise, each process writes out tessellation info to
+            pipes. If True, each process writes out tessellation info to
             files which are then incrementally loaded as consolidation occurs.
-            Defaults to True.
+            Defaults to False.
+        profile (bool, optional): If True, cProfile is used to profile the code
+            and output is printed to the screen. This can also be a string
+            specifying the full path to the file where the output should be
+            saved. Defaults to False.
+
+    Returns:
+        np.ndarray of float64: (n,) array of n voronoi volumes for the provided
+            points.
+
+    """
+    unique_str = datetime.today().strftime("%Y%j%H%M%S")
+    fscript = '{}_mpi.py'.format(unique_str)
+    write_mpi_script(fscript, read_func, 'volumes',
+                     unique_str=unique_str, use_double=use_double,
+                     use_buffer=use_buffer, profile=profile)
+    cmd = 'mpiexec -np {} python {}'.format(nproc, fscript)
+    os.system(cmd)
+    os.remove(fscript)
+    fvols = _vols_filename(unique_str=unique_str)
+    if os.path.isfile(fvols):
+        vols = np.load(fvols)
+        os.remove(fvols)
+        return vols
+    else:
+        raise RuntimeError("The volumes file does not exist. " +
+                           "There must have been an error while running the " +
+                           "parallel script.")
+
+
+def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
+    r"""Return a triangulation that is constructed in parallel using the
+    `multiprocessing` package.
+
+    Args:
+        pts (np.ndarray of float64): (n,m) array of n m-dimensional
+            coordinates.
+        tree (object): Domain decomposition tree for splitting points among the
+            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+        nproc (int): Number of processors that should be used.
+        use_double (bool, optional): If True, the triangulation is forced to
+            use 64bit integers reguardless of if there are too many points for
+            32bit. Otherwise 32bit integers are used so long as the number of
+            points is <=4294967295. Defaults to False.
+        limit_mem (bool, optional): If False, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. If True, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to False.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or
@@ -180,20 +428,92 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
             triangulation object.
 
     """
+    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+    ptsArray = mp.RawArray('d', pts.size)
+    memoryview(idxArray)[:] = tree.idx
+    memoryview(ptsArray)[:] = pts
+    # Split leaves
+    task2leaves = [[] for _ in xrange(nproc)]
+    for leaf in tree.leaves:
+        task = leaf.id % nproc
+        task2leaves[task].append(leaf)
+    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+    # Create & execute processes
+    count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i', 0)]
+    lock = mp.Condition()
+    queues = [mp.Queue() for _ in xrange(nproc+1)]
+    in_pipes = [None for _ in xrange(nproc)]
+    out_pipes = [None for _ in xrange(nproc)]
+    for i in range(nproc):
+        out_pipes[i], in_pipes[i] = mp.Pipe(True)
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    fscript = '{}_mpi.py'.format(unique_str)
-    write_mpi_script(fscript, read_func, 'volumes',
-                     unique_str=unique_str, use_double=use_double,
-                     use_buffer=use_buffer)
-    os.system('mpiexec -np {} python {}'.format(nproc, fscript))
-    os.remove(fscript)
-    T = _get_Delaunay(ndim=ndim)()
-    ftess = _tess_filename(unique_str=unique_str)
-    T.read_from_file(ftess)
-    os.remove(ftess)
-    return T
+    if limit_mem:
+        processes = [DelaunayProcess(
+            'output', _, task2leaves[_], ptsArray, idxArray,
+            left_edges, right_edges, queues, lock, count, in_pipes[_],
+            unique_str=unique_str) for _ in xrange(nproc)]
+    else:
+        processes = [DelaunayProcess(
+            'triangulate', _, task2leaves[_], ptsArray, idxArray,
+            left_edges, right_edges, queues, lock, count, in_pipes[_],
+            unique_str=unique_str) for _ in xrange(nproc)]
+    for p in processes:
+        p.start()
+    # Synchronize to ensure rapid receipt of output info from leaves
+    lock.acquire()
+    lock.wait()
+    lock.release()
+    # Setup methods for recieving leaf info
+    if not limit_mem:
+        serial = [None for _ in xrange(tree.num_leaves)]
+        dt2dtype = {0: np.uint32, 1: np.uint64, 2: np.int32, 3: np.int64}
+        dummy_head = np.empty(5, 'uint64')
 
-def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
+        def recv_leaf(p):
+            out_pipes[p].recv_bytes_into(dummy_head)
+            iid, ncell, dt, idx_inf, ncell_tot = dummy_head
+            dtype = dt2dtype[dt]
+            s = [np.empty((ncell, tree.ndim+1), dtype),
+                 np.empty((ncell, tree.ndim+1), dtype),
+                 dtype(idx_inf),
+                 np.empty((ncell, tree.ndim+1), 'uint32'),
+                 np.empty(ncell, 'uint64'),
+                 ncell_tot]
+            for _ in range(2) + range(3, 5):
+                out_pipes[p].recv_bytes_into(s[_])
+            s = tuple(s)
+            assert(tree.leaves[iid].id == iid)
+            serial[iid] = s
+    else:
+        serial = [0]
+        dummy_head = np.empty(1, 'uint64')
+
+        def recv_leaf(p):
+            out_pipes[p].recv_bytes_into(dummy_head)
+            serial[0] += dummy_head[0]
+    # Recieve output from processes
+    total_count = 0
+    max_total_count = tree.num_leaves
+    proc_list = range(nproc)
+    while total_count != max_total_count:
+        for i in proc_list:
+            while out_pipes[i].poll():
+                recv_leaf(i)
+                total_count += 1
+    # for i in range(nproc):
+    #     for _ in range(len(task2leaves[i])):
+    #         recv_leaf(i)
+    # Consolidate tessellation
+    out = consolidate_tess(tree, serial, pts, use_double=use_double,
+                           unique_str=unique_str, limit_mem=limit_mem)
+    # Close queues and processes
+    for p in processes:
+        p.join()
+    return out
+
+
+def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
     parallel.
 
@@ -255,7 +575,6 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     total_count = 0
     max_total_count = tree.num_leaves
     proc_list = range(nproc)
-    t0 = time.time()
     while total_count != max_total_count:
         for i in proc_list:
             while out_pipes[i].poll():
@@ -264,182 +583,15 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_double=False):
     # for i in range(nproc):
     #     for _ in range(len(task2leaves[i])):
     #         recv_leaf(i)
-    t1 = time.time()
-    print("{}s for recieving".format(t1-t0))
     # Cleanup
     for p in processes:
         p.join()
     return vol
 
 
-def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
-                        use_buffer=False, in_memory=False):
-    r"""Return a triangulation that is constructed in parallel using MPI.
-
-    Args:
-        read_func (func): Function for reading in points. The function should
-            return a dictionary with 'pts' key at a minimum corresponding to
-            the 2D array of points that should be triangulated. Additional
-            optional keys include:
-                periodic (bool): True if the domain is periodic.
-                left_edge (np.ndarray of float64): Left edges of the domain.
-                right_edge (np.ndarray of float64): Right edges of the domain.
-            A list of lines resulting in the above mentioned dictionary is also
-            accepted.
-        ndim (int): Number of dimension in the domain.
-        nproc (int): Number of processors that should be used.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
-        use_buffer (bool, optional): If True, communications are done by way of
-            buffers rather than pickling python objects. Defaults to False.
-        in_memory (bool, optional): If True, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. Otherwise, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to True.
-
-    Returns:
-        :class:`cgal4py.delaunay.Delaunay2` or
-            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
-            triangulation object.
-
-    """
-    unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    fscript = '{}_mpi.py'.format(unique_str)
-    write_mpi_script(fscript, read_func, 'triangulate',
-                     unique_str=unique_str, use_double=use_double,
-                     use_buffer=use_buffer)
-    os.system('mpiexec -np {} python {}'.format(nproc, fscript))
-    os.remove(fscript)
-    T = _get_Delaunay(ndim=ndim)()
-    ftess = _tess_filename(unique_str=unique_str)
-    T.read_from_file(ftess)
-    if os.path.isfile(ftess):
-        os.remove(ftess)
-    return T
-    
-
-def ParallelDelaunay(pts, tree, nproc, use_double=False, in_memory=False):
-    r"""Return a triangulation that is constructed in parallel.
-
-    Args:
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional
-            coordinates.
-        tree (object): Domain decomposition tree for splitting points among the
-            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
-        nproc (int): Number of processors that should be used.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
-        in_memory (bool, optional): If True, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. Otherwise, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to True.
-
-    Returns:
-        :class:`cgal4py.delaunay.Delaunay2` or
-            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
-            triangulation object.
-
-    """
-    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-    ptsArray = mp.RawArray('d', pts.size)
-    memoryview(idxArray)[:] = tree.idx
-    memoryview(ptsArray)[:] = pts
-    # Split leaves
-    task2leaves = [[] for _ in xrange(nproc)]
-    for leaf in tree.leaves:
-        task = leaf.id % nproc
-        task2leaves[task].append(leaf)
-    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-    # Create & execute processes
-    count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i', 0)]
-    lock = mp.Condition()
-    queues = [mp.Queue() for _ in xrange(nproc+1)]
-    in_pipes = [None for _ in xrange(nproc)]
-    out_pipes = [None for _ in xrange(nproc)]
-    for i in range(nproc):
-        out_pipes[i], in_pipes[i] = mp.Pipe(True)
-    unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    if in_memory:
-        processes = [DelaunayProcess(
-            'triangulate', _, task2leaves[_], ptsArray, idxArray,
-            left_edges, right_edges, queues, lock, count, in_pipes[_],
-            unique_str=unique_str) for _ in xrange(nproc)]
-    else:
-        processes = [DelaunayProcess(
-            'output', _, task2leaves[_], ptsArray, idxArray,
-            left_edges, right_edges, queues, lock, count, in_pipes[_],
-            unique_str=unique_str) for _ in xrange(nproc)]
-    for p in processes:
-        p.start()
-    # Synchronize to ensure rapid receipt of output info from leaves
-    lock.acquire()
-    lock.wait()
-    lock.release()
-    # Setup methods for recieving leaf info
-    if in_memory:
-        serial = [None for _ in xrange(tree.num_leaves)]
-        dt2dtype = {0: np.uint32, 1: np.uint64, 2: np.int32, 3: np.int64}
-        dummy_head = np.empty(5, 'uint64')
-
-        def recv_leaf(p):
-            out_pipes[p].recv_bytes_into(dummy_head)
-            iid, ncell, dt, idx_inf, ncell_tot = dummy_head
-            dtype = dt2dtype[dt]
-            s = [np.empty((ncell, tree.ndim+1), dtype),
-                 np.empty((ncell, tree.ndim+1), dtype),
-                 dtype(idx_inf),
-                 np.empty((ncell, tree.ndim+1), 'uint32'),
-                 np.empty(ncell, 'uint64'),
-                 ncell_tot]
-            for _ in range(2) + range(3, 5):
-                out_pipes[p].recv_bytes_into(s[_])
-            s = tuple(s)
-            assert(tree.leaves[iid].id == iid)
-            serial[iid] = s
-    else:
-        serial = [0]
-        dummy_head = np.empty(1, 'uint64')
-
-        def recv_leaf(p):
-            out_pipes[p].recv_bytes_into(dummy_head)
-            serial[0] += dummy_head[0]
-    # Recieve output from processes
-    total_count = 0
-    max_total_count = tree.num_leaves
-    proc_list = range(nproc)
-    t0 = time.time()
-    while total_count != max_total_count:
-        for i in proc_list:
-            while out_pipes[i].poll():
-                recv_leaf(i)
-                total_count += 1
-    # for i in range(nproc):
-    #     for _ in range(len(task2leaves[i])):
-    #         recv_leaf(i)
-    t1 = time.time()
-    print("Recieving took {} s".format(t1-t0))
-    # Consolidate tessellation
-    t0 = time.time()
-    out = consolidate_tess(tree, serial, pts, use_double=use_double,
-                           unique_str=unique_str, in_memory=in_memory)
-    t1 = time.time()
-    print("Consolidation took {} s".format(t1-t0))
-    # Close queues and processes
-    for p in processes:
-        p.join()
-    return out
-
-
 # @profile
 def consolidate_tess(tree, leaf_output, pts, use_double=False,
-                     unique_str=None, in_memory=True):
+                     unique_str=None, limit_mem=False):
     r"""Creates a single triangulation from the triangulations of leaves.
 
     Args:
@@ -452,13 +604,13 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
         unique_str (str, optional): Unique identifier for files in a run. If
-            `in_memory == False` those files will be loaded and used to create
+            `limit_mem == True` those files will be loaded and used to create
             the consolidated tessellation. Defaults to None. If None, there is
             a risk that multiple runs could be sharing files of the same name.
-        in_memory (bool, optional): If True, the triangulation is consolidated
+        limit_mem (bool, optional): If False, the triangulation is consolidated
             from partial triangulations on each leaf that already exist in
-            memory. Otherwise, partial triangulations are loaded from files for
-            each leaf. Defaults to `True`.
+            memory. If True, partial triangulations are loaded from files for
+            each leaf. Defaults to `False`.
 
     Returns:
         :class:`cgal4py.delaunay.Delaunay2` or
@@ -476,7 +628,7 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
     else:
         idx_inf = np.uint32(uint32_max)
     # Loop over leaves adding them
-    if in_memory:
+    if not limit_mem:
         ncells_tot = 0
         for s in leaf_output:
             ncells_tot += np.int64(s[5])
@@ -557,7 +709,10 @@ class DelaunayProcessMPI(object):
         rank = comm.Get_rank()
         # Get info for leaves
         if rank == 0:
-            tree = GenericTree.from_tree(tree0)
+            if isinstance(tree0, GenericTree):
+                tree = tree0
+            else:
+                tree = GenericTree.from_tree(tree0)
             task2leaves = [[] for _ in xrange(size)]
             for leaf in tree.leaves:
                 leaf.pts = pts[tree.idx[leaf.start_idx:leaf.stop_idx]]
@@ -912,31 +1067,84 @@ class DelaunayProcessMPI(object):
             T = consolidate_tess(self._tree, serial, self._pts,
                                  use_double=self._use_double,
                                  unique_str=self._unique_str)
-                                 # in_memory=in_memory)
+                                 # limit_mem=limit_mem)
             ftess = _tess_filename(unique_str=self._unique_str)
-            T.write_to_file(ftess)
+            # T.write_to_file(ftess)
+            cells, neighbors, idx_inf = T.serialize()
+            ffmt = _dtype2fmt[self._pts.dtype]
+            ifmt = _dtype2fmt[cells.dtype]
+            with open(ftess, 'wb') as fd:
+                fd.write(struct.pack('cc', ffmt, ifmt))
+                fd.write(struct.pack(ifmt, idx_inf))
+                fd.write(struct.pack(2*ifmt, *self._pts.shape))
+                fd.write(self._pts.tobytes())
+                fd.write(struct.pack(2*ifmt, *cells.shape))
+                fd.write(cells.tobytes())
+                fd.write(neighbors.tobytes())
+                
 
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
-        out = [(leaf.id, leaf.voronoi_volumes()) for leaf in self._leaves]
-        out = self._comm.gather(out, root=0)
+        local = {leaf.id: leaf.voronoi_volumes() for leaf in self._leaves}
+        if False:#self._use_buffer:
+            pass
+        else:
+            out = self._comm.gather(local, root=0)
+            if self._proc_idx == 0:
+                # Preallocate
+                tot = 0
+                dtype = None
+                for x in out:
+                    for k in x.values():
+                        tot += k.size
+                        dtype = k.dtype
+                vol = np.empty(tot, dtype)
+                # Transfer values
+                for x in out:
+                    for k in x.keys():
+                        leaf = self._tree.leaves[k]
+                        vol[self._tree.idx[leaf.start_idx:leaf.stop_idx]] = x[k]
+                # Save volumes
+                fvols = _vols_filename(unique_str=self._unique_str)
+                # np.save(fvols, vol)
+                with open(fvols, 'wb') as fd:
+                    fd.write(vol.tobytes())
+
 
     def run(self):
         r"""Performs tessellation and communication for each leaf on this
         process."""
+        np_dtype = 'int64'
+        mpi_dtype = _get_mpi_type(np_dtype)
         if self._task in ['triangulate', 'volumes']:
             self.tessellate_leaves()
             self._comm.Barrier()
             # Continue exchanges until there are not any particles that need to
             # be exchanged.
-            nrecv_tot = -1
-            while nrecv_tot != 0:
+            nrecv = -1
+            while nrecv != 0:
                 self.outgoing_points()
-                nrecv = self.incoming_points()
-                nrecv = self._comm.gather(nrecv, root=0)
-                if self._proc_idx == 0:
-                    nrecv_tot = sum(nrecv)
-                nrecv_tot = self._comm.bcast(nrecv_tot, root=0)
+                nrecv0 = self.incoming_points()
+                if self._use_buffer:
+                    nrecv_local = np.array([nrecv0], np_dtype)
+                    if self._proc_idx == 0:
+                        nrecv_total = np.empty(self._num_proc, np_dtype)
+                    else:
+                        nrecv_total = None
+                    self._comm.Gather((nrecv_local, mpi_dtype),
+                                      (nrecv_total, mpi_dtype), root=0)
+                    nrecv_tot = np.empty(1, np_dtype)
+                    if self._proc_idx == 0:
+                        nrecv_tot[0] = sum(nrecv_total)
+                    self._comm.Bcast(nrecv_tot, root=0)
+                    nrecv = nrecv_tot[0]
+                else:
+                    nrecv_total = self._comm.gather(nrecv0, root=0)
+                    if self._proc_idx == 0:
+                        nrecv_tot = sum(nrecv_total)
+                    else:
+                        nrecv_tot = None
+                    nrecv = self._comm.bcast(nrecv_tot, root=0)
             if self._task == 'triangulate':
                 self.enqueue_triangulation()
             elif self._task == 'volumes':

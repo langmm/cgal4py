@@ -32,7 +32,7 @@ def py_intersect_sph_box(np.ndarray[np.float64_t, ndim=1] c, np.float64_t r,
     assert(re.shape[0] == c.shape[0])
     cdef uint32_t ndim = <uint32_t>len(c)
     cdef cbool out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = intersect_sph_box(ndim, &c[0], r, &le[0], &re[0])
     return <pybool>out
 
@@ -60,7 +60,7 @@ def py_arg_tLT(np.ndarray[np.int64_t, ndim=2] cells,
     assert(i2 < cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef cbool out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = arg_tLT[int64_t](&cells[0,0], &idx_verts[0,0], ndim, i1, i2)
     return <pybool>out
 
@@ -85,7 +85,7 @@ def py_tEQ(np.ndarray[np.int64_t, ndim=2] cells, int i1, int i2):
     assert(i2 < cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef cbool out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = tEQ[int64_t](&cells[0,0], ndim, i1, i2)
     return <pybool>out
 
@@ -110,7 +110,7 @@ def py_tGT(np.ndarray[np.int64_t, ndim=2] cells, int i1, int i2):
     assert(i2 < cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef cbool out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = tGT[int64_t](&cells[0,0], ndim, i1, i2)
     return <pybool>out
 
@@ -135,7 +135,7 @@ def py_tLT(np.ndarray[np.int64_t, ndim=2] cells, int i1, int i2):
     assert(i2 < cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef cbool out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = tLT[int64_t](&cells[0,0], ndim, i1, i2)
     return <pybool>out
 
@@ -145,7 +145,7 @@ cdef void _sortCellVerts_int64(np.ndarray[np.int64_t, ndim=2] cells,
                                np.ndarray[np.int64_t, ndim=2] neigh):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortCellVerts[int64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -153,7 +153,7 @@ cdef void _sortCellVerts_uint64(np.ndarray[np.uint64_t, ndim=2] cells,
                                 np.ndarray[np.uint64_t, ndim=2] neigh):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortCellVerts[uint64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -161,7 +161,7 @@ cdef void _sortCellVerts_int32(np.ndarray[np.int32_t, ndim=2] cells,
                                np.ndarray[np.int32_t, ndim=2] neigh):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortCellVerts[int32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -169,7 +169,7 @@ cdef void _sortCellVerts_uint32(np.ndarray[np.uint32_t, ndim=2] cells,
                                 np.ndarray[np.uint32_t, ndim=2] neigh):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortCellVerts[uint32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 
 @cython.boundscheck(False)
@@ -209,7 +209,7 @@ def _sortSerializedTess_int32(np.ndarray[np.int32_t, ndim=2] cells,
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     if ncells == 0:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortSerializedTess[int32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -219,7 +219,7 @@ def _sortSerializedTess_uint32(np.ndarray[np.uint32_t, ndim=2] cells,
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     if ncells == 0:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortSerializedTess[uint32_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -229,7 +229,7 @@ def _sortSerializedTess_int64(np.ndarray[np.int64_t, ndim=2] cells,
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     if ncells == 0:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortSerializedTess[int64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -239,7 +239,7 @@ def _sortSerializedTess_uint64(np.ndarray[np.uint64_t, ndim=2] cells,
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     if ncells == 0:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         sortSerializedTess[uint64_t](&cells[0,0], &neigh[0,0], ncells, ndim)
 
 def py_sortSerializedTess(cells, neigh):
@@ -287,7 +287,7 @@ def py_quickSort_tess(np.ndarray[np.int64_t, ndim=2] cells,
     assert(cells.shape[0] == neigh.shape[0])
     assert(cells.shape[0] == idx.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         quickSort_tess[int64_t](&cells[0,0], &neigh[0,0], &idx[0], ndim, l, r)
 
 @cython.boundscheck(False)
@@ -322,7 +322,7 @@ def py_partition_tess(np.ndarray[np.int64_t, ndim=2] cells,
     assert(cells.shape[0] == idx.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef int64_t out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = partition_tess[int64_t](&cells[0,0], &neigh[0,0], &idx[0], 
                                       ndim, l, r, p)
     return out
@@ -333,7 +333,7 @@ cdef void _arg_sortCellVerts_int64(np.ndarray[np.int64_t, ndim=2] cells,
                                    np.ndarray[np.uint32_t, ndim=2] idx_verts):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortCellVerts[int64_t](&cells[0,0], &idx_verts[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -341,7 +341,7 @@ cdef void _arg_sortCellVerts_uint64(np.ndarray[np.uint64_t, ndim=2] cells,
                                     np.ndarray[np.uint32_t, ndim=2] idx_verts):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortCellVerts[uint64_t](&cells[0,0], &idx_verts[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -349,7 +349,7 @@ cdef void _arg_sortCellVerts_int32(np.ndarray[np.int32_t, ndim=2] cells,
                                    np.ndarray[np.uint32_t, ndim=2] idx_verts):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortCellVerts[int32_t](&cells[0,0], &idx_verts[0,0], ncells, ndim)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -357,7 +357,7 @@ cdef void _arg_sortCellVerts_uint32(np.ndarray[np.uint32_t, ndim=2] cells,
                                     np.ndarray[np.uint32_t, ndim=2] idx_verts):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortCellVerts[uint32_t](&cells[0,0], &idx_verts[0,0], ncells, ndim)
 
 def py_arg_sortCellVerts(cells):
@@ -401,7 +401,7 @@ def _arg_sortSerializedTess_int32(np.ndarray[np.int32_t, ndim=2] cells,
                                   np.ndarray[np.uint64_t, ndim=1] idx_cells):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortSerializedTess[int32_t](&cells[0,0], ncells, ndim, 
                                         &idx_verts[0,0], &idx_cells[0])
 @cython.boundscheck(False)
@@ -411,7 +411,7 @@ def _arg_sortSerializedTess_uint32(np.ndarray[np.uint32_t, ndim=2] cells,
                                    np.ndarray[np.uint64_t, ndim=1] idx_cells):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortSerializedTess[uint32_t](&cells[0,0], ncells, ndim,
                                          &idx_verts[0,0], &idx_cells[0])
 @cython.boundscheck(False)
@@ -421,7 +421,7 @@ def _arg_sortSerializedTess_int64(np.ndarray[np.int64_t, ndim=2] cells,
                                   np.ndarray[np.uint64_t, ndim=1] idx_cells):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortSerializedTess[int64_t](&cells[0,0], ncells, ndim,
                                         &idx_verts[0,0], &idx_cells[0])
 @cython.boundscheck(False)
@@ -431,7 +431,7 @@ def _arg_sortSerializedTess_uint64(np.ndarray[np.uint64_t, ndim=2] cells,
                                    np.ndarray[np.uint64_t, ndim=1] idx_cells):
     cdef uint64_t ncells = <uint64_t>cells.shape[0]
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_sortSerializedTess[uint64_t](&cells[0,0], ncells, ndim,
                                          &idx_verts[0,0], &idx_cells[0])
 
@@ -500,7 +500,7 @@ def py_arg_quickSort_tess(np.ndarray[np.int64_t, ndim=2] cells,
     assert(cells.shape[0] == idx_verts.shape[0])
     assert(cells.shape[0] == idx_cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         arg_quickSort_tess[int64_t](&cells[0,0], &idx_verts[0,0], &idx_cells[0], 
                                     ndim, l, r)
 
@@ -537,7 +537,7 @@ def py_arg_partition_tess(np.ndarray[np.int64_t, ndim=2] cells,
     assert(cells.shape[0] == idx_cells.shape[0])
     cdef uint32_t ndim = <uint32_t>cells.shape[1]
     cdef int64_t out
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         out = arg_partition_tess[int64_t](&cells[0,0], &idx_verts[0,0], &idx_cells[0], 
                                           ndim, l, r, p)
     return out
@@ -556,7 +556,7 @@ cdef void _swap_cells_int32(np.ndarray[np.int32_t, ndim=2] verts,
     cdef uint32_t ndim = <uint32_t>verts.shape[1]
     if i1 >= ncells or i2 >= ncells:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         swap_cells[int32_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
 
 @cython.boundscheck(False)
@@ -573,7 +573,7 @@ cdef void _swap_cells_uint32(np.ndarray[np.uint32_t, ndim=2] verts,
     cdef uint32_t ndim = <uint32_t>verts.shape[1]
     if i1 >= ncells or i2 >= ncells:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         swap_cells[uint32_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
 
 @cython.boundscheck(False)
@@ -590,7 +590,7 @@ cdef void _swap_cells_int64(np.ndarray[np.int64_t, ndim=2] verts,
     cdef uint32_t ndim = <uint32_t>verts.shape[1]
     if i1 >= ncells or i2 >= ncells:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         swap_cells[int64_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
 
 @cython.boundscheck(False)
@@ -607,7 +607,7 @@ cdef void _swap_cells_uint64(np.ndarray[np.uint64_t, ndim=2] verts,
     cdef uint32_t ndim = <uint32_t>verts.shape[1]
     if i1 >= ncells or i2 >= ncells:
         return
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         swap_cells[uint64_t](&verts[0,0], &neigh[0,0], ndim, i1, i2)
 
 def py_swap_cells(verts, neigh, i1, i2):
@@ -652,7 +652,7 @@ cdef sLeaves32 _vectorize_leaves_uint32(np.uint32_t ndim, object serial,
         sort_verts = s[3]
         sort_cells = s[4]
         ncells = <int64_t>verts.shape[0]
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             leaves.push_back(sLeaf32(i, ndim, ncells, idx_inf,
                                      &verts[0,0], &neigh[0,0],
                                      &sort_verts[0,0], &sort_cells[0],
@@ -680,7 +680,7 @@ cdef sLeaves64 _vectorize_leaves_uint64(np.uint32_t ndim, object serial,
         sort_verts = s[3]
         sort_cells = s[4]
         ncells = <int64_t>verts.shape[0]
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             leaves.push_back(sLeaf64(i, ndim, ncells, idx_inf,
                                      &verts[0,0], &neigh[0,0],
                                      &sort_verts[0,0], &sort_cells[0],
@@ -703,7 +703,7 @@ cdef np.int64_t _consolidate_uint32_uint64(np.uint32_t ndim, np.uint64_t idx_inf
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint64_t] obj
     cdef uint64_t i
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj = ConsolidatedLeaves[uint64_t](ndim, idx_inf, max_ncells,
                                            &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
@@ -729,7 +729,7 @@ cdef np.int64_t _consolidate_uint32_uint32(np.uint32_t ndim, np.uint32_t idx_inf
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint32_t] obj
     cdef uint64_t i
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj = ConsolidatedLeaves[uint32_t](ndim, idx_inf, max_ncells,
                                            &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
@@ -755,7 +755,7 @@ cdef np.int64_t _consolidate_uint64_uint64(np.uint32_t ndim, np.uint64_t idx_inf
     assert(cells.shape[0] == max_ncells)
     cdef ConsolidatedLeaves[uint64_t] obj
     cdef uint64_t i
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj = ConsolidatedLeaves[uint64_t](ndim, idx_inf, max_ncells,
                                            &verts[0,0], &cells[0,0])
         for i in range(num_leaves):
@@ -833,7 +833,7 @@ cdef void _output_leaf_uint32(char* fname, int leaf_id, np.uint32_t idx_inf,
                                 &verts[0,0], &neigh[0,0],
                                 &sort_verts[0,0], &sort_cells[0],
                                 idx_start, idx_stop)
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         leaf.write_to_file(fname)
 
 def output_leaf(fname, leaf_id, idx_inf, verts, neigh, sort_verts, sort_cells,
@@ -891,7 +891,7 @@ def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t id
     cdef ConsolidatedLeaves[uint32_t] obj
     cdef uint64_t i
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj = ConsolidatedLeaves[uint32_t](
             ndim, ncells, idx_inf, max_ncells,
             &all_verts[0,0], &all_neigh[0,0], 
@@ -901,7 +901,7 @@ def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t id
     print("Initialization of consolidated leaves took {} s".format(t1-t0))
     # Insert leaf
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj.add_leaf[uint32_t](leaf)
     t1 = time.time()
     print("Adding leaf took {} s".format(t1-t0))
@@ -929,7 +929,7 @@ def _add_leaf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t id
     print("Getting map arrays took {} s".format(t1-t0))
     # Clean up things allocated during initialization
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj.cleanup()
     t1 = time.time()
     print("Clean up took {} s".format(t1-t0))
@@ -996,7 +996,7 @@ def _add_inf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t idx
     cdef ConsolidatedLeaves[uint32_t] obj
     cdef uint64_t i
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj = ConsolidatedLeaves[uint32_t](
             ndim, ncells, idx_inf, max_ncells,
             &all_verts[0,0], &all_neigh[0,0])
@@ -1004,13 +1004,13 @@ def _add_inf_uint32_uint32(np.uint32_t ndim, np.uint64_t ncells, np.uint32_t idx
     print("Initialization of consolidated leaves (for inf) took {} s".format(t1-t0))
     # Insert leaf
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj.add_inf()
     t1 = time.time()
     print("Adding infinite cells took {} s".format(t1-t0))
     # Clean up things allocated during initialization
     t0 = time.time()
-    with nogil:
+    with nogil, cython.boundscheck(False), cython.wraparound(False):
         obj.cleanup()
     t1 = time.time()
     print("Clean up took {} s".format(t1-t0))
@@ -1097,7 +1097,7 @@ cdef class SerializedLeaf32:
         self.sort_cells = sort_cells
         self.idx_start = idx_start
         self.idx_stop = idx_stop
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.SL = new SerializedLeaf[uint32_t](
                 leaf_id, ndim, ncells, idx_inf, &verts[0,0], &neigh[0,0],
                 &sort_verts[0,0], &sort_cells[0], idx_start, idx_stop)
@@ -1171,7 +1171,7 @@ cdef class SerializedLeaf64:
         self.sort_cells = sort_cells
         self.idx_start = idx_start
         self.idx_stop = idx_stop
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.SL = new SerializedLeaf[uint64_t](
                 leaf_id, ndim, ncells, idx_inf, &verts[0,0], &neigh[0,0],
                 &sort_verts[0,0], &sort_cells[0], idx_start, idx_stop)
@@ -1215,7 +1215,7 @@ cdef class ConsolidatedLeaves32:
         neigh.fill(idx_inf)
         self.verts = verts
         self.neigh = neigh
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.CL = new ConsolidatedLeaves[uint32_t](
                 ndim, idx_inf, max_ncells, &verts[0,0], &neigh[0,0])
 
@@ -1228,12 +1228,12 @@ cdef class ConsolidatedLeaves32:
 
     cdef void _add_leaf32(self, SerializedLeaf32 leaf):
         cdef SerializedLeaf[uint32_t] SL = dereference(leaf.SL)
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.CL.add_leaf[uint32_t](SL)
 
     cdef void _add_leaf64(self, SerializedLeaf64 leaf):
         cdef SerializedLeaf[uint64_t] SL = dereference(leaf.SL)
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.CL.add_leaf[uint64_t](SL)
 
     def add_leaf(self, leaf):
@@ -1259,7 +1259,7 @@ cdef class ConsolidatedLeaves32:
 
         """
         cdef char* cfname = fname
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.CL.add_leaf_fromfile(cfname)
 
     def finalize(self):
@@ -1270,7 +1270,7 @@ cdef class ConsolidatedLeaves32:
     def add_inf(self):
         r"""Add infinite cells to tessellation assuming that any cell without a
         neighbor must be incident to a missing infinite cell."""
-        with nogil:
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.CL.add_inf()
 
     def resize(self):

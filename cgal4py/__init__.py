@@ -17,7 +17,7 @@ except:
 
 def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
                 use_double=False, nproc=0, dd_method='kdtree', dd_kwargs={},
-                limit_mem=False):
+                limit_mem=False, **kwargs):
     r"""Triangulation of points.
 
     Args:
@@ -44,6 +44,8 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
         limit_mem (bool, optional): If True, memory usage is limited by
             writing things to file at a cost to performance. Defaults to
             False.
+        \*\*kwargs: Additiona keyword arguments are passed to the appropriate
+            class for constructuing the triangulation.
 
     Returns:
         T (:class:`cgal4py.delaunay.Delaunay2` or
@@ -79,20 +81,22 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
         raise NotImplementedError("'limit_mem' has not yet been implemented.")
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
+        if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
+            dd_kwargs['nleaves'] = nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
         T = parallel.ParallelDelaunay(pts, tree, nproc,
-                                      use_double=use_double)
+                                      use_double=use_double, **kwargs)
     # Serial
     else:
         T = Delaunay(pts, use_double=use_double, periodic=periodic,
-                     left_edge=left_edge, right_edge=right_edge)
+                     left_edge=left_edge, right_edge=right_edge, **kwargs)
     return T
 
 
 def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
                     use_double=False, nproc=0, dd_method='kdtree',
-                    dd_kwargs={}, limit_mem=False):
+                    dd_kwargs={}, limit_mem=False, **kwargs):
     r"""Volume of voronoi cells for each point.
 
     Args:
@@ -119,6 +123,8 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
         limit_mem (bool, optional): If True, memory usage is limited by
             writing things to file at a cost to performance. Defaults to
             False.
+        \*\*kwargs: Additiona keyword arguments are passed to the appropriate
+            class for constructuing the triangulation.
 
     Returns:
         np.ndarray of float64: (n,) array of n voronoi cell mD volumes. A value
@@ -153,14 +159,16 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
         raise NotImplementedError("'limit_mem' has not yet been implemented.")
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
+        if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
+            dd_kwargs['nleaves'] = nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
         vols = parallel.ParallelVoronoiVolumes(pts, tree, nproc,
-                                               use_double=use_double)
+                                               use_double=use_double, **kwargs)
     # Serial
     else:
         T = Delaunay(pts, use_double=use_double, periodic=periodic,
-                     left_edge=left_edge, right_edge=right_edge)
+                     left_edge=left_edge, right_edge=right_edge, **kwargs)
         vols = T.voronoi_volumes()
     return vols
 
