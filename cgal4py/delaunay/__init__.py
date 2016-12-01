@@ -352,13 +352,11 @@ def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
                                  bit64=bit64)
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
                                  bit64=bit64)
-    if (ndim in [2, 3]) and not bit64:
-        return getattr(importlib.import_module(modname),clsname)
-    else:
-        warnings.warn("Extension {} is not a built in. ".format(modname) +
-                      "It will be created and compiled for " +
-                      "import using pyximport.")
-        return getattr(importlib.import_module(modname),clsname)
+    # if (ndim not in [2, 3]) or bit64:
+    #     warnings.warn("Extension {} is not a built in. ".format(modname) +
+    #                   "It will be created and compiled for " +
+    #                   "import using pyximport.")
+    return getattr(importlib.import_module(modname),clsname)
 
 
 def Delaunay(pts, use_double=False, periodic=False,

@@ -1277,3 +1277,103 @@ cdef class ConsolidatedLeaves32:
         r"""Resize the arrays to match the number of cells."""
         self.verts.resize((self.ncells, self.ndim+1),refcheck=False)
         self.neigh.resize((self.ncells, self.ndim+1),refcheck=False)
+
+
+cdef class ConsolidatedLeaves64:
+    r"""Wrapper class for C++ ConsolidatedLeaves class with 64bit cell indices.
+
+    Args:
+        ndim (uint32): Number of dimensions in domain.
+        idx_inf (uint64): Flag identifying infinite vertices/cells.
+        max_ncells (int64): Number of cells that will be allocated for.
+
+    Attributes:
+        ndim (uint32): Number of dimensions in domain.
+        idx_inf (uint64): Flag identifying infinite vertices/cells.
+        max_ncells (int64): Number of cells that will be allocated for.
+        verts (np.ndarray): Indices of vertices constituting cells.
+
+    """
+    cdef ConsolidatedLeaves[uint64_t] *CL
+    cdef public np.uint32_t ndim
+    cdef public np.uint64_t idx_inf
+    cdef public np.int64_t max_ncells
+    cdef public object verts
+    cdef public object neigh
+    
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def __cinit__(self, uint32_t ndim, uint64_t idx_inf, int64_t max_ncells):
+        self.ndim = ndim
+        self.idx_inf = idx_inf
+        self.max_ncells = max_ncells
+        cdef np.ndarray[np.uint64_t, ndim=2] verts 
+        cdef np.ndarray[np.uint64_t, ndim=2] neigh
+        verts = np.empty((max_ncells, ndim+1), 'uint64')
+        neigh = np.empty((max_ncells, ndim+1), 'uint64')
+        verts.fill(idx_inf)
+        neigh.fill(idx_inf)
+        self.verts = verts
+        self.neigh = neigh
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.CL = new ConsolidatedLeaves[uint64_t](
+                ndim, idx_inf, max_ncells, &verts[0,0], &neigh[0,0])
+
+    def __dealloc__(self):
+        self.CL.cleanup()
+
+    @property
+    def ncells(self):
+        return self.CL.ncells
+
+    cdef void _add_leaf32(self, SerializedLeaf32 leaf):
+        cdef SerializedLeaf[uint32_t] SL = dereference(leaf.SL)
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.CL.add_leaf[uint32_t](SL)
+
+    cdef void _add_leaf64(self, SerializedLeaf64 leaf):
+        cdef SerializedLeaf[uint64_t] SL = dereference(leaf.SL)
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.CL.add_leaf[uint64_t](SL)
+
+    def add_leaf(self, leaf):
+        r"""Add a serialized leaf to the consolidated tessellation.
+
+        Args:
+            leaf (SerializedLeaf32 or SerializedLeaf64): Leaf that should be 
+                added to the tessellation.
+
+        """
+        if isinstance(leaf, SerializedLeaf32):
+            self._add_leaf32(leaf)
+        elif isinstance(leaf, SerializedLeaf64):
+            self._add_leaf64(leaf)
+        else:
+            raise Exception("Unrecognized leaf type: {}".format(type(leaf)))
+
+    def add_leaf_fromfile(self, fname):
+        r"""Add a serialized leaf from a file to the consolidated tessellation.
+
+        Args:
+            fname (str): Full path to file containing serialized leaf info.
+
+        """
+        cdef char* cfname = fname
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.CL.add_leaf_fromfile(cfname)
+
+    def finalize(self):
+        r"""Perform operations to complete the consolidated triangulation."""
+        self.add_inf()
+        self.resize()
+
+    def add_inf(self):
+        r"""Add infinite cells to tessellation assuming that any cell without a
+        neighbor must be incident to a missing infinite cell."""
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.CL.add_inf()
+
+    def resize(self):
+        r"""Resize the arrays to match the number of cells."""
+        self.verts.resize((self.ncells, self.ndim+1),refcheck=False)
+        self.neigh.resize((self.ncells, self.ndim+1),refcheck=False)

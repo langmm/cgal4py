@@ -181,8 +181,6 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
                 "    pstats.Stats(pr).sort_stats('time').print_stats(25)")
     with open(fname, 'w') as f:
         f.write("\n".join(lines))
-        # for l in lines:
-        #     f.write(l+"\n")
 
 
 def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
@@ -245,15 +243,15 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
     if use_mpi:
         unique_str = datetime.today().strftime("%Y%j%H%M%S")
         fpick = _generate_filename("dict", unique_str=unique_str)
-        out = dict(pts=pts, tree=tree)
+        out = dict(pts=pts, tree=GenericTree.from_tree(tree))
         with open(fpick, 'wb') as fd:
-            pickle.dump(out, fd)
+            cPickle.dump(out, fd, cPickle.HIGHEST_PROTOCOL)
         assert(os.path.isfile(fpick))
-        read_lines = ["import pickle",
+        read_lines = ["import cPickle",
                       "with open('{}', 'rb') as fd:".format(fpick),
-                      "    load_dict = pickle.load(fd)"]
+                      "    load_dict = cPickle.load(fd)"]
         ndim = tree.ndim
-        out = ParallelVoronoiVolumesMPI(read_func, ndim, nproc, **kwargs)
+        out = ParallelVoronoiVolumesMPI(read_lines, ndim, nproc, **kwargs)
         os.remove(fpick)
     else:
         out = ParallelVoronoiVolumesMulti(pts, tree, nproc, **kwargs)
@@ -321,7 +319,7 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
     
 
 def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
-                              use_buffer=False, limit_mem=False, profile=False):
+                              limit_mem=False, use_buffer=False, profile=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
     parallel using MPI.
 
@@ -341,13 +339,13 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
-        use_buffer (bool, optional): If True, communications are done by way of
-            buffers rather than pickling python objects. Defaults to False.
         limit_mem (bool, optional): If False, the triangulation results from
             each process are moved to local memory using `multiprocessing`
             pipes. If True, each process writes out tessellation info to
             files which are then incrementally loaded as consolidation occurs.
             Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
         profile (bool, optional): If True, cProfile is used to profile the code
             and output is printed to the screen. This can also be a string
             specifying the full path to the file where the output should be
@@ -426,12 +424,12 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
         out_pipes[i], in_pipes[i] = mp.Pipe(True)
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     if limit_mem:
-        processes = [DelaunayProcess(
+        processes = [DelaunayProcessMulti(
             'output', _, task2leaves[_], ptsArray, idxArray,
             left_edges, right_edges, queues, lock, count, in_pipes[_],
             unique_str=unique_str) for _ in xrange(nproc)]
     else:
-        processes = [DelaunayProcess(
+        processes = [DelaunayProcessMulti(
             'triangulate', _, task2leaves[_], ptsArray, idxArray,
             left_edges, right_edges, queues, lock, count, in_pipes[_],
             unique_str=unique_str) for _ in xrange(nproc)]
@@ -490,7 +488,8 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
     return out
 
 
-def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False):
+def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False,
+                                limit_mem=False):
     r"""Return the voronoi cell volumes after constructing triangulation in
     parallel.
 
@@ -504,6 +503,11 @@ def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False):
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
+        limit_mem (bool, optional): If False, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. If True, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to False.
 
     Returns:
         np.ndarray of float64: (n,) array of n voronoi volumes for the provided
@@ -531,7 +535,7 @@ def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False):
     for i in range(nproc):
         out_pipes[i], in_pipes[i] = mp.Pipe(True)
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    processes = [DelaunayProcess(
+    processes = [DelaunayProcessMulti(
         'volumes', _, task2leaves[_], ptsArray, idxArray,
         left_edges, right_edges, queues, lock, count, in_pipes[_],
         unique_str=unique_str) for _ in xrange(nproc)]
@@ -685,10 +689,12 @@ class DelaunayProcessMPI(object):
         size = comm.Get_size()
         rank = comm.Get_rank()
         # Get info for leaves
+        tree = tree0
+        task2leaves = None
+        left_edges = None
+        right_edges = None
         if rank == 0:
-            if isinstance(tree0, GenericTree):
-                tree = tree0
-            else:
+            if not isinstance(tree0, GenericTree):
                 tree = GenericTree.from_tree(tree0)
             task2leaves = [[] for _ in xrange(size)]
             for leaf in tree.leaves:
@@ -697,17 +703,19 @@ class DelaunayProcessMPI(object):
                 task2leaves[task].append(leaf)
             left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
             right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-        else:
-            tree = None
         # Communicate points
-        if rank == 0:
-            for p in range(1, size):
-                pkg = [task2leaves[p], left_edges, right_edges, unique_str] 
-                comm.send(pkg, dest=p, tag=0)
-            leaves = task2leaves[0]
-        else:
-            pkg = comm.recv(source=0, tag=0)
-            leaves, left_edges, right_edges, unique_str = pkg
+        # TODO: Serialize & allow for use of buffer
+        leaves = comm.scatter(task2leaves, root=0)
+        pkg = (left_edges, right_edges, unique_str)
+        left_edges, right_edges, unique_str = comm.bcast(pkg, root=0)
+        # if rank == 0:
+        #     for p in range(1, size):
+        #         pkg = [task2leaves[p], left_edges, right_edges, unique_str] 
+        #         comm.send(pkg, dest=p, tag=0)
+        #     leaves = task2leaves[0]
+        # else:
+        #     pkg = comm.recv(source=0, tag=0)
+        #     leaves, left_edges, right_edges, unique_str = pkg
         nleaves = len(leaves) 
         # Set attributes
         self._task = taskname
@@ -725,9 +733,8 @@ class DelaunayProcessMPI(object):
         ndim = left_edges.shape[1]
         self._ndim = ndim
         self._local_leaves = len(leaves)
-        if self._local_leaves == 0:
-            self._total_leaves = 0
-        else:
+        self._total_leaves = 0
+        if self._local_leaves != 0:
             self._total_leaves = leaves[0].num_leaves
         self._done = False
         self._task2leaf = {i:[] for i in range(size)}
@@ -736,6 +743,12 @@ class DelaunayProcessMPI(object):
             self._task2leaf[task].append(i)
 
     def get_leaf(self, leafid):
+        r"""Return the leaf object associated wth a given leaf id.
+
+        Args:
+            leafid (int): Leaf ID.
+
+        """
         return self._leaves[self._leafid2idx[leafid]]
 
     def tessellate_leaves(self):
@@ -779,10 +792,9 @@ class DelaunayProcessMPI(object):
             tot_nleaves = rcnt.sum()
             # Send the ids and sizes of leaves
             rids = np.empty(2*tot_nleaves, sids.dtype)
+            recv_buf = None
             if self._proc_idx == root:
                 recv_buf = (rids, 2*rcnt, _get_mpi_type(rids.dtype))
-            else:
-                recv_buf = None
             self._comm.Gatherv((sids, _get_mpi_type(sids.dtype)),
                                recv_buf, root)
             # Count number on each processor
@@ -795,10 +807,9 @@ class DelaunayProcessMPI(object):
                         j += 2
             # Send the arrays for each leaf
             rarr = np.empty(arr_counts.sum(), sarr.dtype)
+            recv_buf = None
             if self._proc_idx == root:
                 recv_buf = (rarr, arr_counts, _get_mpi_type(rarr.dtype))
-            else:
-                recv_buf = None
             self._comm.Gatherv((sarr, _get_mpi_type(sarr.dtype)),
                                recv_buf, root)
             # Parse out info for each leaf
@@ -1108,10 +1119,9 @@ class DelaunayProcessMPI(object):
                 nrecv0 = self.incoming_points()
                 if self._use_buffer:
                     nrecv_local = np.array([nrecv0], np_dtype)
+                    nrecv_total = None
                     if self._proc_idx == 0:
                         nrecv_total = np.empty(self._num_proc, np_dtype)
-                    else:
-                        nrecv_total = None
                     self._comm.Gather((nrecv_local, mpi_dtype),
                                       (nrecv_total, mpi_dtype), root=0)
                     nrecv_tot = np.empty(1, np_dtype)
@@ -1121,10 +1131,9 @@ class DelaunayProcessMPI(object):
                     nrecv = nrecv_tot[0]
                 else:
                     nrecv_total = self._comm.gather(nrecv0, root=0)
+                    nrecv_tot = None
                     if self._proc_idx == 0:
                         nrecv_tot = sum(nrecv_total)
-                    else:
-                        nrecv_tot = None
                     nrecv = self._comm.bcast(nrecv_tot, root=0)
             if self._task == 'triangulate':
                 self.enqueue_triangulation()
@@ -1133,7 +1142,7 @@ class DelaunayProcessMPI(object):
         self._done = True
 
 
-class DelaunayProcess(mp.Process):
+class DelaunayProcessMulti(mp.Process):
     r"""`multiprocessing.Process` subclass for coordinating operations on a
     single process during a parallel Delaunay triangulation.
 
@@ -1178,7 +1187,7 @@ class DelaunayProcess(mp.Process):
                      'output_tess', 'triangulate', 'volumes', 'output']
         if task not in task_list:
             raise ValueError('{} is not a valid task.'.format(task))
-        super(DelaunayProcess, self).__init__(**kwargs)
+        super(DelaunayProcessMulti, self).__init__(**kwargs)
         self._task = task
         self._leaves = [ParallelLeaf(leaf, left_edges, right_edges, unique_str)
                         for leaf in leaves]
@@ -1194,9 +1203,8 @@ class DelaunayProcess(mp.Process):
         self._count = count
         self._num_proc = len(queues)-1
         self._local_leaves = len(leaves)
-        if self._local_leaves == 0:
-            self._total_leaves = 0
-        else:
+        self._total_leaves = 0
+        if self._local_leaves != 0:
             self._total_leaves = leaves[0].num_leaves
         self._proc_idx = proc_idx
         self._done = False
