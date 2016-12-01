@@ -1,5 +1,7 @@
 import numpy as np
 cimport numpy as np
+import copy
+import time
 cimport cython
 from libcpp.vector cimport vector
 from libcpp.pair cimport pair
@@ -8,8 +10,6 @@ from libcpp cimport bool as cbool
 from cpython cimport bool as pybool
 from cython.operator cimport dereference
 
-import copy
-import time
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

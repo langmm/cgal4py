@@ -11,8 +11,6 @@ import importlib
 import tools
 import os
 import pyximport
-import delaunay2
-import delaunay3
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
@@ -46,16 +44,21 @@ def _create_pyxdep_file(fname, includes=[], overwrite=False):
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
 
+    Returns:
+        bool: If True, a new file was created. If False, there was an
+            appropriate existing file.
+
     """
     assert(fname.endswith('.pyxdep'))
     if os.path.isfile(fname):
         if overwrite:
             os.remove(fname)
         else:
-            return
+            return False
     with open(fname, 'w') as new_file:
         for incl in includes:
             new_file.write('{}\n'.format(incl))
+    return True
 
 def _create_pyxbld_file(fname, sources=[], overwrite=False):
     r"""Create a .pyxbld files for an extension.
@@ -67,13 +70,17 @@ def _create_pyxbld_file(fname, sources=[], overwrite=False):
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
 
+    Returns:
+        bool: If True, a new file was created. If False, there was an
+            appropriate existing file.
+
     """
     assert(fname.endswith('.pyxbld'))
     if os.path.isfile(fname):
         if overwrite:
             os.remove(fname)
         else:
-            return
+            return False
     lines = [
         "def make_ext(modname, pyxfilename):",
         "    from distutils.extension import Extension",
@@ -89,6 +96,7 @@ def _create_pyxbld_file(fname, sources=[], overwrite=False):
     with open(fname, 'w') as new_file:
         for line in lines:
             new_file.write('{}\n'.format(line))
+    return True
 
 def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
     r"""Create an alternate version of an extension by making the appropriate
@@ -107,11 +115,16 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
 
+    Returns:
+        bool: If True, a new file was created. If False, there was an
+            appropriate existing file.
+
     Raises:
         ValueError: If `fname0` does not have a supported extension.
         IOError: If `fname0` does not exist.
 
     """
+    created_file = False
     ext = os.path.splitext(fname0)[1]
     if ext in [".pxd", ".pyx"]:
         comment = '#'
@@ -119,7 +132,6 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
         comment = '//'
     else:
         raise ValueError("Unsupported extension {}".format(ext))
-
     gen_file_warn = (comment + " WARNING: This file was automatically " +
                      "generated. Do NOT edit it directly.\n")
     if (not os.path.isfile(fname0)):
@@ -127,7 +139,7 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
                       "({}). dosn't exist".format(fname0))
     if ((not os.path.isfile(fname1)) or overwrite or
             (os.path.getmtime(fname1) < os.path.getmtime(fname0))):
-        print("Creating alterate version of {}...".format(fname0))
+        created_file = True
         if os.path.isfile(fname1):
             os.remove(fname1)
         with open(fname1,'w') as new_file:
@@ -147,6 +159,7 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
                     for i0,i1 in insert:
                         if i0 in line:
                             new_file.write(i1)
+    return created_file
 
 
 def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
@@ -253,6 +266,7 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
 
     """
     generated = False
+    is_new = False
     # Create base file from nD case for >3 dimensions
     if dim < 2:
         raise ValueError("Triangulations are not supported in " +
@@ -269,21 +283,24 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
                     'Delaunay_with_info_{}'.format(dim)),
                    ('const int D = 4; // REPLACE',
                     'const int D = {}; // REPLACE'.format(dim))]
-        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+        is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                   overwrite=overwrite)
         # pxd
         fnameD = _delaunay_filename('pxd', 'D')
         fnameN = _delaunay_filename('pxd', str(dim))
         replace = [('c_delaunayD.hpp', 'c_delaunay{}.hpp'.format(dim)),
                    ('Delaunay_with_info_D',
                     'Delaunay_with_info_{}'.format(dim))]
-        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+        is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                   overwrite=overwrite)
         # pyx
         fnameD = _delaunay_filename('pyx', 'D')
         fnameN = _delaunay_filename('pyx', str(dim))
         replace = [('DelaunayD', 'Delaunay{}'.format(dim)),
                    ('Delaunay_with_info_D',
                     'Delaunay_with_info_{}'.format(dim))]
-        _create_ext_file(fnameD, fnameN, replace=replace, overwrite=overwrite)
+        is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                   overwrite=overwrite)
     # Create 64bit version if requested
     if bit64:
         generated = True
@@ -300,8 +317,8 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
              "ctypedef np.uint64_t np_info_t"),
             (class32, class64)]
         insert = [("ctypedef np.uint32_t np_info_t", import_line)]
-        _create_ext_file(fname32, fname64, replace=replace, insert=insert,
-                         overwrite=overwrite)
+        is_new += _create_ext_file(fname32, fname64, replace=replace,
+                                   insert=insert, overwrite=overwrite)
     # Create pyxdep & pyxbld for generated files
     if generated:
         if bit64:
@@ -326,8 +343,16 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
             assert(os.path.isfile(cpp_file))
         dep = _delaunay_filename('pyxdep', dim, periodic=periodic, bit64=bit64)
         bld = _delaunay_filename('pyxbld', dim, periodic=periodic, bit64=bit64)
-        _create_pyxdep_file(dep, includes=includes, overwrite=overwrite)
-        _create_pyxbld_file(bld, sources=sources, overwrite=overwrite)
+        is_new += _create_pyxdep_file(dep, includes=includes,
+                                      overwrite=overwrite)
+        is_new += _create_pyxbld_file(bld, sources=sources,
+                                      overwrite=overwrite)
+    if is_new:
+        modname = _delaunay_filename('module', ndim, periodic=periodic,
+                                     bit64=bit64)
+        warnings.warn("\n\nExtension {} is not a built in. ".format(modname) +
+                      "It was automatically generated and will be compiled " +
+                      "at import using pyximport.\n\n")
         
 
 def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
@@ -352,10 +377,6 @@ def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
                                  bit64=bit64)
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
                                  bit64=bit64)
-    # if (ndim not in [2, 3]) or bit64:
-    #     warnings.warn("Extension {} is not a built in. ".format(modname) +
-    #                   "It will be created and compiled for " +
-    #                   "import using pyximport.")
     return getattr(importlib.import_module(modname),clsname)
 
 
@@ -449,7 +470,7 @@ def VoronoiVolumes(pts, *args, **kwargs):
     return T.voronoi_volumes()
 
 
-__all__ = ["tools", "Delaunay", "VoronoiVolumes", "delaunay2", "delaunay3",
+__all__ = ["tools", "Delaunay", "VoronoiVolumes",
            "Delaunay2", "Delaunay3"]
 if is_valid_P2():
     __all__.append("PeriodicDelaunay2")

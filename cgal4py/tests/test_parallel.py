@@ -1,20 +1,17 @@
 r"""Tests for parallel implementation of triangulations."""
 import nose.tools as nt
-import unittest
 import numpy as np
 import os
-from nose.tools import assert_raises, nottest
 from cgal4py import parallel, delaunay
 from cgal4py.domain_decomp import GenericTree
-from test_cgal4py import make_points, make_test
-from test_delaunay2 import pts as pts2
+from test_cgal4py import make_points, make_test, MyTestCase
 import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
 np.random.seed(10)
 
 
-@nottest
+@nt.nottest
 def lines_load_test(npts, ndim, periodic=False):
     lines = [
         "from cgal4py.tests.test_cgal4py import make_points",
@@ -24,7 +21,7 @@ def lines_load_test(npts, ndim, periodic=False):
     return lines
 
 
-# @nottest
+# @nt.nottest
 # def runtest(func_name, *args, **kwargs):
 #     if func_name in ['delaunay', 'Delaunay', 'triangulate']:
 #         func = runtest_ParallelDelaunay
@@ -35,7 +32,7 @@ def lines_load_test(npts, ndim, periodic=False):
 #     return func(*args, **kwargs)
 
 
-# @nottest
+# @nt.nottest
 # def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False,
 #                            profile=False):
 #     tests = [
@@ -57,7 +54,7 @@ def lines_load_test(npts, ndim, periodic=False):
 #                     **t['kwargs'])
 
 
-# @nottest
+# @nt.nottest
 # def runtest_ParallelVoronoiVolumes(npts, ndim, nproc, use_mpi=False,
 #                                    use_buffer=False, profile=False, **kwargs):
 #     pts, tree = make_test(npts, ndim, **kwargs)
@@ -71,7 +68,7 @@ def lines_load_test(npts, ndim, periodic=False):
 #     assert(np.allclose(v_seri, v_para))
 
 
-# @nottest
+# @nt.nottest
 # def runtest_ParallelDelaunay(npts, ndim, nproc, use_mpi=False,
 #                              use_buffer=False, profile=False, **kwargs):
 #     pts, tree = make_test(npts, ndim, **kwargs)
@@ -109,48 +106,7 @@ def lines_load_test(npts, ndim, periodic=False):
 #         raise
 
 
-class MyTestFunction(object):
-
-    def __init__(self):
-        self._func = None
-        self.param_runs = []
-        self.param_returns = []
-        self.param_raises = []
-        self.setup_param()
-
-    def setup_param(self):
-        pass
-
-    @property
-    def func(self):
-        if self._func is None:
-            raise AttributeError("_func must be set.")
-        else:
-            return self._func
-
-    def check_runs(self, args, kwargs):
-        self.func(*args, **kwargs)
-
-    def check_returns(self, result, args, kwargs):
-        nt.eq_(result, self.func(*args, **kwargs))
-
-    def check_raises(self, excpt, args, kwargs):
-        nt.assert_raises(excpt, self.func, *args, **kwargs)
-
-    def test_runs_generator(self):
-        for args, kwargs in self.param_runs:
-            yield self.check_runs, args, kwargs
-
-    def test_returns_generator(self):
-        for res, args, kwargs in self.param_returns:
-            yield self.check_returns, res, args, kwargs
-
-    def test_raises_generator(self):
-        for err, args, kwargs in self.param_raises:
-            yield self.check_raises, err, args, kwargs
-
-
-class TestGetMPIType(MyTestFunction):
+class TestGetMPIType(MyTestCase):
 
     def setup_param(self):
         self._func = parallel._get_mpi_type
@@ -161,7 +117,7 @@ class TestGetMPIType(MyTestFunction):
         self.param_raises = [(ValueError, ['m'], {})]
 
 
-class TestWriteMPIScript(MyTestFunction):
+class TestWriteMPIScript(MyTestCase):
 
     def setup_param(self):
         self._func = parallel.write_mpi_script
@@ -192,46 +148,192 @@ class TestWriteMPIScript(MyTestFunction):
         os.remove(self._fname)
 
 
-class TestParallelLeaf(MyTestFunction):
+class TestParallelLeaf(MyTestCase):
 
     def setup_param(self):
         self._func = parallel.ParallelLeaf
+        self.param_runs = [
+            ((0, 2), {}),
+            ((0, 3), {}),
+            # ((0, 4), {}),
+            ((0, 2), {'periodic':True}),
+            ((0, 3), {'periodic':True}),
+            # ((0, 4), {'periodic':True}),
+            ]
 
-    def check_leaves(self, ndim, periodic):
-        pts, tree = make_test(0, ndim, periodic=periodic)
+    def check_runs(self, args, kwargs):
+        pts, tree = make_test(*args, **kwargs)
         left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
         right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-        out = []
-        pleaves = []
-        for i, leaf in enumerate(tree.leaves):
-            assert(leaf.id == i)
-            pleaf = parallel.ParallelLeaf(leaf, left_edges, right_edges)
-            pleaf.tessellate(pts)
-            pleaves.append(pleaf)
-            out.append(pleaf.outgoing_points())
-        pleaves[0].incoming_points(1, out[1][0][0], out[1][1], out[1][2],
-                                   out[1][3], pts[out[1][0][0], :])
-        pleaves[0].incoming_points(0, out[0][0][0], out[0][1], out[0][2],
-                                   out[0][3], pts[out[0][0][0], :])
+        for leaf in tree.leaves:
+            pleaf = self._func(leaf, left_edges, right_edges)
 
-    def test_leaves_generate(self):
-        for periodic in [False, True]:
-            for ndim in [2, 3]: # ,4]:
-                yield self.check_leaves, ndim, periodic
+    def check_tessellate(self, args, kwargs):
+        pts, tree = make_test(*args, **kwargs)
+        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        leaf = tree.leaves[0]
+        pleaf = self._func(leaf, left_edges, right_edges)
+        pleaf.pts = pts[tree.idx[pleaf.idx], :]
+        pleaf.tessellate()
+        pleaf.tessellate(pts)
+        pleaf.tessellate(pts, tree.idx)
+
+    def check_exchange(self, args, kwargs):
+        pts, tree = make_test(*args, **kwargs)
+        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        leaf0 = tree.leaves[0]
+        leaf1 = tree.leaves[1]
+        pleaf0 = self._func(leaf0, left_edges, right_edges)
+        pleaf1 = self._func(leaf1, left_edges, right_edges)
+        pleaf0.tessellate(pts, tree.idx)
+        pleaf1.tessellate(pts, tree.idx)
+        out0 = pleaf0.outgoing_points()
+        out1 = pleaf1.outgoing_points()
+        pleaf1.incoming_points(0, out0[0][1], out0[1], out0[2], out0[3],
+                               pts[out0[0][1], :])
+        pleaf1.incoming_points(1, out1[0][1], out1[1], out1[2], out1[3],
+                               pts[out1[0][1], :])
+        if kwargs.get('periodic', True):
+            idx = pleaf1.idx
+            pos = pts[idx, :]
+            pleaf1.periodic_left[0] = True
+            pleaf1.periodic_right[0] = True
+            pos[0,0] = tree.left_edge[0]
+            pos[1,0] = tree.right_edge[0]
+            pleaf1.incoming_points(1, idx, pleaf1.neighbors, 
+                                   pleaf1.left_edges, pleaf1.right_edges, pos)
+
+    def test_tessellate_generator(self):
+        for args, kwargs in self.param_runs:
+            yield self.check_tessellate, args, kwargs
+
+    def test_exchange_generator(self):
+        for args, kwargs in self.param_runs:
+            yield self.check_exchange, args, kwargs
+
+    def test_serialize(self):
+        pts, tree = make_test(0, 2)
+        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        leaf = tree.leaves[0]
+        pleaf = self._func(leaf, left_edges, right_edges)
+        pleaf.tessellate(pts, tree.idx)
+        pleaf.serialize(store=True)
 
 
-class TestParallelVoronoiVolumes(MyTestFunction):
+class TestDelaunayProcessMPI(MyTestCase):
+
+    def setup_param(self):
+        self._func = parallel.DelaunayProcessMPI
+        taskname1 = 'triangulate'
+        taskname2 = 'volumes'
+        ndim = 2
+        periodic = False
+        pts, tree = make_test(0, ndim, periodic=periodic)
+        self._dummy1 = self._func(taskname1, pts, tree)
+        self._dummy2 = self._func(taskname1, pts, tree, use_buffer=True)
+        self._dummy3 = self._func(taskname2, pts, tree)
+        self._dummy4 = self._func(taskname2, pts, tree, use_buffer=True)
+        self._leaves = self._dummy1._leaves
+        self.param_runs = [
+            ((taskname1, pts, tree), {}),
+            ((taskname1, pts, GenericTree.from_tree(tree)), {}),
+            ((taskname1, pts, tree), {'use_double':True}),
+            ((taskname1, pts, tree), {'use_buffer':True}),
+            ((taskname2, pts, tree), {}),
+            ((taskname2, pts, tree), {'use_buffer':True})
+            ]
+        self.param_raises = [
+            (ValueError, ('null', pts, tree), {})
+            ]
+
+    def check_runs(self, args, kwargs):
+        self.func(*args, **kwargs).run()
+
+    def test_gather_leaf_arrays(self):
+        arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in self._leaves}
+        self._dummy1.gather_leaf_arrays(arr)
+        self._dummy2.gather_leaf_arrays(arr)
+
+
+class TestDelaunayProcessMulti(MyTestCase):
+
+    def setup_param(self):
+        self._func = parallel.DelaunayProcessMulti
+        self.param_runs = [
+            (('triangulate',), {}),
+            (('triangulate',), {'limit_mem':True}),
+            (('volumes',), {})
+            ]
+
+    def check_runs(self, args, kwargs):
+        (taskname,) = args
+        ndim = 2
+        periodic = False
+        pts, tree = make_test(0, ndim, periodic=periodic)
+        idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+        ptsArray = mp.RawArray('d', pts.size)
+        memoryview(idxArray)[:] = tree.idx
+        memoryview(ptsArray)[:] = pts
+        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        leaves = tree.leaves
+        nproc = 2  # len(leaves)
+        count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
+        lock = mp.Condition()
+        queues = [mp.Queue() for _ in xrange(nproc+1)]
+        in_pipes = [None for _ in xrange(nproc)]
+        out_pipes = [None for _ in xrange(nproc)]
+        for i in range(nproc):
+            out_pipes[i],in_pipes[i] = mp.Pipe(True)
+        # Split leaves
+        task2leaves = [[] for _ in xrange(nproc)]
+        for leaf in leaves:
+            task = leaf.id % nproc
+            task2leaves[task].append(leaf)
+        # Dummy process
+        processes = []
+        for i in xrange(nproc):
+            processes.append(self._func(
+                taskname, i, task2leaves[i],
+                ptsArray, idxArray, left_edges, right_edges,
+                queues, lock, count, in_pipes[i], **kwargs))
+        # Perform setup on higher processes
+        for i in xrange(1, nproc):
+            P = processes[i]
+            P.tessellate_leaves()
+            P.outgoing_points()
+        for i in xrange(1, nproc):
+            count[0].value += 1
+        # Perform entire run on lowest process
+        P = processes[0]
+        P.run(test_in_serial=True)
+        # Do tear down on higher processes
+        for i in xrange(1, nproc):
+            P = processes[i]
+            P.incoming_points()
+            P.enqueue_result()
+            for l in range(len(task2leaves[i])):
+                x = P.receive_result(out_pipes[i])
+
+
+class TestParallelVoronoiVolumes(MyTestCase):
 
     def setup_param(self):
         self._func = parallel.ParallelVoronoiVolumes
-        ndim_list = [2, 3] # , 4]
+        ndim_list = [2, 3]  # , 4]
         param_test = []
         self._fprof = 'test_ParallelVoronoiVolumes.cProfile'
         for ndim in ndim_list:
             param_test += [
                 ((0, ndim, 2), {}),
-                ((1000, ndim, 2), {'nleaves': 2}),
-                ((4*4*2, ndim, 4), {'leafsize': 8}),
+                ((100, ndim, 2), {'nleaves': 2}),
+                ((100, ndim, 4), {'nleaves': 4}),
+                ((100, ndim, 4), {'nleaves': 8}),
+                # ((1000, ndim, 2), {'nleaves': 2}),
+                # ((4*4*2, ndim, 4), {'leafsize': 8}),
                 # ((1e5, ndim, 8), {'nleaves': 8}),
                 # ((1e7, ndim, 10), {'nleaves': 10}),
                 ]
@@ -256,23 +358,28 @@ class TestParallelVoronoiVolumes(MyTestFunction):
                         ]
 
     def check_returns(self, result, args, kwargs):
+        print result
+        print self.func(*args, **kwargs)
         assert(np.allclose(result, self.func(*args, **kwargs)))
         if os.path.isfile(self._fprof):
             os.remove(self._fprof)
 
 
-class TestParallelDelaunay(MyTestFunction):
+class TestParallelDelaunay(MyTestCase):
 
     def setup_param(self):
         self._func = parallel.ParallelDelaunay
-        ndim_list = [2, 3] # , 4]
+        ndim_list = [2, 3]  # , 4]
         param_test = []
         self._fprof = 'test_ParallelDelaunay.cProfile'
         for ndim in ndim_list:
             param_test += [
                 ((0, ndim, 2), {}),
-                ((1000, ndim, 2), {'nleaves': 2}),
-                ((4*4*2, ndim, 4), {'leafsize': 8}),
+                ((100, ndim, 2), {'nleaves': 2}),
+                ((100, ndim, 4), {'nleaves': 4}),
+                ((100, ndim, 4), {'nleaves': 8}),
+                # ((1000, ndim, 2), {'nleaves': 2}),
+                # ((4*4*2, ndim, 4), {'leafsize': 8}),
                 # ((1e5, ndim, 8), {'nleaves': 8}),
                 # ((1e7, ndim, 10), {'nleaves': 10}),
                 ]
@@ -321,178 +428,3 @@ class TestParallelDelaunay(MyTestFunction):
             raise
         if os.path.isfile(self._fprof):
             os.remove(self._fprof)
-
-
-class TestDelaunayProcessMPI(MyTestFunction):
-
-    def setup_param(self):
-        self._func = parallel.DelaunayProcessMPI
-        taskname1 = 'triangulate'
-        taskname2 = 'volumes'
-        ndim = 2
-        periodic = False
-        pts, tree = make_test(0, ndim, periodic=periodic)
-        self._dummy1 = self._func(taskname1, pts, tree)
-        self._dummy2 = self._func(taskname1, pts, tree, use_buffer=True)
-        self._dummy3 = self._func(taskname2, pts, tree)
-        self._dummy4 = self._func(taskname2, pts, tree, use_buffer=True)
-        self._leaves = self._dummy1._leaves
-        self.param_runs = [
-            ((taskname1, pts, tree), {}),
-            ((taskname1, pts, GenericTree.from_tree(tree)), {}),
-            ((taskname1, pts, tree), {'use_double':True}),
-            ((taskname1, pts, tree), {'use_buffer':True}),
-            ((taskname2, pts, tree), {}),
-            ((taskname2, pts, tree), {'use_buffer':True})
-            ]
-        self.param_raises = [
-            (ValueError, ('null', pts, tree), {})
-            ]
-
-    def check_runs(self, args, kwargs):
-        self.func(*args, **kwargs).run()
-
-    def test_get_leaf(self):
-        self._dummy1.get_leaf(0)
-
-    def test_tessellate_leaves(self):
-        self._dummy1.tessellate_leaves()
-
-    def test_gather_leaf_arrays(self):
-        arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in self._leaves}
-        self._dummy1.gather_leaf_arrays(arr)
-        self._dummy2.gather_leaf_arrays(arr)
-
-    def test_alltoall_leaf_arrays(self):
-        arr = {(leaf.id, 0): np.arange(5*(leaf.id+1)) for leaf in self._leaves}
-        self._dummy1.alltoall_leaf_arrays(arr)
-        out = self._dummy2.alltoall_leaf_arrays(arr, return_counts=True)
-        self._dummy2.alltoall_leaf_arrays(arr, leaf_counts=out[1])
-        self._dummy2.alltoall_leaf_arrays({}, dtype=arr[(0,0)].dtype)
-        nt.assert_raises(Exception, self._dummy2.alltoall_leaf_arrays, {})
-
-    def test_outgoing_points(self):
-        self._dummy1.tessellate_leaves()
-        self._dummy2.tessellate_leaves()
-        self._dummy1.outgoing_points()
-        self._dummy2.outgoing_points()
-
-    def test_incoming_points(self):
-        self._dummy1.tessellate_leaves()
-        self._dummy2.tessellate_leaves()
-        self._dummy1.outgoing_points()
-        self._dummy2.outgoing_points()
-        self._dummy1.incoming_points()
-        self._dummy2.incoming_points()
-
-    def test_enqueue_triangulation(self):
-        self._dummy1.tessellate_leaves()
-        self._dummy2.tessellate_leaves()
-        self._dummy1.enqueue_triangulation()
-        self._dummy2.enqueue_triangulation()
-        
-    def test_enqueue_volumes(self):
-        self._dummy1.tessellate_leaves()
-        self._dummy1.enqueue_volumes()
-        self._dummy2.tessellate_leaves()
-        self._dummy2.enqueue_volumes()
-
-
-class TestDelaunayProcessMulti(MyTestFunction):
-
-    def setup_param(self):
-        self._func = parallel.DelaunayProcessMulti
-        taskname = 'triangulate'
-        ndim = 2
-        periodic = False
-        pts, tree = make_test(0, ndim, periodic=periodic)
-        idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-        ptsArray = mp.RawArray('d', pts.size)
-        memoryview(idxArray)[:] = tree.idx
-        memoryview(ptsArray)[:] = pts
-        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-        leaves = tree.leaves
-        nproc = 2 # len(leaves)
-        count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
-        lock = mp.Condition()
-        queues = [mp.Queue() for _ in xrange(nproc+1)]
-        in_pipes = [None for _ in xrange(nproc)]
-        out_pipes = [None for _ in xrange(nproc)]
-        for i in range(nproc):
-            out_pipes[i],in_pipes[i] = mp.Pipe(True)
-        # Split leaves
-        task2leaves = [[] for _ in xrange(nproc)]
-        for leaf in leaves:
-            task = leaf.id % nproc
-            task2leaves[task].append(leaf)
-        # Dummy process
-        self._dummy_args1 = (taskname, 0, task2leaves[0],
-                             ptsArray, idxArray,
-                             left_edges, right_edges,
-                             queues, lock, count, in_pipes[0])
-        self._dummy_args2 = (taskname, 1, task2leaves[1],
-                             ptsArray, idxArray,
-                             left_edges, right_edges,
-                             queues, lock, count, in_pipes[1])
-        self._dummy1 = self._func(*self._dummy_args1)
-        self._dummy2 = self._func(*self._dummy_args2)
-        self.param_runs = []
-        self.param_raises = []
-
-    # def check_runs(self, args, kwargs):
-    #     self.func(*args, **kwargs).run()
-
-    def test_tessellate_leaves(self):
-        self._dummy1.tessellate_leaves()
-
-    # def test_outgoing_points(self):
-    #     self._dummy1.outgoing_points()
-        
-
-    # def test_incoming_points(self):
-    #     self._dummy1.incoming_points()
-
-# # def test_DelaunayProcess2():
-# #     pts, tree = make_test(0, 2)
-# #     idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-# #     ptsArray = mp.RawArray('d',pts.size)
-# #     memoryview(idxArray)[:] = tree.idx
-# #     memoryview(ptsArray)[:] = pts
-# #     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-# #     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-# #     leaves = tree.leaves
-# #     nproc = 2 # len(leaves)
-# #     count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
-# #     lock = mp.Condition()
-# #     queues = [mp.Queue() for _ in xrange(nproc+1)]
-# #     in_pipes = [None for _ in xrange(nproc)]
-# #     out_pipes = [None for _ in xrange(nproc)]
-# #     for i in range(nproc):
-# #         out_pipes[i],in_pipes[i] = mp.Pipe(True)
-# #     # Split leaves
-# #     task2leaves = [[] for _ in xrange(nproc)]
-# #     for leaf in leaves:
-# #         task = leaf.id % nproc
-# #         task2leaves[task].append(leaf)
-# #     # Create processes & tessellate
-# #     processes = []
-# #     for i in xrange(nproc):
-# #         P = parallel.DelaunayProcess('triangulate', i, task2leaves[i],
-# #                                      ptsArray, idxArray,
-# #                                      left_edges, right_edges,
-# #                                      queues, lock, count, in_pipes[i])
-# #         processes.append(P)
-# #     # Split
-# #     P1, P2 = processes[0], processes[1]
-# #     # Do partial run on 1
-# #     P1.tessellate_leaves()
-# #     P1.outgoing_points()
-# #     # Full run on 2
-# #     P2.run()
-# #     # Finish on 1
-# #     i,j,arr,ln,rn = queues[0].get()
-# #     queues[0].put((i,j,np.array([]),ln,rn))
-# #     P1.incoming_points()
-# #     P1.enqueue_triangulation()
-# #     time.sleep(0.01)

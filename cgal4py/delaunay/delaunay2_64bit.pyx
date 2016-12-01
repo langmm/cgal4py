@@ -1363,7 +1363,9 @@ cdef class Delaunay2_64bit:
         attr = '_'+fget.__name__
         def wrapped_fget(solf):
             if solf._locked:
-                raise RuntimeError("Cannot get dependent property '{}' while triangulation is locked.".format(attr))
+                raise RuntimeError("Cannot get dependent property " +
+                                   "'{}' ".format(attr) +
+                                   "while triangulation is locked.")
             solf._update_tess()
             if attr not in solf._cache_to_clear_on_update:
                 solf._cache_to_clear_on_update[attr] = fget(solf)

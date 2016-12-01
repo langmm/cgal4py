@@ -4,7 +4,7 @@ from datetime import datetime
 import cProfile
 import pstats
 import time
-from nose.tools import assert_raises, nottest
+import nose.tools as nt
 from cgal4py import triangulate, voronoi_volumes, domain_decomp
 from test_delaunay2 import pts as pts2
 from test_delaunay2 import left_edge as left_edge2
@@ -14,7 +14,7 @@ from test_delaunay3 import left_edge as left_edge3
 from test_delaunay3 import right_edge as right_edge3
 
 
-@nottest
+@nt.nottest
 def make_points(npts, ndim, distrib='uniform', seed=0):
     npts = int(npts)
     if npts <= 0:
@@ -50,7 +50,7 @@ def make_points(npts, ndim, distrib='uniform', seed=0):
     return pts, left_edge, right_edge
 
 
-@nottest
+@nt.nottest
 def make_test(npts, ndim, distrib='uniform', periodic=False,
               leafsize=None, nleaves=0):
     # Points
@@ -65,7 +65,7 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
     return pts, tree
 
 
-@nottest
+@nt.nottest
 def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
              profile=False, use_mpi=False, use_buffer=False, **kwargs):
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
@@ -107,37 +107,87 @@ def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
         return ps
 
 
-def test_triangulate():
-    T2 = triangulate(pts2)
-    T3 = triangulate(pts3)
-    T2 = triangulate(pts2, periodic=True,
-                     left_edge=left_edge2, right_edge=right_edge2)
-    T3 = triangulate(pts3, periodic=True,
-                     left_edge=left_edge3, right_edge=right_edge3)
-    del(T2, T3)
-    assert_raises(ValueError, triangulate, np.zeros((3, 3, 3)))
-    assert_raises(ValueError, triangulate, pts2, left_edge=np.zeros(3))
-    assert_raises(ValueError, triangulate, pts2, right_edge=np.zeros(3))
-    assert_raises(ValueError, triangulate, pts2,
-                  left_edge=np.zeros((2, 2, 2)))
-    assert_raises(ValueError, triangulate, pts2,
-                  right_edge=np.zeros((2, 2, 2)))
-    assert_raises(NotImplementedError, triangulate, pts2, limit_mem=True)
+class MyTestCase(object):
+
+    def __init__(self):
+        self._func = None
+        self.param_runs = []
+        self.param_returns = []
+        self.param_raises = []
+        self.setup_param()
+
+    def setup_param(self):
+        pass
+
+    @property
+    def func(self):
+        if self._func is None:
+            raise AttributeError("_func must be set.")
+        else:
+            return self._func
+
+    def check_runs(self, args, kwargs):
+        self.func(*args, **kwargs)
+
+    def check_returns(self, result, args, kwargs):
+        nt.eq_(result, self.func(*args, **kwargs))
+
+    def check_raises(self, excpt, args, kwargs):
+        nt.assert_raises(excpt, self.func, *args, **kwargs)
+
+    def test_runs_generator(self):
+        for args, kwargs in self.param_runs:
+            yield self.check_runs, args, kwargs
+
+    def test_returns_generator(self):
+        for res, args, kwargs in self.param_returns:
+            yield self.check_returns, res, args, kwargs
+
+    def test_raises_generator(self):
+        for err, args, kwargs in self.param_raises:
+            yield self.check_raises, err, args, kwargs
 
 
-def test_voronoi_volumes():
-    v2 = voronoi_volumes(pts2)
-    v3 = voronoi_volumes(pts3)
-    v2 = voronoi_volumes(pts2, periodic=True,
-                         left_edge=left_edge2, right_edge=right_edge2)
-    v3 = voronoi_volumes(pts3, periodic=True,
-                         left_edge=left_edge3, right_edge=right_edge3)
-    del(v2, v3)
-    assert_raises(ValueError, voronoi_volumes, np.zeros((3, 3, 3)))
-    assert_raises(ValueError, voronoi_volumes, pts2, left_edge=np.zeros(3))
-    assert_raises(ValueError, voronoi_volumes, pts2, right_edge=np.zeros(3))
-    assert_raises(ValueError, voronoi_volumes, pts2,
-                  left_edge=np.zeros((2, 2, 2)))
-    assert_raises(ValueError, voronoi_volumes, pts2,
-                  right_edge=np.zeros((2, 2, 2)))
-    assert_raises(NotImplementedError, voronoi_volumes, pts2, limit_mem=True)
+
+class TestTriangulate(MyTestCase):
+
+    def setup_param(self):
+        self._func = triangulate
+        self.param_runs = [
+            ((pts2,), {}),
+            ((pts3,), {}),
+            ((pts2,), {'periodic': True,
+                       'left_edge': left_edge2, 'right_edge': right_edge2}),
+            ((pts3,), {'periodic': True,
+                       'left_edge': left_edge3, 'right_edge': right_edge3}),
+            ]
+        self.param_raises = [
+            (ValueError, (np.zeros((3, 3, 3)),), {}),
+            (ValueError, (pts2,), {'left_edge': np.zeros(3)}),
+            (ValueError, (pts2,), {'right_edge': np.zeros(3)}),
+            (ValueError, (pts2,), {'left_edge': np.zeros((2, 2, 2))}),
+            (ValueError, (pts2,), {'right_edge': np.zeros((2, 2, 2))}),
+            (NotImplementedError, (pts2,), {'limit_mem': True}),
+            ]
+
+
+class TestVoronoiVolumes(MyTestCase):
+
+    def setup_param(self):
+        self._func = voronoi_volumes
+        self.param_runs = [
+            ((pts2,), {}),
+            ((pts3,), {}),
+            ((pts2,), {'periodic': True,
+                       'left_edge': left_edge2, 'right_edge': right_edge2}),
+            ((pts3,), {'periodic': True,
+                       'left_edge': left_edge3, 'right_edge': right_edge3}),
+            ]
+        self.param_raises = [
+            (ValueError, (np.zeros((3, 3, 3)),), {}),
+            (ValueError, (pts2,), {'left_edge': np.zeros(3)}),
+            (ValueError, (pts2,), {'right_edge': np.zeros(3)}),
+            (ValueError, (pts2,), {'left_edge': np.zeros((2, 2, 2))}),
+            (ValueError, (pts2,), {'right_edge': np.zeros((2, 2, 2))}),
+            (NotImplementedError, (pts2,), {'limit_mem': True}),
+            ]
