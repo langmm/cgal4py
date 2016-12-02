@@ -51,8 +51,8 @@ def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
     if overwrite or not os.path.isfile(fname_stat):
         cProfile.run(
             "from cgal4py.tests.test_cgal4py import run_test; "+
-            "run_test('{}',{},{},{},".format(
-                func, npart, nproc, ndim, periodic) +
+            "run_test({},{}, nproc={}, func_name='{}',".format(
+                npart, ndim, nproc, func) +
             "periodic={},use_mpi={},use_buffer={})".format(
                 periodic, use_mpi, use_buffer),
             fname_stat)
@@ -89,7 +89,8 @@ def time_run(func, npart, nproc, ndim, nrep=1, periodic=False, use_mpi=False,
     times = np.empty(nrep, 'float')
     for i in range(nrep):
         t1 = time.time()
-        run_test(func, npart, nproc, ndim, periodic=periodic, use_mpi=use_mpi,
+        run_test(npart, ndim, nproc=nproc, func_name=func,
+                 periodic=periodic, use_mpi=use_mpi,
                  use_buffer=use_buffer)
         t2 = time.time()
         times[i] = t2 - t1
@@ -140,6 +141,7 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
             times[j, i, 0], times[j, i, 1] = time_run(
                 func, npart, nproc, ndim, nrep=nrep,
                 periodic=periodic, use_mpi=use_mpi, use_buffer=use_buffer)
+            print("Finished {}D on {}.".format(ndim, nproc))
     fig, axs = plt.subplots(1, 1)
     for i in range(len(ndim_list)):
         ndim = ndim_list[i]

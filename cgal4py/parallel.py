@@ -721,6 +721,13 @@ class DelaunayProcessMPI(object):
         for i in range(self._total_leaves):
             task = i % size
             self._task2leaf[task].append(i)
+                
+    def output_filename(self):
+        if self._task == 'triangulate':
+            fname = _tess_filename(unique_str=self._unique_str)
+        elif self._task == 'volumes':
+            fname = _vols_filename(unique_str=self._unique_str)
+        return fname
 
     def get_leaf(self, leafid):
         r"""Return the leaf object associated wth a given leaf id.
@@ -1040,7 +1047,6 @@ class DelaunayProcessMPI(object):
             # T.write_to_file(ftess)
             with open(ftess, 'wb') as fd:
                 T.serialize_to_buffer(fd, self._pts)
-                
 
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
@@ -1082,7 +1088,6 @@ class DelaunayProcessMPI(object):
             with open(fvols, 'wb') as fd:
                 fd.write(vol.tobytes())
 
-
     def run(self):
         r"""Performs tessellation and communication for each leaf on this
         process."""
@@ -1121,7 +1126,7 @@ class DelaunayProcessMPI(object):
                 self.enqueue_volumes()
         self._done = True
         # Clean up leaves
-        if self._proc_idx == 0 and self._limit_mem:
+        if self._limit_mem:
             for leaf in self._leaves:
                 leaf.remove_tess()
 
@@ -1407,6 +1412,9 @@ class DelaunayProcessMulti(mp.Process):
                     with self._count[2].get_lock():
                         self._count[2].value = 1
             self.enqueue_result()
+        # Clean up leaves
+        for leaf in self._leaves:
+            leaf.remove_tess()
         # Synchronize to ensure rapid receipt
         if test_in_serial:
             with self._count[0].get_lock():
@@ -1417,9 +1425,6 @@ class DelaunayProcessMulti(mp.Process):
         if self._count[0].value < self._num_proc:
             self._lock.wait()
         else:
-            # Clean up leaves
-            for leaf in self._leaves:
-                leaf.remove_tess()
             self._lock.notify_all()
         self._lock.release()
         self._done = True

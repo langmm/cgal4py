@@ -178,11 +178,11 @@ class TestDelaunayProcessMPI(MyTestCase):
             ]
 
     def check_runs(self, args, kwargs):
-        self.func(*args, **kwargs).run()
-        fvols = parallel._vols_filename(
-            unique_str=kwargs.get('unique_str', None))
-        if os.path.isfile(fvols):
-            os.remove(fvols)
+        x = self.func(*args, **kwargs)
+        x.run()
+        fname = x.output_filename()
+        if os.path.isfile(fname):
+            os.remove(fname)
 
     def test_gather_leaf_arrays(self):
         arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in self._leaves}
@@ -250,9 +250,15 @@ class TestDelaunayProcessMulti(MyTestCase):
             P.enqueue_result()
             for l in range(len(task2leaves[i])):
                 x = P.receive_result(out_pipes[i])
-            if kwargs.get('limit_mem', False):
-                for leaf in P._leaves:
+        # Clean up files
+        for i in xrange(nproc):
+            P = processes[i]
+            for leaf in P._leaves:
+                if kwargs.get('limit_mem', False):
                     leaf.remove_tess()
+                ffinal = leaf.tess_output_filename
+                if os.path.isfile(ffinal):
+                    os.remove(ffinal)
 
 
 class TestParallelDelaunay(MyTestCase):
@@ -314,7 +320,8 @@ class TestParallelDelaunay(MyTestCase):
                     T.num_edges, T.num_finite_edges, T.num_infinite_edges))
                 if ndim == 3:
                     print('\t facets: {}, {}, {}'.format(
-                        T.num_facets, T.num_finite_facets, T.num_infinite_facets))
+                        T.num_facets, T.num_finite_facets,
+                        T.num_infinite_facets))
             raise
         if os.path.isfile(self._fprof):
             os.remove(self._fprof)
