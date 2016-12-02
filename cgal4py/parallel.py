@@ -71,6 +71,11 @@ def _leaf_tess_filename(leaf_id, unique_str=None):
                               unique_str=unique_str, ext='.dat')
 
 
+def _final_leaf_tess_filename(leaf_id, unique_str=None):
+    return _generate_filename('finaleleaf{}'.format(leaf_id),
+                              unique_str=unique_str, ext='.dat')
+
+
 def write_mpi_script(fname, read_func, taskname, unique_str=None,
                      use_double=False, use_buffer=False, overwrite=False,
                      profile=False, limit_mem=False):
@@ -172,7 +177,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "                                use_double=use_double,",
         "                                use_buffer=use_buffer,",
         "                                unique_str=unique_str,",
-        "                                limit_mem=limit_mem)",
+        "                                limit_mem={})".format(limit_mem),
         "p.run()"]
     if profile:
         lines += [
@@ -617,7 +622,7 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
         else:
             cons = tools.ConsolidatedLeaves32(ndim, idx_inf, ncells_tot)
         for i, leaf in enumerate(tree.leaves):
-            fname = _leaf_tess_filename(leaf.id, unique_str=unique_str)
+            fname = _final_leaf_tess_filename(leaf.id, unique_str=unique_str)
             cons.add_leaf_fromfile(fname)
             os.remove(fname)
     cons.finalize()
@@ -744,7 +749,7 @@ class DelaunayProcessMPI(object):
         
         """
         total_arr = {}
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             leaf_ids = local_arr.keys()
             np_dtype = local_arr[leaf_ids[0]].dtype
             mpi_dtype = _get_mpi_type(np_dtype)
@@ -820,7 +825,7 @@ class DelaunayProcessMPI(object):
         
         """
         total_arr = {}
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             local_leaf_ids = local_arr.keys()
             leaf_ids = [[] for i in range(self._num_proc)]
             local_array_count = 0
@@ -906,7 +911,7 @@ class DelaunayProcessMPI(object):
 
     def outgoing_points(self):
         r"""Enqueues points at edges of each leaf's boundaries."""
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             send_int = {}
             send_flt = {}
             for leaf in self._leaves:
@@ -959,7 +964,7 @@ class DelaunayProcessMPI(object):
 
     def incoming_points(self):
         r"""Takes points from the queue and adds them to the triangulation."""
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             nrecv = 0
             for k, v in self._tot_recv.items():
                 src, dst = k
@@ -984,7 +989,7 @@ class DelaunayProcessMPI(object):
 
     def enqueue_triangulation(self):
         r"""Enqueue resulting tessellation."""
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             send_arr = {}
             for leaf in self._leaves:
                 send_arr[leaf.id] = leaf.serialize(as_single_array=True)
@@ -1040,7 +1045,7 @@ class DelaunayProcessMPI(object):
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
         local = {leaf.id: leaf.voronoi_volumes() for leaf in self._leaves}
-        if self._use_buffer:
+        if self._use_buffer:  # pragma: no cover
             total = self.gather_leaf_arrays(local)
             if self._proc_idx == 0:
                 # Preallocate
@@ -1092,7 +1097,7 @@ class DelaunayProcessMPI(object):
             while nrecv != 0:
                 self.outgoing_points()
                 nrecv0 = self.incoming_points()
-                if self._use_buffer:
+                if self._use_buffer:  # pragma: no cover
                     nrecv_local = np.array([nrecv0], np_dtype)
                     nrecv_total = None
                     if self._proc_idx == 0:
@@ -1115,6 +1120,10 @@ class DelaunayProcessMPI(object):
             elif self._task == 'volumes':
                 self.enqueue_volumes()
         self._done = True
+        # Clean up leaves
+        if self._proc_idx == 0 and self._limit_mem:
+            for leaf in self._leaves:
+                leaf.remove_tess()
 
 
 class DelaunayProcessMulti(mp.Process):
@@ -1148,6 +1157,11 @@ class DelaunayProcessMulti(mp.Process):
         unique_str (str, optional): Unique string identifying the domain
             decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
             file naming. Defaults to None.
+        limit_mem (bool, optional): If False, the triangulation results from
+            each process are moved to local memory using `multiprocessing`
+            pipes. If True, each process writes out tessellation info to
+            files which are then incrementally loaded as consolidation occurs.
+            Defaults to False.
         **kwargs: Variable keyword arguments are passed to
             `multiprocessing.Process`.
 
@@ -1241,7 +1255,6 @@ class DelaunayProcessMulti(mp.Process):
         r"""Enqueue the appropriate result for the given task."""
         if self._task == 'triangulate':
             if self._limit_mem:
-                self.output_tess()
                 self.enqueue_number_of_cells()
             else:
                 self.enqueue_triangulation()
@@ -1332,7 +1345,7 @@ class DelaunayProcessMulti(mp.Process):
     def enqueue_number_of_cells(self):
         r"""Enqueue resulting number of cells."""
         for leaf in self._leaves:
-            ncells = leaf.T.num_cells
+            ncells = leaf.write_tess_to_file()
             self._pipe.send_bytes(struct.pack('QQ', leaf.id, ncells))
 
     def receive_number_of_cells(self, pipe):
@@ -1404,6 +1417,9 @@ class DelaunayProcessMulti(mp.Process):
         if self._count[0].value < self._num_proc:
             self._lock.wait()
         else:
+            # Clean up leaves
+            for leaf in self._leaves:
+                leaf.remove_tess()
             self._lock.notify_all()
         self._lock.release()
         self._done = True
@@ -1422,6 +1438,9 @@ class ParallelLeaf(object):
         unique_str (str, optional): Unique string identifying the domain
             decomposition that will be used to construct an output file name.
             Default to None.
+        limit_mem (bool, optional): If True, triangulations for this leaf are
+            only held in memory so long as they are needed and then are output
+            to a file. Otherwise, the triangualtions are kept in local memory.
 
     Attributes:
         norig (int): The number of points originally located on this leaf.
@@ -1445,11 +1464,15 @@ class ParallelLeaf(object):
             leaves in `self.neighbors`.
         unique_str (str): Unique string identifying the domain decomposition
             that will be used to construct an output file name.
+        limit_mem (bool): If True, triangulations for this leaf are only held
+            in memory so long as they are needed and then are output to a file.
+            Otherwise, the triangualtions are kept in local memory.
         All attributes of `leaf`'s class also apply.
 
     """
 
-    def __init__(self, leaf, left_edges, right_edges, unique_str=None):
+    def __init__(self, leaf, left_edges, right_edges, unique_str=None,
+                 limit_mem=False):
         self._leaf = leaf
         self.norig = leaf.npts
         self.T = None
@@ -1486,6 +1509,7 @@ class ParallelLeaf(object):
         self.left_edges = le[self.neighbors, :]
         self.right_edges = re[self.neighbors, :]
         self.unique_str = unique_str
+        self.limit_mem = limit_mem
 
     def __getattr__(self, name):
         if name in dir(self._leaf):
@@ -1494,10 +1518,58 @@ class ParallelLeaf(object):
             raise AttributeError
 
     @property
-    def tess_output_filename(self):
+    def tess_filename(self):
         r"""The default filename that should be used for tessellation
         output."""
         return _leaf_tess_filename(self.id, unique_str=self.unique_str)
+
+    @property
+    def tess_output_filename(self):
+        r"""The default filename that should be used for tessellation
+        output."""
+        return _final_leaf_tess_filename(self.id, unique_str=self.unique_str)
+
+    def save_tess(self, fname=None):
+        r"""Save the tessellation data for this leaf to a file and then remove
+        it from memory.
+
+        Args:
+            fname (str, optional): Full path to file where tessellation data
+                should be saved. If not provided `self.tess_filename` is used.
+                Defaults to None.
+
+        """
+        if fname is None:
+            fname = self.tess_filename
+        self.T.write_to_file(fname)
+        self.T = None
+
+    def load_tess(self, fname=None):
+        r"""Load the tessellation data for this leaf from a file.
+
+        Args:
+            fname (str, optional): Full path to file where tessellation data
+                should be loaded from. If not provided `self.tess_filename` is
+                used. Defaults to None.
+
+        """
+        if fname is None:
+            fname = self.tess_filename
+        self.T = self.Tclass.from_file(fname)
+
+    def remove_tess(self, fname=None):
+        r"""Remove the tessellation data for this leaf that is saved to a file.
+
+        Args:
+            fname (str, optional): Full path to file where tessellation data
+                is stored. If not provided `self.tess_filename` is used.
+                Defaults to None.
+
+        """
+        if fname is None:
+            fname = self.tess_filename
+        if os.path.isfile(fname):
+            os.remove(fname)
 
     def tessellate(self, pts=None, idx=None):
         r"""Perform tessellation on leaf.
@@ -1508,13 +1580,16 @@ class ParallelLeaf(object):
 
         """
         if pts is None:
-            self.T = Delaunay(self.pts)
+            new_pts = self.pts
         else:
             if idx is None:
                 new_pts = np.copy(pts[self.slice, :])
             else:
                 new_pts = np.copy(pts[idx[self.slice], :])
-            self.T = Delaunay(new_pts)
+        self.T = Delaunay(new_pts)
+        self.Tclass = self.T.__class__
+        if self.limit_mem:
+            self.save_tess()
 
     def outgoing_points(self, return_pts=False):
         r"""Get indices of points that should be sent to each neighbor.
@@ -1534,6 +1609,8 @@ class ParallelLeaf(object):
                     leaves.
 
         """
+        if self.limit_mem:
+            self.load_tess()
         n = self.neighbors
         le = self.left_edges
         re = self.right_edges
@@ -1556,9 +1633,12 @@ class ParallelLeaf(object):
             ptall = [None for k in xrange(self.num_leaves)]
             for i, k in enumerate(n):
                 ptall[k] = self.pts[idx_enq[i]]
-            return hvall, n, le, re, ptall
+            out = (hvall, n, le, re, ptall)
         else:
-            return hvall, n, le, re
+            out = (hvall, n, le, re)
+        if self.limit_mem:
+            self.save_tess()
+        return out
 
     # def outgoing_points_boundary(self):
     #     r"""Get indices of points that should be sent to each neighbor."""
@@ -1567,6 +1647,8 @@ class ParallelLeaf(object):
     #     # may need to be sent to distant leaves for an accurate convex hull.
     #     # Currently points on an edge without a bordering leaf are sent to all
     #     # leaves, but it is possible this could miss a few points...
+    #     if self.limit_mem:
+    #         self.load_tess()
     #     lind, rind, iind = self.T.boundary_points(self.left_edge,
     #                                               self.right_edge,
     #                                               True)
@@ -1625,6 +1707,8 @@ class ParallelLeaf(object):
     #         for i in range(self.ndim):
     #             ln_out[k][i] = list(set(ln_out[k][i]))
     #             rn_out[k][i] = list(set(rn_out[k][i]))
+    #     if self.limit_mem:
+    #         self.save_tess()
     #     return hvall, ln_out, rn_out
 
     def incoming_points(self, leafid, idx, n, le, re, pos):
@@ -1643,6 +1727,8 @@ class ParallelLeaf(object):
         """
         if idx is None or idx.shape[0] == 0:
             return
+        if self.limit_mem:
+            self.load_tess()
         # Wrap points
         if self.id == leafid:
             for i in range(self.ndim):
@@ -1675,6 +1761,8 @@ class ParallelLeaf(object):
                 self.neighbors.append(n[i])
                 self.left_edges = np.vstack([self.left_edges, le[i, :]])
                 self.right_edges = np.vstack([self.right_edges, re[i, :]])
+        if self.limit_mem:
+            self.save_tess()
 
     # def incoming_points_boundary(self, leafid, idx, ln, rn, pos):
     #     r"""Add incoming points from other leaves.
@@ -1691,6 +1779,8 @@ class ParallelLeaf(object):
     #     """
     #     if idx.shape[0] == 0:
     #         return
+    #     if self.limit_mem:
+    #         self.load_tess()
     #     # Wrap points
     #     if self.id == leafid:
     #         for i in range(self.ndim):
@@ -1725,6 +1815,8 @@ class ParallelLeaf(object):
     #             rn[i].remove(self.id)
     #         self.left_neighbors[i] = ln[i]
     #         self.right_neighbors[i] = rn[i]
+    #     if self.limit_mem:
+    #         self.save_tess()
 
     # def consolidate(self, ncells, idx_inf, all_verts, all_cells,
     #                 leaf_start, leaf_stop, split_map, inf_map):
@@ -1770,6 +1862,8 @@ class ParallelLeaf(object):
             tuple: Vertices and neighbors for cells in the triangulation.
 
         """
+        if self.limit_mem:
+            self.load_tess()
         cells, neigh, idx_inf = self.T.serialize_info2idx(self.norig, self.idx)
         idx_verts, idx_cells = tools.py_arg_sortSerializedTess(cells)
         if store:
@@ -1778,6 +1872,7 @@ class ParallelLeaf(object):
             self.neigh = neigh
             self.sort_verts = idx_verts
             self.sort_cells = idx_cells
+            out = None
         else:
             ncell_tot = self.T.num_cells
             if as_single_array:
@@ -1785,8 +1880,11 @@ class ParallelLeaf(object):
                     np.array([cells.shape[0], ncell_tot, idx_inf]),
                     cells.flatten(), neigh.flatten(),
                     idx_verts.flatten(), idx_cells.flatten()]).astype('int64')
-                return out
-            return cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot
+            else:
+                out = (cells, neigh, idx_inf, idx_verts, idx_cells, ncell_tot)
+        if self.limit_mem:
+            self.save_tess()
+        return out
 
     def write_tess_to_file(self, fname=None):
         r"""Write out serialized information about the tessellation on this
@@ -1821,4 +1919,9 @@ class ParallelLeaf(object):
                 infinite cell.
 
         """
-        return self.T.voronoi_volumes()[:self.norig]
+        if self.limit_mem:
+            self.load_tess()
+        out = self.T.voronoi_volumes()[:self.norig]
+        if self.limit_mem:
+            self.save_tess()
+        return out

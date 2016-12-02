@@ -6,12 +6,6 @@ import pstats
 import time
 import nose.tools as nt
 from cgal4py import triangulate, voronoi_volumes, domain_decomp
-from test_delaunay2 import pts as pts2
-from test_delaunay2 import left_edge as left_edge2
-from test_delaunay2 import right_edge as right_edge2
-from test_delaunay3 import pts as pts3
-from test_delaunay3 import left_edge as left_edge3
-from test_delaunay3 import right_edge as right_edge3
 
 
 @nt.nottest
@@ -19,13 +13,28 @@ def make_points(npts, ndim, distrib='uniform', seed=0):
     npts = int(npts)
     if npts <= 0:
         if ndim == 2:
-            pts = pts2
-            left_edge = left_edge2
-            right_edge = right_edge2
+            left_edge = -2*np.ones(2, 'float64')
+            right_edge = 2*np.ones(2, 'float64')
+            pts = np.array([[-0.49419885869540180, -0.07594397977563715],
+                            [-0.06448037284989526,  0.49582484963658130],
+                            [+0.49111543670946320,  0.09383830681375946],
+                            [-0.34835358086909700, -0.35867782576523670],
+                            [-1,     -1],
+                            [-1,      1],
+                            [+1,     -1],
+                            [+1,      1]], 'float64')
         elif ndim == 3:
-            pts = pts3
-            left_edge = left_edge3
-            right_edge = right_edge3
+            left_edge = -2*np.ones(3, 'float64')
+            right_edge = 2*np.ones(3, 'float64')
+            pts = np.array([[+0,  0,  0],
+                            [-1, -1, -1],
+                            [-1, -1,  1],
+                            [-1,  1, -1],
+                            [-1,  1,  1],
+                            [+1, -1, -1],
+                            [+1, -1,  1],
+                            [+1,  1, -1],
+                            [+1,  1,  1.0000001]], 'float64')
         else:
             raise ValueError("Invalid 'ndim': {}".format(ndim))
         npts = pts.shape[0]
@@ -42,9 +51,9 @@ def make_points(npts, ndim, distrib='uniform', seed=0):
                                    size=(npts, ndim))
             np.clip(pts, LE, RE)
         elif distrib in (2, '2'):
-            pts = pts2
+            pts = make_points(0, 2)[0]
         elif distrib in (3, '3'):
-            pts = pts3
+            pts = make_points(0, 3)[0]
         else:
             raise ValueError("Invalid 'distrib': {}".format(distrib))
     return pts, left_edge, right_edge
@@ -67,7 +76,34 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
 
 @nt.nottest
 def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
-             profile=False, use_mpi=False, use_buffer=False, **kwargs):
+             profile=False, use_mpi=False, use_buffer=False,
+             limit_mem=False, **kwargs):
+    r"""Run a rountine with a designated number of points & dimensions on a
+    selected number of processors.
+
+    Args:
+        func (str): Name of the function that should be run. Values include:
+            'Delaunay': Full triangulation.
+            'VoronoiVolumes': Cell volumes from triangulation.
+        npart (int): Number of particles.
+        nproc (int): Number of processors.
+        ndim (int): Number of dimensions.
+        periodic (bool, optional): If True, the domain is assumed to be
+            periodic. Defaults to False.
+        use_mpi (bool, optional): If True, the MPI parallelized version is used
+            instead of the version using the multiprocessing package. Defaults
+            to False.
+        use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
+            versions of MPI communications will be used rather than indirect
+            communications of python objects via pickling. Defaults to False.
+        limit_mem (bool, optional): If True, memory usage is limited by
+            writing things to file at a cost to performance. Defaults to
+            False.
+
+    Raises:
+        ValueError: If `func` is not one of the supported values.
+
+    """
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     pts, left_edge, right_edge = make_points(npts, ndim, distrib=distrib)
     if func_name.lower() in ['tess', 'delaunay', 'triangulate']:
@@ -79,6 +115,7 @@ def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
     # Set keywords for multiprocessing version
     if nproc > 1:
         kwargs['use_mpi'] = use_mpi
+        kwargs['limit_mem'] = limit_mem
         if use_mpi:
             kwargs['use_buffer'] = use_buffer
             if profile:
@@ -153,21 +190,21 @@ class TestTriangulate(MyTestCase):
 
     def setup_param(self):
         self._func = triangulate
-        self.param_runs = [
-            ((pts2,), {}),
-            ((pts3,), {}),
-            ((pts2,), {'periodic': True,
-                       'left_edge': left_edge2, 'right_edge': right_edge2}),
-            ((pts3,), {'periodic': True,
-                       'left_edge': left_edge3, 'right_edge': right_edge3}),
-            ]
+        self.param_runs = []
+        for ndim in [2, 3]:  # , 4]:
+            pts, le, re = make_points(0, ndim)
+            self.param_runs += [
+                ((pts,), {}),
+                ((pts,), {'periodic': True,
+                          'left_edge': le, 'right_edge': re}),
+                ]
+        pts, le, re = make_points(0, 2)
         self.param_raises = [
             (ValueError, (np.zeros((3, 3, 3)),), {}),
-            (ValueError, (pts2,), {'left_edge': np.zeros(3)}),
-            (ValueError, (pts2,), {'right_edge': np.zeros(3)}),
-            (ValueError, (pts2,), {'left_edge': np.zeros((2, 2, 2))}),
-            (ValueError, (pts2,), {'right_edge': np.zeros((2, 2, 2))}),
-            (NotImplementedError, (pts2,), {'limit_mem': True}),
+            (ValueError, (pts,), {'left_edge': np.zeros(3)}),
+            (ValueError, (pts,), {'right_edge': np.zeros(3)}),
+            (ValueError, (pts,), {'left_edge': np.zeros((2, 2, 2))}),
+            (ValueError, (pts,), {'right_edge': np.zeros((2, 2, 2))}),
             ]
 
 
@@ -175,19 +212,19 @@ class TestVoronoiVolumes(MyTestCase):
 
     def setup_param(self):
         self._func = voronoi_volumes
-        self.param_runs = [
-            ((pts2,), {}),
-            ((pts3,), {}),
-            ((pts2,), {'periodic': True,
-                       'left_edge': left_edge2, 'right_edge': right_edge2}),
-            ((pts3,), {'periodic': True,
-                       'left_edge': left_edge3, 'right_edge': right_edge3}),
-            ]
+        self.param_runs = []
+        for ndim in [2, 3]:  # , 4]:
+            pts, le, re = make_points(0, ndim)
+            self.param_runs += [
+                ((pts,), {}),
+                ((pts,), {'periodic': True,
+                          'left_edge': le, 'right_edge': re}),
+                ]
+        pts, le, re = make_points(0, 2)
         self.param_raises = [
             (ValueError, (np.zeros((3, 3, 3)),), {}),
-            (ValueError, (pts2,), {'left_edge': np.zeros(3)}),
-            (ValueError, (pts2,), {'right_edge': np.zeros(3)}),
-            (ValueError, (pts2,), {'left_edge': np.zeros((2, 2, 2))}),
-            (ValueError, (pts2,), {'right_edge': np.zeros((2, 2, 2))}),
-            (NotImplementedError, (pts2,), {'limit_mem': True}),
+            (ValueError, (pts,), {'left_edge': np.zeros(3)}),
+            (ValueError, (pts,), {'right_edge': np.zeros(3)}),
+            (ValueError, (pts,), {'left_edge': np.zeros((2, 2, 2))}),
+            (ValueError, (pts,), {'right_edge': np.zeros((2, 2, 2))}),
             ]

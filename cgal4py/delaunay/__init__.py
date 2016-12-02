@@ -348,7 +348,7 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
         is_new += _create_pyxbld_file(bld, sources=sources,
                                       overwrite=overwrite)
     if is_new:
-        modname = _delaunay_filename('module', ndim, periodic=periodic,
+        modname = _delaunay_filename('module', dim, periodic=periodic,
                                      bit64=bit64)
         warnings.warn("\n\nExtension {} is not a built in. ".format(modname) +
                       "It was automatically generated and will be compiled " +

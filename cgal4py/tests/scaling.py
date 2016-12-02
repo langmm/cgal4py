@@ -5,66 +5,9 @@ import os
 import cProfile
 import pstats
 from cgal4py import parallel, delaunay
-from test_cgal4py import make_points, make_test
-from test_parallel import lines_load_test
+from test_cgal4py import run_test
 import matplotlib.pyplot as plt
 np.random.seed(10)
-
-
-def run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
-        use_buffer=False):
-    r"""Run a rountine with a designated number of points & dimensions on a
-    selected number of processors.
-
-    Args:
-        func (str): Name of the function that should be run. Values include:
-            'Delaunay': Full triangulation.
-            'VoronoiVolumes': Cell volumes from triangulation.
-        npart (int): Number of particles.
-        nproc (int): Number of processors.
-        ndim (int): Number of dimensions.
-        periodic (bool, optional): If True, the domain is assumed to be
-            periodic. Defaults to False.
-        use_mpi (bool, optional): If True, the MPI parallelized version is used
-            instead of the version using the multiprocessing package. Defaults
-            to False.
-        use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
-            versions of MPI communications will be used rather than indirect
-            communications of python objects via pickling. Defaults to False.
-
-    Raises:
-        ValueError: If `func` is not one of the supported values.
-
-    """
-    if nproc == 1:
-        pts, le, re = make_points(npart, ndim)
-        if func == 'Delaunay':
-            delaunay.Delaunay(pts, periodic=periodic,
-                              left_edge=le, right_edge=re)
-        elif func == 'VoronoiVolumes':
-            delaunay.VoronoiVolumes(pts, periodic=periodic,
-                                    left_edge=le, right_edge=re)
-        else:
-            raise ValueError("Unsupported function: {}".format(func))
-    else:
-        if use_mpi:
-            load_lines = lines_load_test(npart, ndim, periodic=periodic)
-            if func == 'Delaunay':
-                parallel.ParallelDelaunayMPI(load_lines, ndim, nproc,
-                                             use_buffer=use_buffer)
-            elif func == 'VoronoiVolumes':
-                parallel.ParallelVoronoiVolumesMPI(load_lines, ndim, nproc,
-                                                   use_buffer=use_buffer)
-            else:
-                raise ValueError("Unsupported function: {}".format(func))
-        else:
-            pts, tree = make_test(npart, ndim, nleaves=nproc)
-            if func == 'Delaunay':
-                parallel.ParallelDelaunay(pts, tree, nproc)
-            elif func == 'VoronoiVolumes':
-                parallel.ParallelVoronoiVolumes(pts, tree, nproc)
-            else:
-                raise ValueError("Unsupported function: {}".format(func))
 
 
 def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
@@ -107,9 +50,11 @@ def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
                                                                 bufstr)
     if overwrite or not os.path.isfile(fname_stat):
         cProfile.run(
-            "from cgal4py.tests.scaling import run; "+
-            "run('{}',{},{},{},periodic={},use_mpi={},use_buffer={})".format(
-            func, npart, nproc, ndim, periodic, use_mpi, use_buffer),
+            "from cgal4py.tests.test_cgal4py import run_test; "+
+            "run_test('{}',{},{},{},".format(
+                func, npart, nproc, ndim, periodic) +
+            "periodic={},use_mpi={},use_buffer={})".format(
+                periodic, use_mpi, use_buffer),
             fname_stat)
     if display:
         p = pstats.Stats(fname_stat)
@@ -144,8 +89,8 @@ def time_run(func, npart, nproc, ndim, nrep=1, periodic=False, use_mpi=False,
     times = np.empty(nrep, 'float')
     for i in range(nrep):
         t1 = time.time()
-        run(func, npart, nproc, ndim, periodic=periodic, use_mpi=use_mpi,
-            use_buffer=use_buffer)
+        run_test(func, npart, nproc, ndim, periodic=periodic, use_mpi=use_mpi,
+                 use_buffer=use_buffer)
         t2 = time.time()
         times[i] = t2 - t1
     return np.mean(times), np.std(times)

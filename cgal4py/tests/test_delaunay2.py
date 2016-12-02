@@ -8,18 +8,10 @@ r"""Tests for 2D Delaunay triangulation.
 import numpy as np
 import os
 from cgal4py.delaunay import Delaunay2
+from test_cgal4py import MyTestCase, make_points
 
 
-left_edge = -2*np.ones(2, 'float64')
-right_edge = 2*np.ones(2, 'float64')
-pts = np.array([[-0.49419885869540180, -0.07594397977563715],
-                [-0.06448037284989526,  0.49582484963658130],
-                [+0.49111543670946320,  0.09383830681375946],
-                [-0.34835358086909700, -0.35867782576523670],
-                [-1,     -1],
-                [-1,      1],
-                [+1,     -1],
-                [+1,      1]], 'float64')
+pts, left_edge, right_edge = make_points(0, 2)
 pts_dup = np.concatenate([pts, np.reshape(pts[0, :], (1, pts.shape[1]))])
 nverts_fin = pts.shape[0]
 nverts_inf = 1
@@ -32,260 +24,225 @@ ncells_inf = 4
 ncells = ncells_fin + ncells_inf
 
 
-def test_create():
-    T = Delaunay2()
-    del(T)
+class TestDelaunay2(MyTestCase):
 
+    def setup_param(self):
+        self._func = Delaunay2
+        self.param_runs = [
+            ((pts,), {}),
+            ((pts_dup,), {}),
+            ]
+        self.T = Delaunay2()
+        self.T.insert(pts)
+        self.Tdup = Delaunay2()
+        self.Tdup.insert(pts_dup)
+        self.pts = pts
+        self.pts_dup = pts_dup
 
-def test_insert():
-    # without duplicates
-    T = Delaunay2()
-    T.insert(pts)
-    assert(T.is_valid())
-    # with duplicates
-    T = Delaunay2()
-    T.insert(pts_dup)
-    assert(T.is_valid())
+    def check_runs(self, args, kwargs):
+        out = self.func()
+        out.insert(*args, **kwargs)
+        assert(out.is_valid())
 
+    def new_T(self):
+        T = Delaunay2()
+        T.insert(pts)
+        return T
 
-def test_equal():
-    T1 = Delaunay2()
-    T1.insert(pts)
-    T2 = Delaunay2()
-    T2.insert(pts)
-    assert(T1.is_equivalent(T2))
+    def test_equal(self):
+        assert(self.T.is_equivalent(self.T))
 
+    def check_num_verts(self, T):
+        print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
+        assert(T.num_finite_verts == nverts_fin)
+        assert(T.num_infinite_verts == nverts_inf)
+        assert(T.num_verts == nverts)
 
-def test_num_verts():
-    # without duplicates
-    T = Delaunay2()
-    T.insert(pts)
-    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
-    assert(T.num_finite_verts == nverts_fin)
-    assert(T.num_infinite_verts == nverts_inf)
-    assert(T.num_verts == nverts)
-    # with duplicates
-    T = Delaunay2()
-    T.insert(pts_dup)
-    print(T.num_finite_verts, T.num_infinite_verts, T.num_verts)
-    assert(T.num_finite_verts == nverts_fin)
-    assert(T.num_infinite_verts == nverts_inf)
-    assert(T.num_verts == nverts)
+    def check_num_edges(self, T):
+        print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
+        assert(T.num_finite_edges == nedges_fin)
+        assert(T.num_infinite_edges == nedges_inf)
+        assert(T.num_edges == nedges)
 
+    def check_num_cells(self, T):
+        print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
+        assert(T.num_finite_cells == ncells_fin)
+        assert(T.num_infinite_cells == ncells_inf)
+        assert(T.num_cells == ncells)
 
-def test_num_edges():
-    # without duplicates
-    T = Delaunay2()
-    T.insert(pts)
-    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
-    assert(T.num_finite_edges == nedges_fin)
-    assert(T.num_infinite_edges == nedges_inf)
-    assert(T.num_edges == nedges)
-    # with duplicates
-    T = Delaunay2()
-    T.insert(pts_dup)
-    print(T.num_finite_edges, T.num_infinite_edges, T.num_edges)
-    assert(T.num_finite_edges == nedges_fin)
-    assert(T.num_infinite_edges == nedges_inf)
-    assert(T.num_edges == nedges)
+    def test_counts_generate(self):
+        for T in [self.T, self.Tdup]:
+            yield self.check_num_verts, T
+            yield self.check_num_edges, T
+            yield self.check_num_cells, T
 
+    def test_all_verts(self):
+        T = self.T
+        count_fin = count_inf = 0
+        for v in T.all_verts:
+            print(v.index, v.point)
+            if v.is_infinite():
+                count_inf += 1
+            else:
+                count_fin += 1
+        count = count_fin + count_inf
+        assert(count_fin == T.num_finite_verts)
+        assert(count_inf == T.num_infinite_verts)
+        assert(count == T.num_verts)
 
-def test_num_cells():
-    # without duplicates
-    T = Delaunay2()
-    T.insert(pts)
-    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
-    assert(T.num_finite_cells == ncells_fin)
-    assert(T.num_infinite_cells == ncells_inf)
-    assert(T.num_cells == ncells)
-    # with duplicates
-    T = Delaunay2()
-    T.insert(pts_dup)
-    print(T.num_finite_cells, T.num_infinite_cells, T.num_cells)
-    assert(T.num_finite_cells == ncells_fin)
-    assert(T.num_infinite_cells == ncells_inf)
-    assert(T.num_cells == ncells)
+    def test_finite_verts(self):
+        T = self.T
+        count = 0
+        for v in T.finite_verts:
+            assert((not v.is_infinite()))
+            count += 1
+        assert(count == T.num_finite_verts)
 
+    def test_all_edges(self):
+        T = self.T
+        count_fin = count_inf = 0
+        for e in T.all_edges:
+            if e.is_infinite():
+                count_inf += 1
+            else:
+                count_fin += 1
+        print(count_fin, count_inf)
+        count = count_fin + count_inf
+        assert(count_fin == T.num_finite_edges)
+        assert(count_inf == T.num_infinite_edges)
+        assert(count == T.num_edges)
 
-def test_all_verts():
-    T = Delaunay2()
-    T.insert(pts)
-    count_fin = count_inf = 0
-    for v in T.all_verts:
-        print(v.index, v.point)
-        if v.is_infinite():
-            count_inf += 1
-        else:
-            count_fin += 1
-    count = count_fin + count_inf
-    assert(count_fin == T.num_finite_verts)
-    assert(count_inf == T.num_infinite_verts)
-    assert(count == T.num_verts)
+    def test_finite_edges(self):
+        T = self.T
+        count = 0
+        for e in T.finite_edges:
+            assert((not e.is_infinite()))
+            count += 1
+        print(count)
+        assert(count == T.num_finite_edges)
 
+    def test_all_cells(self):
+        T = self.T
+        count_fin = count_inf = 0
+        for c in T.all_cells:
+            if c.is_infinite():
+                count_inf += 1
+            else:
+                count_fin += 1
+        count = count_fin + count_inf
+        assert(count_fin == T.num_finite_cells)
+        assert(count_inf == T.num_infinite_cells)
+        assert(count == T.num_cells)
 
-def test_finite_verts():
-    T = Delaunay2()
-    T.insert(pts)
-    count = 0
-    for v in T.finite_verts:
-        assert((not v.is_infinite()))
-        count += 1
-    assert(count == T.num_finite_verts)
+    def test_finite_cells(self):
+        T = self.T
+        count = 0
+        for c in T.finite_cells:
+            assert((not c.is_infinite()))
+            count += 1
+        assert(count == T.num_finite_cells)
 
+    def test_clear(self):
+        T = self.new_T()
+        T.clear()
+        print(T.num_finite_verts, T.num_cells)
+        assert(T.num_finite_verts == 0)
+        assert(T.num_cells == 0)
 
-def test_all_edges():
-    T = Delaunay2()
-    T.insert(pts)
-    count_fin = count_inf = 0
-    for e in T.all_edges:
-        if e.is_infinite():
-            count_inf += 1
-        else:
-            count_fin += 1
-    print(count_fin, count_inf)
-    count = count_fin + count_inf
-    assert(count_fin == T.num_finite_edges)
-    assert(count_inf == T.num_infinite_edges)
-    assert(count == T.num_edges)
+    def test_io(self):
+        fname = 'test_io2348_2.dat'
+        Tout = self.T
+        Tout.write_to_file(fname)
+        Tin = Delaunay2.from_file(fname)
+        assert(Tout.num_verts == Tin.num_verts)
+        assert(Tout.num_cells == Tin.num_cells)
+        os.remove(fname)
 
+    def test_serialize(self):
+        Tout = self.T
+        f, n, i = Tout.serialize()
+        Tin = Delaunay2.from_serial(self.pts, f, n, i)
+        assert(Tout.num_verts == Tin.num_verts)
+        assert(Tout.num_cells == Tin.num_cells)
 
-def test_finite_edges():
-    T = Delaunay2()
-    T.insert(pts)
-    count = 0
-    for e in T.finite_edges:
-        assert((not e.is_infinite()))
-        count += 1
-    print(count)
-    assert(count == T.num_finite_edges)
+    def test_locate(self):
+        T = self.T
+        for c in T.finite_cells:
+            p = c.center
+            print('{}\n{}\n{}'.format(c, p, T.locate(p)))
+            assert(c == T.locate(p, c))
+            assert(c == T.locate(p))
+            assert(c.vertex(0) == T.locate(c.vertex(0).point))
+            assert(c.vertex(0) == T.locate(c.vertex(0).point, c))
+            # assert(c.edge(0) == T.locate(c.edge(0).midpoint))
+            # assert(c.edge(0) == T.locate(c.edge(0).midpoint, c))
+            break
 
+    def test_get_vertex(self):
+        T = self.T
+        for i in range(nverts_fin):
+            v = T.get_vertex(i)
+            assert(np.allclose(v.point, self.pts[i, :]))
 
-def test_all_cells():
-    T = Delaunay2()
-    T.insert(pts)
-    count_fin = count_inf = 0
-    for c in T.all_cells:
-        if c.is_infinite():
-            count_inf += 1
-        else:
-            count_fin += 1
-    count = count_fin + count_inf
-    assert(count_fin == T.num_finite_cells)
-    assert(count_inf == T.num_infinite_cells)
-    assert(count == T.num_cells)
+    def test_remove(self):
+        T = self.new_T()
+        v = T.get_vertex(0)
+        T.remove(v)
+        assert(T.num_verts == (nverts-1))
 
+    def test_is_edge(self):
+        T = self.T
+        assert(T.is_edge(T.get_vertex(0), T.get_vertex(1)))
+        assert(not T.is_edge(T.get_vertex(0), T.get_vertex(nverts_fin-1)))
 
-def test_finite_cells():
-    T = Delaunay2()
-    T.insert(pts)
-    count = 0
-    for c in T.finite_cells:
-        assert((not c.is_infinite()))
-        count += 1
-    assert(count == T.num_finite_cells)
+    def test_is_cell(self):
+        T = self.T
+        assert(T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3)))
+        assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1),
+                             T.get_vertex(nverts_fin-1)))
 
-
-def test_clear():
-    T = Delaunay2()
-    T.insert(pts)
-    T.clear()
-    print(T.num_finite_verts, T.num_cells)
-    assert(T.num_finite_verts == 0)
-    assert(T.num_cells == 0)
-
-
-def test_io():
-    fname = 'test_io2348_2.dat'
-    Tout = Delaunay2()
-    Tout.insert(pts)
-    Tout.write_to_file(fname)
-    Tin = Delaunay2()
-    Tin.read_from_file(fname)
-    assert(Tout.num_verts == Tin.num_verts)
-    assert(Tout.num_cells == Tin.num_cells)
-    os.remove(fname)
-
-
-def test_serialize():
-    Tout = Delaunay2()
-    Tout.insert(pts)
-    f, n, i = Tout.serialize()
-    Tin = Delaunay2()
-    Tin.deserialize(pts, f, n, i)
-    assert(Tout.num_verts == Tin.num_verts)
-    assert(Tout.num_cells == Tin.num_cells)
-
-
-def test_locate():
-    T = Delaunay2()
-    T.insert(pts)
-    for c in T.finite_cells:
-        p = c.center
-        print('{}\n{}\n{}'.format(c, p, T.locate(p)))
-        assert(c == T.locate(p, c))
-        assert(c == T.locate(p))
-        assert(c.vertex(0) == T.locate(c.vertex(0).point))
-        assert(c.vertex(0) == T.locate(c.vertex(0).point, c))
-        # assert(c.edge(0) == T.locate(c.edge(0).midpoint))
-        # assert(c.edge(0) == T.locate(c.edge(0).midpoint, c))
-        break
-
-
-def test_get_vertex():
-    T = Delaunay2()
-    T.insert(pts)
-    for i in range(nverts_fin):
-        v = T.get_vertex(i)
-        assert(np.allclose(v.point, pts[i, :]))
-
-
-def test_remove():
-    T = Delaunay2()
-    T.insert(pts)
-    v = T.get_vertex(0)
-    T.remove(v)
-    assert(T.num_verts == (nverts-1))
-
-
-def test_is_edge():
-    T = Delaunay2()
-    T.insert(pts)
-    assert(T.is_edge(T.get_vertex(0), T.get_vertex(1)))
-    assert(not T.is_edge(T.get_vertex(0), T.get_vertex(nverts_fin-1)))
-
-
-def test_is_cell():
-    T = Delaunay2()
-    T.insert(pts)
-    assert(T.is_cell(T.get_vertex(0), T.get_vertex(1), T.get_vertex(3)))
-    assert(not T.is_cell(T.get_vertex(0), T.get_vertex(1),
-                         T.get_vertex(nverts_fin-1)))
-
-
-def test_vert():
-    T = Delaunay2()
-    T.insert(pts)
-    vold = None
-    for v in T.all_verts:
-        pnt = v.point
-        idx = v.index
-        vol = v.dual_volume
-        print(v, idx, pnt, vol)
-        assert(v == v)
-        if vold is not None:
-            assert(v != vold)
-        if v.is_infinite():
-            assert(np.isinf(pnt).all())
-            assert(idx == np.iinfo(np.uint32).max)
-            assert(np.isclose(vol, -1))
-        else:
-            assert(np.allclose(pnt, pts[idx, :]))
-            if idx >= 4:
+    def test_vert(self):
+        T = self.new_T()
+        vold = None
+        for v in T.all_verts:
+            pnt = v.point
+            idx = v.index
+            vol = v.dual_volume
+            print(v, idx, pnt, vol)
+            assert(v == v)
+            if vold is not None:
+                assert(v != vold)
+            if v.is_infinite():
+                assert(np.isinf(pnt).all())
+                assert(idx == np.iinfo(np.uint32).max)
                 assert(np.isclose(vol, -1))
-            c = v.cell
-            v.set_cell(c)
-            v.set_point(pnt)
-        vold = v
+            else:
+                assert(np.allclose(pnt, pts[idx, :]))
+                if idx >= 4:
+                    assert(np.isclose(vol, -1))
+                c = v.cell
+                v.set_cell(c)
+                v.set_point(pnt)
+            vold = v
+
+
+# class TestVertex2(MyTestCase):
+
+#     def setup_param(self):
+#         self._func = None
+#         self.pts = make_points(0, 2)
+#         self.T = Delaunay2()
+#         self.T.insert(self.pts)
+#         self.v = self.T.finite_verts
+
+#     def check_point(self, v):
+#         pnt = v.point
+#         idx = v.index
+#         if v.isinfinite():
+#             assert(np.isinf(pnt).all())
+#             assert(idx == np.iinfo(np.uint32).max)
+#         else:
+#             assert(np.allclose(pnt, self.pts[idx, :]))
 
 
 def test_edge():

@@ -110,6 +110,10 @@ class Delaunay_with_info_3
   class Facet;
   class Cell;
 
+  Vertex infinite_vertex() const {
+    return Vertex(T.infinite_vertex());
+  }
+
   void insert(double *pts, Info *val, uint32_t n)
   {
     updated = true;

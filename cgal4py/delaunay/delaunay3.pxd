@@ -33,6 +33,8 @@ cdef extern from "c_delaunay3.hpp":
         cppclass Facet
         cppclass Cell
 
+        Vertex infinite_vertex() const
+
         void insert(double *, Info *val, uint32_t n) except +
         void remove(Vertex) except +
         void clear() except + 

@@ -130,6 +130,10 @@ public:
   class Cell;
   class Face;
 
+  Vertex infinite_vertex() const {
+    return Vertex(T.infinite_vertex());
+  }
+
   Vertex_handle non_const_handle(Vertex_const_handle vh) const {
     DVertex* p_v = (DVertex*)&(*vh);
     return (Vertex_handle(p_v));

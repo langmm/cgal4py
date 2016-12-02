@@ -131,6 +131,10 @@ public:
   class Vertex;
   class Cell;
 
+  Vertex infinite_vertex() const {
+    return Vertex(T.infinite_vertex());
+  }
+
   void insert(double *pts, Info *val, uint32_t n)
   {
     if (n == 0) 

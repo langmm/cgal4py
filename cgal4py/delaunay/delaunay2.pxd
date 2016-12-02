@@ -29,6 +29,8 @@ cdef extern from "c_delaunay2.hpp":
         cppclass Edge
         cppclass Cell
 
+        Vertex infinite_vertex() const
+
         void insert(double *, Info *val, uint32_t n) except +
         void remove(Vertex v) except +
         void clear() except +

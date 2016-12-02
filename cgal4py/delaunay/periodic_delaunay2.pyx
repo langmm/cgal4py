@@ -1394,6 +1394,22 @@ cdef class PeriodicDelaunay2:
         return <pybool>(out)
 
     @classmethod
+    def from_file(cls, fname):
+        r"""Create a triangulation from one saved to a file.
+
+        Args:
+            fname (str): Full path to file where triangulation is saved.
+
+        Returns:
+            :class:`cgal4py.delaunay.PeriodicDelaunay2`: Triangulation
+                constructed from saved information.
+
+        """
+        T = cls()
+        T.read_from_file(fname)
+        return T
+
+    @classmethod
     def from_serial(cls, *args):
         r"""Create a triangulation from serialized information.
 

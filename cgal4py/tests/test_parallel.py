@@ -2,6 +2,7 @@ r"""Tests for parallel implementation of triangulations."""
 import nose.tools as nt
 import numpy as np
 import os
+import time
 from cgal4py import parallel, delaunay
 from cgal4py.domain_decomp import GenericTree
 from test_cgal4py import make_points, make_test, MyTestCase
@@ -19,91 +20,6 @@ def lines_load_test(npts, ndim, periodic=False):
         "load_dict = dict(pts=pts, left_edge=le, right_edge=re,",
         "                 periodic={})".format(periodic)]
     return lines
-
-
-# @nt.nottest
-# def runtest(func_name, *args, **kwargs):
-#     if func_name in ['delaunay', 'Delaunay', 'triangulate']:
-#         func = runtest_ParallelDelaunay
-#     elif func_name in ['volumes','VoronoiVolumes']:
-#         func = runtest_ParallelVoronoiVolumes
-#     else:
-#         raise ValueError("Unrecognized test function: {}".format(func_name))
-#     return func(*args, **kwargs)
-
-
-# @nt.nottest
-# def runtest_ParallelSeries(func_name, ndim, use_mpi=False, periodic=False,
-#                            profile=False):
-#     tests = [
-#         {'npts':0, 'nproc':2, 'kwargs': {}},
-#         {'npts':1000, 'nproc':2, 'kwargs': {'nleaves': 2}},
-#         {'npts':4*4*2, 'nproc':4, 'kwargs': {'leafsize': 8}},
-#         # {'npts':1e5, 'nproc':8, 'kwargs': {'nleaves': 8}},
-#         # {'npts':1e7, 'nproc':10, 'kwargs': {'nleaves': 10}},
-#     ]
-#     if ndim > 2:
-#         tests = tests[1:-1]
-#     for t in tests:
-#         runtest(func_name, t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
-#                 periodic=periodic, profile=profile, **t['kwargs'])
-#     if use_mpi:
-#         for t in tests:
-#             runtest(func_name, t['npts'], ndim, t['nproc'], use_mpi=use_mpi,
-#                     use_buffer=True, periodic=periodic, profile=profile,
-#                     **t['kwargs'])
-
-
-# @nt.nottest
-# def runtest_ParallelVoronoiVolumes(npts, ndim, nproc, use_mpi=False,
-#                                    use_buffer=False, profile=False, **kwargs):
-#     pts, tree = make_test(npts, ndim, **kwargs)
-#     v_seri = delaunay.VoronoiVolumes(pts)
-#     if use_mpi:
-#         v_para = parallel.ParallelVoronoiVolumesMPI(
-#             lines_load_test(npts, ndim), ndim, nproc, use_buffer=use_buffer,
-#             profile=profile)
-#     else:
-#         v_para = parallel.ParallelVoronoiVolumes(pts, tree, nproc)
-#     assert(np.allclose(v_seri, v_para))
-
-
-# @nt.nottest
-# def runtest_ParallelDelaunay(npts, ndim, nproc, use_mpi=False,
-#                              use_buffer=False, profile=False, **kwargs):
-#     pts, tree = make_test(npts, ndim, **kwargs)
-#     T_seri = delaunay.Delaunay(pts)
-#     try:
-#         if use_mpi:
-#             T_para = parallel.ParallelDelaunayMPI(lines_load_test(npts, ndim),
-#                                                   ndim, nproc,
-#                                                   use_buffer=use_buffer,
-#                                                   profile=profile)
-#         else:
-#             T_para = parallel.ParallelDelaunay(pts, tree, nproc)
-#     except:
-#         print(("Test failed with npts={}, ndim={}, nproc={}, use_mpi={}, " +
-#                "use_buffer={}").format(npts, ndim, nproc, use_mpi, use_buffer))
-#         raise
-#     c_seri, n_seri, inf_seri = T_seri.serialize(sort=True)
-#     c_para, n_para, inf_para = T_para.serialize(sort=True)
-#     try:
-#         assert(np.all(c_seri == c_para))
-#         assert(np.all(n_seri == n_para))
-#         assert(T_para.is_equivalent(T_seri))
-#     except:
-#         for name, T in zip(['Parallel','Serial'],[T_para, T_seri]):
-#             print(name)
-#             print('\t verts: {}, {}, {}'.format(
-#                 T.num_verts, T.num_finite_verts, T.num_infinite_verts))
-#             print('\t cells: {}, {}, {}'.format(
-#                 T.num_cells, T.num_finite_cells, T.num_infinite_cells))
-#             print('\t edges: {}, {}, {}'.format(
-#                 T.num_edges, T.num_finite_edges, T.num_infinite_edges))
-#             if ndim == 3:
-#                 print('\t facets: {}, {}, {}'.format(
-#                     T.num_facets, T.num_finite_facets, T.num_infinite_facets))
-#         raise
 
 
 class TestGetMPIType(MyTestCase):
@@ -139,9 +55,11 @@ class TestWriteMPIScript(MyTestCase):
     def test_overwrite(self):
         self.func(self._fname, self._read_lines, 'volumes')
         t0 = os.path.getmtime(self._fname)
+        time.sleep(1)
         self.func(self._fname, self._read_lines, 'volumes', overwrite=False)
         t1 = os.path.getmtime(self._fname)
         nt.eq_(t0, t1)
+        time.sleep(1)
         self.func(self._fname, self._read_lines, 'volumes', overwrite=True)
         t2 = os.path.getmtime(self._fname)
         nt.assert_not_equal(t1, t2)
@@ -195,15 +113,22 @@ class TestParallelLeaf(MyTestCase):
                                pts[out0[0][1], :])
         pleaf1.incoming_points(1, out1[0][1], out1[1], out1[2], out1[3],
                                pts[out1[0][1], :])
+        pleaf0.incoming_points(0, out0[0][0], out0[1], out0[2], out0[3],
+                               pts[out0[0][0], :])
+        pleaf0.incoming_points(1, out1[0][0], out1[1], out1[2], out1[3],
+                               pts[out1[0][0], :])
         if kwargs.get('periodic', True):
             idx = pleaf1.idx
             pos = pts[idx, :]
             pleaf1.periodic_left[0] = True
             pleaf1.periodic_right[0] = True
+            pleaf1.left_neighbors.append(0)
             pos[0,0] = tree.left_edge[0]
             pos[1,0] = tree.right_edge[0]
             pleaf1.incoming_points(1, idx, pleaf1.neighbors, 
                                    pleaf1.left_edges, pleaf1.right_edges, pos)
+            pleaf1.incoming_points(0, idx, pleaf0.neighbors, 
+                                   pleaf0.left_edges, pleaf0.right_edges, pos)
 
     def test_tessellate_generator(self):
         for args, kwargs in self.param_runs:
@@ -237,13 +162,16 @@ class TestDelaunayProcessMPI(MyTestCase):
         self._dummy3 = self._func(taskname2, pts, tree)
         self._dummy4 = self._func(taskname2, pts, tree, use_buffer=True)
         self._leaves = self._dummy1._leaves
+        # TODO: use_buffer curregntly segfaults when run with coverage
         self.param_runs = [
             ((taskname1, pts, tree), {}),
             ((taskname1, pts, GenericTree.from_tree(tree)), {}),
             ((taskname1, pts, tree), {'use_double':True}),
-            ((taskname1, pts, tree), {'use_buffer':True}),
+            # ((taskname1, pts, tree), {'use_buffer':True}),
+            ((taskname1, pts, tree), {'limit_mem':True}),
             ((taskname2, pts, tree), {}),
-            ((taskname2, pts, tree), {'use_buffer':True})
+            # ((taskname2, pts, tree), {'use_buffer':True}),
+            ((taskname2, pts, tree), {'limit_mem':True}),
             ]
         self.param_raises = [
             (ValueError, ('null', pts, tree), {})
@@ -251,6 +179,10 @@ class TestDelaunayProcessMPI(MyTestCase):
 
     def check_runs(self, args, kwargs):
         self.func(*args, **kwargs).run()
+        fvols = parallel._vols_filename(
+            unique_str=kwargs.get('unique_str', None))
+        if os.path.isfile(fvols):
+            os.remove(fvols)
 
     def test_gather_leaf_arrays(self):
         arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in self._leaves}
@@ -265,7 +197,8 @@ class TestDelaunayProcessMulti(MyTestCase):
         self.param_runs = [
             (('triangulate',), {}),
             (('triangulate',), {'limit_mem':True}),
-            (('volumes',), {})
+            (('volumes',), {}),
+            (('triangulate',), {'limit_mem':True}),
             ]
 
     def check_runs(self, args, kwargs):
@@ -317,52 +250,9 @@ class TestDelaunayProcessMulti(MyTestCase):
             P.enqueue_result()
             for l in range(len(task2leaves[i])):
                 x = P.receive_result(out_pipes[i])
-
-
-class TestParallelVoronoiVolumes(MyTestCase):
-
-    def setup_param(self):
-        self._func = parallel.ParallelVoronoiVolumes
-        ndim_list = [2, 3]  # , 4]
-        param_test = []
-        self._fprof = 'test_ParallelVoronoiVolumes.cProfile'
-        for ndim in ndim_list:
-            param_test += [
-                ((0, ndim, 2), {}),
-                ((100, ndim, 2), {'nleaves': 2}),
-                ((100, ndim, 4), {'nleaves': 4}),
-                ((100, ndim, 4), {'nleaves': 8}),
-                # ((1000, ndim, 2), {'nleaves': 2}),
-                # ((4*4*2, ndim, 4), {'leafsize': 8}),
-                # ((1e5, ndim, 8), {'nleaves': 8}),
-                # ((1e7, ndim, 10), {'nleaves': 10}),
-                ]
-        self.param_returns = []
-        for args, kwargs in param_test:
-            pts, tree = make_test(args[0], args[1], **kwargs)
-            ans = delaunay.VoronoiVolumes(pts)
-            read_lines = lines_load_test(args[0], args[1])
-            for limit_mem in [False, True]:
-                self.param_returns += [
-                    (ans, (pts, tree, args[2]),
-                         {'use_mpi': False, 'limit_mem': limit_mem})
-                    ]
-                for profile in [False, self._fprof]:
-                    self.param_returns += [
-                        (ans, (pts, tree, args[2]),
-                             {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': False}),
-                        (ans, (pts, tree, args[2]),
-                             {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': True})
-                        ]
-
-    def check_returns(self, result, args, kwargs):
-        print result
-        print self.func(*args, **kwargs)
-        assert(np.allclose(result, self.func(*args, **kwargs)))
-        if os.path.isfile(self._fprof):
-            os.remove(self._fprof)
+            if kwargs.get('limit_mem', False):
+                for leaf in P._leaves:
+                    leaf.remove_tess()
 
 
 class TestParallelDelaunay(MyTestCase):
@@ -426,5 +316,51 @@ class TestParallelDelaunay(MyTestCase):
                     print('\t facets: {}, {}, {}'.format(
                         T.num_facets, T.num_finite_facets, T.num_infinite_facets))
             raise
+        if os.path.isfile(self._fprof):
+            os.remove(self._fprof)
+
+
+class TestParallelVoronoiVolumes(MyTestCase):
+
+    def setup_param(self):
+        self._func = parallel.ParallelVoronoiVolumes
+        ndim_list = [2, 3]  # , 4]
+        param_test = []
+        self._fprof = 'test_ParallelVoronoiVolumes.cProfile'
+        for ndim in ndim_list:
+            param_test += [
+                ((0, ndim, 2), {}),
+                ((100, ndim, 2), {'nleaves': 2}),
+                ((100, ndim, 4), {'nleaves': 4}),
+                ((100, ndim, 4), {'nleaves': 8}),
+                # ((1000, ndim, 2), {'nleaves': 2}),
+                # ((4*4*2, ndim, 4), {'leafsize': 8}),
+                # ((1e5, ndim, 8), {'nleaves': 8}),
+                # ((1e7, ndim, 10), {'nleaves': 10}),
+                ]
+        self.param_returns = []
+        for args, kwargs in param_test:
+            pts, tree = make_test(args[0], args[1], **kwargs)
+            ans = delaunay.VoronoiVolumes(pts)
+            read_lines = lines_load_test(args[0], args[1])
+            for limit_mem in [False, True]:
+                self.param_returns += [
+                    (ans, (pts, tree, args[2]),
+                         {'use_mpi': False, 'limit_mem': limit_mem})
+                    ]
+                for profile in [False, self._fprof]:
+                    self.param_returns += [
+                        (ans, (pts, tree, args[2]),
+                             {'use_mpi': True, 'limit_mem': limit_mem,
+                              'profile': profile, 'use_buffer': False}),
+                        (ans, (pts, tree, args[2]),
+                             {'use_mpi': True, 'limit_mem': limit_mem,
+                              'profile': profile, 'use_buffer': True})
+                        ]
+
+    def check_returns(self, result, args, kwargs):
+        print result
+        print self.func(*args, **kwargs)
+        assert(np.allclose(result, self.func(*args, **kwargs)))
         if os.path.isfile(self._fprof):
             os.remove(self._fprof)

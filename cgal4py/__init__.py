@@ -58,7 +58,6 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
             elements.
         ValueError: If `right_edge` is not a 1D array with `pts.shape[1]`
             elements.
-        NotImplementedError: If `limit_mem == True`.
 
     """
     # Check input
@@ -77,15 +76,13 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
         if (right_edge.ndim != 1) or (len(right_edge) != ndim):
             raise ValueError("right_edge must be a 1D array with " +
                              "{} elements.".format(ndim))
-    if limit_mem:
-        raise NotImplementedError("'limit_mem' has not yet been implemented.")
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
         if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
             dd_kwargs['nleaves'] = nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
-        T = parallel.ParallelDelaunay(pts, tree, nproc,
+        T = parallel.ParallelDelaunay(pts, tree, nproc, limit_mem=limit_mem,
                                       use_double=use_double, **kwargs)
     # Serial
     else:
@@ -136,7 +133,6 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
             elements.
         ValueError: If `right_edge` is not a 1D array with `pts.shape[1]`
             elements.
-        NotImplementedError: If `limit_mem == True`.
 
     """
     # Check input
@@ -155,8 +151,6 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
         if (right_edge.ndim != 1) or (len(right_edge) != ndim):
             raise ValueError("right_edge must be a 1D array with " +
                              "{} elements.".format(ndim))
-    if limit_mem:
-        raise NotImplementedError("'limit_mem' has not yet been implemented.")
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
         if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
@@ -164,6 +158,7 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
         vols = parallel.ParallelVoronoiVolumes(pts, tree, nproc,
+                                               limit_mem=limit_mem,
                                                use_double=use_double, **kwargs)
     # Serial
     else:

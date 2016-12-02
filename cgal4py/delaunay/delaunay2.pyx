@@ -1215,23 +1215,60 @@ cdef class Delaunay2:
         self._locked = False
         self._cache_to_clear_on_update = {}
 
-    def is_equivalent(Delaunay2 self, Delaunay2 solf):
-        r"""Determine if two triangulations are equivalent. Currently only 
-        checks that the triangulations have the same numbers of vertices, cells, 
-        and edges.
+    def _lock(self):
+        self._locked = True
+    def _unlock(self):
+        self._locked = False
+    def _set_updated(self):
+        self.T.updated = <cbool>True
+    def _unset_updated(self):
+        self.T.updated = <cbool>False
 
-        Args: 
-            solf (:class:`cgal4py.delaunay.Delaunay2`): Triangulation this one 
-                should be compared to.
+    def _update_tess(self):
+        if self.T.updated:
+            self._cache_to_clear_on_update.clear()
+            self.T.updated = <cbool>False
 
-        Returns: 
-            bool: True if the two triangulations are equivalent. 
+    @staticmethod
+    def _update_to_tess(func):
+        def wrapped_func(solf, *args, **kwargs):
+            solf._lock()
+            out = func(solf, *args, **kwargs)
+            solf._unlock()
+            solf._set_updated()
+            solf._update_tess()
+            return out
+        return wrapped_func
+
+    @staticmethod
+    def _dependent_property(fget):
+        attr = '_'+fget.__name__
+        def wrapped_fget(solf):
+            if solf._locked:
+                raise RuntimeError("Cannot get dependent property " +
+                                   "'{}' ".format(attr) +
+                                   "while triangulation is locked.")
+            solf._update_tess()
+            if attr not in solf._cache_to_clear_on_update:
+                solf._cache_to_clear_on_update[attr] = fget(solf)
+            return solf._cache_to_clear_on_update[attr]
+        return property(wrapped_fget, None, None, fget.__doc__)
+
+    @classmethod
+    def from_file(cls, fname):
+        r"""Create a triangulation from one saved to a file.
+
+        Args:
+            fname (str): Full path to file where triangulation is saved.
+
+        Returns:
+            :class:`cgal4py.delaunay.Delaunay2`: Triangulation constructed from 
+                saved information.
 
         """
-        cdef cbool out
-        with nogil, cython.boundscheck(False), cython.wraparound(False):
-            out = self.T.is_equal(dereference(solf.T))
-        return <pybool>(out)
+        T = cls()
+        T.read_from_file(fname)
+        return T
 
     @classmethod
     def from_serial(cls, *args):
@@ -1330,45 +1367,6 @@ cdef class Delaunay2:
             count=nx*ny).reshape(nx, ny)
         self.deserialize(pos, cells, neigh, idx_inf)
 
-    def _lock(self):
-        self._locked = True
-    def _unlock(self):
-        self._locked = False
-    def _set_updated(self):
-        self.T.updated = <cbool>True
-    def _unset_updated(self):
-        self.T.updated = <cbool>False
-
-    def _update_tess(self):
-        if self.T.updated:
-            self._cache_to_clear_on_update.clear()
-            self.T.updated = <cbool>False
-
-    @staticmethod
-    def _update_to_tess(func):
-        def wrapped_func(solf, *args, **kwargs):
-            solf._lock()
-            out = func(solf, *args, **kwargs)
-            solf._unlock()
-            solf._set_updated()
-            solf._update_tess()
-            return out
-        return wrapped_func
-
-    @staticmethod
-    def _dependent_property(fget):
-        attr = '_'+fget.__name__
-        def wrapped_fget(solf):
-            if solf._locked:
-                raise RuntimeError("Cannot get dependent property " +
-                                   "'{}' ".format(attr) +
-                                   "while triangulation is locked.")
-            solf._update_tess()
-            if attr not in solf._cache_to_clear_on_update:
-                solf._cache_to_clear_on_update[attr] = fget(solf)
-            return solf._cache_to_clear_on_update[attr]
-        return property(wrapped_fget, None, None, fget.__doc__)
-
     def is_valid(self):
         r"""Determine if the triangulation is a valid Delaunay triangulation.
 
@@ -1380,6 +1378,24 @@ cdef class Delaunay2:
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             out = self.T.is_valid()
         return <pybool>out
+
+    def is_equivalent(Delaunay2 self, Delaunay2 solf):
+        r"""Determine if two triangulations are equivalent. Currently only 
+        checks that the triangulations have the same numbers of vertices, cells, 
+        and edges.
+
+        Args: 
+            solf (:class:`cgal4py.delaunay.Delaunay2`): Triangulation this one 
+                should be compared to.
+
+        Returns: 
+            bool: True if the two triangulations are equivalent. 
+
+        """
+        cdef cbool out
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            out = self.T.is_equal(dereference(solf.T))
+        return <pybool>(out)
 
     def write_to_file(self, fname):
         r"""Write the serialized tessellation information to a file.
@@ -1707,6 +1723,14 @@ cdef class Delaunay2:
         r"""int: The total number of cells (finite + infinite) in the 
         triangulation."""
         return self.T.num_cells()
+
+    @_dependent_property
+    def infinite_vertex(self):
+        r"""Delaunay2_vertex: The infinite vertex."""
+        cdef Delaunay_with_info_2[info_t].Vertex x = self.T.infinite_vertex()
+        cdef Delaunay2_vertex out = Delaunay2_vertex()
+        out.assign(self.T, x)
+        return out
 
     @_update_to_tess
     @cython.boundscheck(False)

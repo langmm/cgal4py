@@ -9,19 +9,10 @@ r"""Tests for 3D Delaunay Triangulation.
 import numpy as np
 import os
 from cgal4py.delaunay import Delaunay3
+from test_cgal4py import MyTestCase, make_points
 
 
-left_edge = -2*np.ones(3, 'float64')
-right_edge = 2*np.ones(3, 'float64')
-pts = np.array([[+0,  0,  0],
-                [-1, -1, -1],
-                [-1, -1,  1],
-                [-1,  1, -1],
-                [-1,  1,  1],
-                [+1, -1, -1],
-                [+1, -1,  1],
-                [+1,  1, -1],
-                [+1,  1,  1.0000001]], 'float64')
+pts, left_edge, right_edge = make_points(0, 3)
 pts_dup = np.concatenate([pts, np.reshape(pts[0, :], (1, pts.shape[1]))])
 nverts_fin = pts.shape[0]
 nverts_inf = 1
