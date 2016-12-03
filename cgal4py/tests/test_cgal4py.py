@@ -4,8 +4,14 @@ from datetime import datetime
 import cProfile
 import pstats
 import time
+import signal
 import nose.tools as nt
 from cgal4py import triangulate, voronoi_volumes, domain_decomp
+
+
+@nt.nottest
+def signal_print_traceback(signo, frame):
+    print(traceback.print_stack(frame))
 
 
 @nt.nottest

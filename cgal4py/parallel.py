@@ -306,6 +306,10 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
             :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
             triangulation object.
 
+    Raises:
+        RuntimeError: If the MPI script does not result in a file containing
+            the triangulation.
+
     """
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     fscript = '{}_mpi.py'.format(unique_str)
@@ -363,6 +367,10 @@ def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
     Returns:
         np.ndarray of float64: (n,) array of n voronoi volumes for the provided
             points.
+
+    Raises:
+        RuntimeError: If the MPI script does not result in a file containing
+            the volumes.
 
     """
     unique_str = datetime.today().strftime("%Y%j%H%M%S")

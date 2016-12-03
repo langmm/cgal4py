@@ -79,9 +79,13 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
         if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
-            dd_kwargs['nleaves'] = nproc
+            if limit_mem:
+                dd_kwargs['nleaves'] = 2*nproc
+            else:
+                dd_kwargs['nleaves'] = nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
+        print tree.num_leaves
         T = parallel.ParallelDelaunay(pts, tree, nproc, limit_mem=limit_mem,
                                       use_double=use_double, **kwargs)
     # Serial
@@ -154,7 +158,10 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
     # Parallel
     if nproc > 1 and FLAG_MULTIPROC:
         if (not 'nleaves' in dd_kwargs) and (not 'leafsize' in dd_kwargs):
-            dd_kwargs['nleaves'] = nproc
+            if limit_mem:
+                dd_kwargs['nleaves'] = nproc
+            else:
+                dd_kwargs['nleaves'] = 2*nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
         vols = parallel.ParallelVoronoiVolumes(pts, tree, nproc,

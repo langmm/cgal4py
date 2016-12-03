@@ -13,6 +13,7 @@ import os
 import pyximport
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
+import parallel_delaunay
 from periodic_delaunay2 import is_valid as is_valid_P2
 from periodic_delaunay3 import is_valid as is_valid_P3
 if is_valid_P2():

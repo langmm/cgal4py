@@ -12,6 +12,8 @@ except ImportError:
 else:
     use_cython = True
 
+include_parallel_delaunay = True
+
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
 # RTDFLAG = True
@@ -31,6 +33,8 @@ if not RTDFLAG:
 # Set generic extension options
 ext_options = dict(language="c++",
                    include_dirs=[numpy.get_include()],
+                   libraries=[],
+                   extra_link_args=[],
                    extra_compile_args=["-std=c++14"],# "-std=gnu++11",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
@@ -40,8 +44,8 @@ if RTDFLAG:
     ext_options_cgal = copy.deepcopy(ext_options)
 else:
     ext_options_cgal = copy.deepcopy(ext_options)
-    ext_options_cgal['libraries'] = ['gmp','CGAL']
-    ext_options_cgal['extra_link_args'] = ["-lgmp"]
+    ext_options_cgal['libraries'] += ['gmp','CGAL']
+    ext_options_cgal['extra_link_args'] += ["-lgmp"]
 
 
 def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
@@ -109,6 +113,39 @@ ext_modules += [
               sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
               **ext_options)
     ]
+if include_parallel_delaunay:
+    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
+    import cykdtree
+    cykdtree_cpp = os.path.join(
+        os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+    cykdtree_utils_cpp = os.path.join(
+        os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+    # OpenMPI
+    if False:
+        mpi_compile_args = os.popen(
+            "mpic++ --showme:compile").read().strip().split(' ')
+        mpi_link_args = os.popen(
+            "mpic++ --showme:link").read().strip().split(' ')
+    else:
+        mpi_compile_args = os.popen(
+            "mpic++ -compile_info").read().strip().split(' ')[1:]
+        mpi_link_args = os.popen(
+            "mpic++ -link_info").read().strip().split(' ')[1:]
+    ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
+    ext_options_mpicgal['extra_link_args'] += mpi_link_args
+    ext_options_mpicgal['include_dirs'].append(
+        os.path.dirname(cykdtree.__file__))
+    pyx_file = "cgal4py/delaunay/parallel_delaunay.pyx"
+    cpp_file = "cgal4py/delaunay/c_parallel_delaunay.cpp"
+    if not os.path.isfile(cpp_file):
+        open(cpp_file,'a').close()
+    assert(os.path.isfile(cpp_file))
+    ext_modules.append(
+        Extension("cgal4py.delaunay.parallel_delaunay",
+                  sources=[pyx_file, cpp_file,
+                           "cgal4py/delaunay/c_delaunay2.cpp",
+                           cykdtree_cpp, cykdtree_utils_cpp],
+                  **ext_options_mpicgal))
 
 
 if use_cython:
