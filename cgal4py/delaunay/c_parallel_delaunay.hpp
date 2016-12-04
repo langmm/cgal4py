@@ -12,39 +12,96 @@ typedef Delaunay_with_info_2<Info> Delaunay;
 class Leaf
 {
 public:
+  uint32_t nleaves;
   uint32_t ndim;
   uint64_t npts_orig = 0;
   uint64_t npts = 0;
   uint64_t *idx = NULL;
   double *pts = NULL;
+  double *le = NULL;
+  double *re = NULL;
+  int nneigh;
+  uint32_t *neigh = NULL;
+  double *neigh_le;
+  double *neigh_re;
   Delaunay *T = NULL;
-  Leaf(uint32_t ndim0, int src) {
+  Leaf(uint32_t nleaves0, uint32_t ndim0, int src) {
+    nleaves = nleaves0;
     ndim = ndim0;
+    neigh = (uint32_t*)malloc(nleaves*sizeof(uint32_t));
+    neigh_le = (double*)malloc(nleaves*ndim*sizeof(double*));
+    neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     recv(src);
   };
-  Leaf(uint32_t ndim0, uint64_t npts0, uint64_t *idx0, double *pts0) {
+  Leaf(uint32_t nleaves0, uint32_t ndim0, uint64_t npts0,
+       uint64_t *idx0, double *pts0,
+       double *le0, double *re0, std::vector<uint32_t> neigh0,
+       std::vector<double*> neigh_le0, std::vector<double*> neigh_re0) {
+    nleaves = nleaves0;
     ndim = ndim0;
+    neigh = (uint32_t*)malloc(nleaves*sizeof(uint32_t));
+    neigh_le = (double*)malloc(nleaves*ndim*sizeof(double*));
+    neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     npts = npts0;
     idx = idx0;
     pts = pts0;
+    le = le0;
+    re = re0;
+    nneigh = (int)(neigh0.size());
+    for (int i = 0; i < nneigh; i++) {
+      neigh[i] = neigh0[i];
+      for (uint32_t j = 0; j < ndim; j++) {
+	neigh_le[ndim*i+j] = neigh_le0[i][j];
+	neigh_re[ndim*i+j] = neigh_re0[i][j];
+      }
+    }
   }
+
   void send(int dst) {
     MPI_Send(&npts, 1, MPI_UNSIGNED_LONG, dst, 0, MPI_COMM_WORLD);
-    MPI_Send(idx, npts, MPI_UNSIGNED_LONG, dst, 0, MPI_COMM_WORLD);
-    MPI_Send(pts, ndim*npts, MPI_DOUBLE, dst, 0, MPI_COMM_WORLD);
+    MPI_Send(idx, npts, MPI_UNSIGNED_LONG, dst, 1, MPI_COMM_WORLD);
+    MPI_Send(pts, ndim*npts, MPI_DOUBLE, dst, 2, MPI_COMM_WORLD);
+    MPI_Send(le, ndim, MPI_DOUBLE, dst, 3, MPI_COMM_WORLD);
+    MPI_Send(re, ndim, MPI_DOUBLE, dst, 4, MPI_COMM_WORLD);
+    MPI_Send(&nneigh, 1, MPI_INT, dst, 5, MPI_COMM_WORLD);
+    MPI_Send(neigh, nneigh, MPI_UNSIGNED, dst, 6, MPI_COMM_WORLD);
+    MPI_Send(neigh_le, nneigh*ndim, MPI_DOUBLE, dst, 7, MPI_COMM_WORLD);
+    MPI_Send(neigh_re, nneigh*ndim, MPI_DOUBLE, dst, 7, MPI_COMM_WORLD);
   };
+
   void recv(int src) {
     MPI_Recv(&npts, 1, MPI_UNSIGNED_LONG, src, 0, MPI_COMM_WORLD,
-	     MPI_STATUS_IGNORE);
-    MPI_Recv(idx, npts, MPI_UNSIGNED_LONG, src, 0, MPI_COMM_WORLD,
-	     MPI_STATUS_IGNORE);
-    MPI_Recv(pts, ndim*npts, MPI_DOUBLE, src, 0, MPI_COMM_WORLD,
-	     MPI_STATUS_IGNORE);
+    	     MPI_STATUS_IGNORE);
+    idx = (uint64_t*)malloc(npts*sizeof(uint64_t));
+    pts = (double*)malloc(ndim*npts*sizeof(double));
+    le = (double*)malloc(ndim*sizeof(double));
+    re = (double*)malloc(ndim*sizeof(double));
+    MPI_Recv(idx, npts, MPI_UNSIGNED_LONG, src, 1, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(pts, ndim*npts, MPI_DOUBLE, src, 2, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(le, ndim, MPI_DOUBLE, src, 3, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(re, ndim, MPI_DOUBLE, src, 4, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(&nneigh, 1, MPI_INT, src, 5, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(neigh, nneigh, MPI_UNSIGNED, src, 6, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(neigh_le, nneigh*ndim, MPI_DOUBLE, src, 7, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
+    MPI_Recv(neigh_re, nneigh*ndim, MPI_DOUBLE, src, 7, MPI_COMM_WORLD,
+    	     MPI_STATUS_IGNORE);
   }
+
   void tessellate() {
     T = new Delaunay();
     T->insert(pts, idx, npts);
     npts_orig = npts;
+  }
+
+  std::vector<std::vector<Info>> outgoing_points() {
+
   }
 };
 
@@ -86,6 +143,8 @@ public:
     domain_decomp(le, re, periodic);
     // Insert points into leaves
     tessellate();
+    // Exchange points
+    exchange();
     printf("Inserted points on %d of %d\n", rank, size);
   }
 
@@ -95,7 +154,23 @@ public:
   }
 
   void exchange() {
+    uint64_t nrecv_total = 1;
+    uint64_t nrecv;
+    while (nrecv_total != 0) {
+      outgoing_points();
+      nrecv = incoming_points();
+      MPI_Allreduce(&nrecv, &nrecv_total, 1, MPI_UNSIGNED, MPI_SUM,
+		    MPI_COMM_WORLD);
+    }
+  }
 
+  void outgoing_points() {
+
+  }
+
+  uint64_t incoming_points() {
+    uint64_t nrecv = 0;
+    return nrecv;
   }
 
   void domain_decomp(double *le, double *re, bool *periodic) {
@@ -128,91 +203,52 @@ public:
 	nleaves_per_proc[k % size]++;
       }
     }
-    MPI_Scatter(nleaves_per_proc, 1, MPI_INT, &nleaves, 1, MPI_INT,
+    MPI_Scatter(nleaves_per_proc, 1, MPI_INT,
+		&nleaves, 1, MPI_INT,
 		0, MPI_COMM_WORLD);
     leaves = (Leaf*)malloc(nleaves*sizeof(Leaf));
-    // for (i = 0; i < nleaves; i++) {
-    //   leaves[i] = Leaf();
-    // }
-
-    // // Send size of leaves
-    // uint64_t *leaf_sizes = NULL;
-    // uint64_t *leaf_sizes_total = NULL;
-    // int *offset_leaves = NULL;
-    // int *counts_leaves = NULL;
-    // leaf_sizes = (uint64_t*)malloc(nleaves*sizeof(uint64_t));
-    // if (rank == 0) {
-    //   offset_leaves = (int*)malloc(size*sizeof(int));
-    //   counts_leaves = (int*)malloc(size*sizeof(int));
-    //   leaf_sizes_total = (uint64_t*)malloc(nleaves_total*sizeof(uint64_t));
-    //   i = 0, j = 0;
-    //   for (int p = 0; p < size; p++) {
-    // 	counts_leaves[p] = nleaves_per_proc[p];
-    // 	offset_leaves[p] = i;
-    // 	j = p;
-    // 	while (j < (uint64_t)(nleaves_total)) {
-    // 	  leaf_sizes_total[i] = tree->leaves[j]->children;
-    // 	  j += size;
-    // 	  i++;
-    // 	}
-    //   }
-    // }
-    // MPI_Scatterv(leaf_sizes_total, counts_leaves, offset_leaves,
-    // 		 MPI_UNSIGNED_LONG, leaf_sizes, nleaves,
-    // 		 MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-    // for (i = 0; i < nleaves; i++) {
-    //   leaves[i].n = leaf_sizes[i];
-    // }
-    // free(leaf_sizes);
-    // if (rank == 0) {
-    //   free(leaf_sizes_total);
-    //   free(offset_leaves);
-    //   free(counts_leaves);
-    // }
 
     // Send leaves
     if (rank == 0) {
       int task;
-      uint64_t nprev = 0;
       double *ipts;
       int iroot = 0;
+      uint64_t sidx = 0;
       for (i = 0; i < nleaves_total; i++) {
 	task = i % size;
+	sidx = tree->leaves[i]->left_idx;
 	ipts = (double*)malloc(ndim*tree->leaves[i]->children*sizeof(double));
+	std::vector<double*> neigh_le;
+	std::vector<double*> neigh_re;
+	std::vector<uint32_t>::iterator it;
 	for (j = 0; j < tree->leaves[i]->children; j++) {
 	  for (k = 0; k < ndim; k++) {
-	    ipts[ndim*j+k] = pts_total[ndim*idx_total[nprev+j]+k];
+	    ipts[ndim*j+k] = pts_total[ndim*idx_total[sidx+j]+k];
 	  }
 	}
-	Leaf ileaf(ndim, (uint64_t)(tree->leaves[i]->children),
-		   idx_total+tree->leaves[i]->left_idx, ipts);
+	for (it = tree->leaves[i]->all_neighbors.begin();
+	     it != tree->leaves[i]->all_neighbors.end(); it++) {
+	  neigh_le.push_back(tree->leaves[*it]->left_edge);
+	  neigh_re.push_back(tree->leaves[*it]->right_edge);
+	}
+	Leaf ileaf(nleaves_total, ndim, tree->leaves[i]->children,
+		   idx_total+sidx, ipts,
+		   tree->leaves[i]->left_edge, tree->leaves[i]->right_edge,
+		   tree->leaves[i]->all_neighbors, neigh_le, neigh_re);
 	if (task == rank) {
 	  leaves[iroot] = ileaf;
 	  iroot++;
-	  // leaves[i].idx = idx_total+nprev;
-	  // leaves[i].pts = ipts;
 	} else {
 	  ileaf.send(task);
-	  // MPI_Send(idx_total+nprev, tree->leaves[i]->children,
-	  // 	   MPI_UNSIGNED_LONG, task, 0, MPI_COMM_WORLD);
-	  // MPI_Send(ipts, ndim*tree->leaves[i]->children,
-	  // 	   MPI_DOUBLE, task, 0, MPI_COMM_WORLD);
 	  free(ipts);
 	}
-	nprev += tree->leaves[i]->children;
       }
     } else {
       for (i = 0; i < nleaves; i++) {
-	leaves[i] = Leaf(ndim, 0); // calls recv
-	// leaves[i].idx = (uint64_t*)malloc(leaves[i].n*sizeof(uint64_t));
-	// leaves[i].pts = (double*)malloc(ndim*leaves[i].n*sizeof(double));
-	// MPI_Recv(leaves[i].idx, leaves[i].n, MPI_UNSIGNED_LONG,
-	// 	 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	// MPI_Recv(leaves[i].pts, ndim*leaves[i].n, MPI_DOUBLE,
-	// 	 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	leaves[i] = Leaf(nleaves_total, ndim, 0); // calls recv
       }
     }
-    printf("Received indexes for %d leaves on %d of %d\n", nleaves, rank, size);
+    printf("Received %d leaves on %d of %d\n", nleaves, rank, size);
   }
 
 };
