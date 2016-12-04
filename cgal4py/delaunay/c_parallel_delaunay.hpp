@@ -100,8 +100,9 @@ public:
     npts_orig = npts;
   }
 
-  std::vector<std::vector<Info>> outgoing_points() {
-
+  std::vector<std::vector<uint64_t>> outgoing_points() {
+    std::vector<std::vector<uint64_t>> out = T->outgoing_points(nneigh, le, re);
+    return out;
   }
 };
 
@@ -145,7 +146,7 @@ public:
     tessellate();
     // Exchange points
     exchange();
-    printf("Inserted points on %d of %d\n", rank, size);
+    printf("Done on %d of %d\n", rank, size);
   }
 
   void tessellate() {
@@ -165,6 +166,12 @@ public:
   }
 
   void outgoing_points() {
+    std::vector<std::vector<uint64_t>> iout;
+    std::vector<std::vector<std::vector<uint64_t>>> out;
+    for (int i = 0; i < nleaves; i++) {
+      iout = leaves[i].outgoing_points();
+      out.push_back(iout);
+    }
 
   }
 
