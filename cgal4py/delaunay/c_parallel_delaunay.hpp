@@ -37,9 +37,9 @@ public:
   double *leaves_le;
   double *leaves_re; 
   Delaunay *T = NULL;
-  // std::set<uint32_t> *all_neigh;
-  // std::vector<std::set<uint32_t>> *lneigh;
-  // std::vector<std::set<uint32_t>> *rneigh;
+  std::set<uint32_t> *all_neigh;
+  std::vector<std::set<uint32_t>> *lneigh;
+  std::vector<std::set<uint32_t>> *rneigh;
 
   Leaf(uint32_t nleaves0, uint32_t ndim0, int src) {
     uint32_t k;
@@ -53,16 +53,13 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    // all_neigh = new std::set<uint32_t>();
-    // lneigh = new std::vector<*std::set<uint32_t>>();
-    // rneigh = new std::vector<*std::set<uint32_t>>();
-    // all_neigh->reserve(nleaves);
-    // for (k = 0; k < ndim; k++) {
-    //   lneigh->push_back(new std::set<uint32_t>());
-    //   (*lneigh)[k]->reserve(nleaves);
-    //   rneigh->push_back(new std::set<uint32_t>());
-    //   (*rneigh)[k]->reserve(nleaves);
-    // }
+    all_neigh = new std::set<uint32_t>();
+    lneigh = new std::vector<std::set<uint32_t>>();
+    rneigh = new std::vector<std::set<uint32_t>>();
+    for (k = 0; k < ndim; k++) {
+      lneigh->push_back(std::set<uint32_t>());
+      rneigh->push_back(std::set<uint32_t>());
+    }
     // Receive leaf info from root process
     recv(src);
     int i;
@@ -86,13 +83,13 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    // all_neigh = new std::set<uint32_t>();
-    // lneigh = new std::vector<std::set<uint32_t>>();
-    // rneigh = new std::vector<std::set<uint32_t>>();
-    // for (k = 0; k < ndim; k++) {
-    //   lneigh->push_back(std::set<uint32_t>());
-    //   rneigh->push_back(std::set<uint32_t>());
-    // }
+    all_neigh = new std::set<uint32_t>();
+    lneigh = new std::vector<std::set<uint32_t>>();
+    rneigh = new std::vector<std::set<uint32_t>>();
+    for (k = 0; k < ndim; k++) {
+      lneigh->push_back(std::set<uint32_t>());
+      rneigh->push_back(std::set<uint32_t>());
+    }
     // Transfer leaf information
     Node* node = tree->leaves[index];
     std::vector<uint32_t>::iterator it;
@@ -127,29 +124,29 @@ public:
       periodic_le[k] = node->periodic_left[k];
       periodic_re[k] = node->periodic_right[k];
     }
-    // for (k = 0; k < ndim; k++) {
-    //   (*lneigh)[k].insert(node->left_neighbors[k].begin(),
-    // 			  node->left_neighbors[k].end());
-    //   (*rneigh)[k].insert(node->right_neighbors[k].begin(),
-    // 			  node->right_neighbors[k].end());
-    // }
+    for (k = 0; k < ndim; k++) {
+      (*lneigh)[k].insert(node->left_neighbors[k].begin(),
+    			  node->left_neighbors[k].end());
+      (*rneigh)[k].insert(node->right_neighbors[k].begin(),
+    			  node->right_neighbors[k].end());
+    }
     // Shift edges of periodic neighbors
-    // for (k = 0; k < ndim; k++) {
-    //   if (periodic_le[k]) {
-    // 	for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
-    // 	     it != (*lneigh)[k].end(); it++) {
-    // 	  leaves_le[*it, k] -= domain_width[k];
-    // 	  leaves_re[*it, k] -= domain_width[k];
-    // 	}
-    //   }
-    //   if (periodic_re[k]) {
-    // 	for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
-    // 	     it != (*rneigh)[k].end(); it++) {
-    // 	  leaves_le[*it, k] += domain_width[k];
-    // 	  leaves_re[*it, k] += domain_width[k];
-    // 	}
-    //   }
-    // }
+    for (k = 0; k < ndim; k++) {
+      if (periodic_le[k]) {
+    	for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    	     it != (*lneigh)[k].end(); it++) {
+    	  leaves_le[*it, k] -= domain_width[k];
+    	  leaves_re[*it, k] -= domain_width[k];
+    	}
+      }
+      if (periodic_re[k]) {
+    	for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    	     it != (*rneigh)[k].end(); it++) {
+    	  leaves_le[*it, k] += domain_width[k];
+    	  leaves_re[*it, k] += domain_width[k];
+    	}
+      }
+    }
     // Select edges of neighbors
     for (i = 0; i < nneigh; i++) {
       n = neigh[i];
@@ -174,31 +171,31 @@ public:
     MPI_Send(neigh, nneigh, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
     MPI_Send(leaves_le, nleaves*ndim, MPI_DOUBLE, dst, i++, MPI_COMM_WORLD);
     MPI_Send(leaves_re, nleaves*ndim, MPI_DOUBLE, dst, i++, MPI_COMM_WORLD);
-    // uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
-    // int ndum;
-    // for (k = 0; k < ndim; k++) {
-    //   // left neighbors
-    //   ndum = (int)((*lneigh)[k].size());
-    //   j = 0;
-    //   for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
-    // 	   it != (*lneigh)[k].end(); it++) {
-    // 	dummy[j] = *it;
-    // 	j++;
-    //   }
-    //   MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
-    //   MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
-    //   // right neighbors
-    //   ndum = (int)((*rneigh)[k].size());
-    //   j = 0;
-    //   for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
-    // 	   it != (*rneigh)[k].end(); it++) {
-    // 	dummy[j] = *it;
-    // 	j++;
-    //   }
-    //   MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
-    //   MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
-    // }
-    // free(dummy);
+    uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
+    int ndum;
+    for (k = 0; k < ndim; k++) {
+      // left neighbors
+      ndum = (int)((*lneigh)[k].size());
+      j = 0;
+      for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    	   it != (*lneigh)[k].end(); it++) {
+    	dummy[j] = *it;
+    	j++;
+      }
+      MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
+      MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
+      // right neighbors
+      ndum = (int)((*rneigh)[k].size());
+      j = 0;
+      for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    	   it != (*rneigh)[k].end(); it++) {
+    	dummy[j] = *it;
+    	j++;
+      }
+      MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
+      MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
+    }
+    free(dummy);
   };
 
   void recv(int src) {
@@ -237,33 +234,54 @@ public:
     	     MPI_STATUS_IGNORE);
     MPI_Recv(leaves_re, nleaves*ndim, MPI_DOUBLE, src, i++, MPI_COMM_WORLD,
     	     MPI_STATUS_IGNORE);
-    // uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
-    // int ndum;
-    // for (k = 0; k < ndim; k++) {
-    //   // left neighbors
-    //   MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-    // 	       MPI_STATUS_IGNORE);
-    //   MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-    // 	       MPI_STATUS_IGNORE);
-    //   for (j = 0; j < ndum; j++) {
-    // 	(*lneigh)[k].insert(dummy[j]);
-    //   }
-    //   // right neighbors
-    //   MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-    // 	       MPI_STATUS_IGNORE);
-    //   MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-    // 	       MPI_STATUS_IGNORE);
-    //   for (j = 0; j < ndum; j++) {
-    // 	(*rneigh)[k].insert(dummy[j]);
-    //   }
-    // }
-    // free(dummy);
+    uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
+    int ndum;
+    for (k = 0; k < ndim; k++) {
+      // left neighbors
+      MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
+    	       MPI_STATUS_IGNORE);
+      MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
+    	       MPI_STATUS_IGNORE);
+      for (j = 0; j < ndum; j++) {
+    	(*lneigh)[k].insert(dummy[j]);
+      }
+      // right neighbors
+      MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
+    	       MPI_STATUS_IGNORE);
+      MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
+    	       MPI_STATUS_IGNORE);
+      for (j = 0; j < ndum; j++) {
+    	(*rneigh)[k].insert(dummy[j]);
+      }
+    }
+    free(dummy);
+  }
+
+  void insert(double *pts_new, uint64_t *idx_new, uint64_t npts_new) {
+    uint64_t *idx_dum = (uint64_t*)malloc(npts_new*sizeof(uint64_t));
+    for (uint64_t i = 0, j = npts; i < npts_new; i++, j++)
+      idx_dum[i] = j;
+    T->insert(pts_new, idx_dum, npts_new);
+    free(idx_dum);
+    // Copy indices
+    idx = (uint64_t*)realloc(idx, (npts+npts_new)*sizeof(uint64_t));
+    memmove(idx+npts, idx_new, npts_new*sizeof(uint64_t));
+    // Copy points
+    pts = (double*)realloc(pts, ndim*(npts+npts_new)*sizeof(double));
+    memmove(pts+ndim*npts, pts_new, ndim*npts_new*sizeof(double));
+    // Advance count
+    npts += npts_new;
   }
 
   void tessellate() {
     T = new Delaunay();
-    printf("%d: npts = %d\n", id, npts);
-    T->insert(pts, idx, npts);
+    // Insert points using monotonic indices
+    uint64_t *idx_dum = (uint64_t*)malloc(npts*sizeof(uint64_t));
+    for (uint64_t i = 0; i < npts; i++)
+      idx_dum[i] = i;
+    T->insert(pts, idx_dum, npts);
+    // T->insert(pts, idx, npts);
+    free(idx_dum);
     npts_orig = npts;
   }
 
@@ -327,10 +345,10 @@ public:
 	memcpy(ngh_out[task]+nold_neigh, neigh, nnew_neigh*sizeof(uint32_t));
       }
     }
-    // Transfer neighbors to log
+    // Transfer neighbors to log & reset count to 0
     for (i = 0; i < nneigh; i++) {
       n = neigh[i];
-      // all_neigh->insert(n);
+      all_neigh->insert(n);
     }
     nneigh = 0;
   }
@@ -345,24 +363,49 @@ public:
     uint32_t k;
     if (src == id) {
       for (k = 0; k < ndim; k++) {
-	// if (periodic_le[k] and periodic_re[k]) {
-	//   for (j = 0; j < nnpts_recv; j++) {
-	//     if ((pts_recv[ndim*j+k] - le[k]) < (re[k] - pts_recv[ndim*j+k])) {
-	//       pts_recv[ndim*j+k] += domain_width[k];
-	//     }
-	//     if ((re[k] - pts_recv[ndim*j+k]) < (pts_recv[ndim*j+k] - le[k])) {
-	//       pts_recv[ndim*j+k] -= domain_width[k];
-	//     }
-	//   }
-	// }
+	if (periodic_le[k] and periodic_re[k]) {
+	  for (j = 0; j < nnpts_recv; j++) {
+	    if ((pts_recv[ndim*j+k] - le[k]) < (re[k] - pts_recv[ndim*j+k])) {
+	      pts_recv[ndim*j+k] += domain_width[k];
+	    }
+	    if ((re[k] - pts_recv[ndim*j+k]) < (pts_recv[ndim*j+k] - le[k])) {
+	      pts_recv[ndim*j+k] -= domain_width[k];
+	    }
+	  }
+	}
       }
     } else {
       for (k = 0; k < ndim; k++) {
-	// if (periodic_re[k] and 
+	if (periodic_re[k] and ((*rneigh)[k].count(src) > 0)) {
+	  for (j = 0; j < nnpts_recv; j++) {
+	    if ((pts_recv[ndim*j+k] + domain_width[k] - re[k]) <
+		(le[k] - pts_recv[ndim*j+k]))
+	      pts_recv[ndim*j+k] += domain_width[k];
+	  }
+	}
+	if (periodic_le[k] and ((*lneigh)[k].count(src) > 0)) {
+	  for (j = 0; j < nnpts_recv; j++) {
+	    if ((le[k] - pts_recv[ndim*j+k] + domain_width[k]) <
+		(pts_recv[ndim*j+k] - re[k]))
+	      pts_recv[ndim*j+k] -= domain_width[k];
+	  }
+	}
+      }
+    }
+    // Add points to tessellation, then arrays
+    insert(pts_recv, idx_recv, nnpts_recv);
+    // Add neighbors
+    uint32_t n;
+    for (i = 0; i < nneigh_recv; i++) {
+      n = neigh_recv[i];
+      if ((n != id) and (all_neigh->count(n) == 0)) {
+	neigh[nneigh] = n;
+	memcpy(neigh_le+ndim*nneigh, leaves_le+ndim*n, ndim*sizeof(double));
+	memcpy(neigh_re+ndim*nneigh, leaves_re+ndim*n, ndim*sizeof(double));
+	nneigh++;
       }
     }
   }
-			   
 
 };
 
@@ -391,8 +434,8 @@ public:
     printf("Hello from %d of %d.\n", rank, size);
   }
 
-  void insert(uint64_t npts0, uint32_t ndim0, double *pts0,
-	      double *le, double *re, bool *periodic) {
+  void run(uint64_t npts0, uint32_t ndim0, double *pts0,
+	   double *le, double *re, bool *periodic) {
     ndim = ndim0;
     npts_total = npts0;
     pts_total = pts0;
@@ -405,9 +448,9 @@ public:
     // Domain decomp
     domain_decomp(le, re, periodic);
     // Insert points into leaves
-    // tessellate();
+    tessellate();
     // Exchange points
-    // exchange();
+    exchange();
     printf("Done on %d of %d\n", rank, size);
   }
 
@@ -420,25 +463,25 @@ public:
     uint64_t nrecv_total = 1;
     uint64_t nrecv;
     int nexch;
-    uint32_t *src_recv;
-    uint32_t *dst_recv;
-    uint32_t *cnt_recv;
-    uint32_t *nct_recv;
-    uint64_t *idx_recv;
-    double *pts_recv;
-    uint32_t *ngh_recv;
+    uint32_t *src_recv = NULL;
+    uint32_t *dst_recv = NULL;
+    uint32_t *cnt_recv = NULL;
+    uint32_t *nct_recv = NULL;
+    uint64_t *idx_recv = NULL;
+    double *pts_recv = NULL;
+    uint32_t *ngh_recv = NULL;
     while (nrecv_total != 0) {
-      src_recv = NULL;
-      dst_recv = NULL;
-      cnt_recv = NULL;
-      nct_recv = NULL;
-      idx_recv = NULL;
-      pts_recv = NULL;
-      ngh_recv = NULL;
-      nexch = outgoing_points(src_recv, dst_recv, cnt_recv, nct_recv,
-			      idx_recv, pts_recv, ngh_recv);
-      // nrecv = incoming_points(nexch, src_recv, dst_recv, cnt_recv, nct_recv,
-      // 			      idx_recv, pts_recv, ngh_recv);
+      nexch = outgoing_points(&src_recv, &dst_recv, &cnt_recv, &nct_recv,
+			      &idx_recv, &pts_recv, &ngh_recv);
+      nrecv = incoming_points(nexch, src_recv, dst_recv, cnt_recv, nct_recv,
+      			      idx_recv, pts_recv, ngh_recv);
+      free(src_recv);
+      free(dst_recv);
+      free(cnt_recv);
+      free(nct_recv);
+      // free(idx_recv);  // Memory moved to leaf
+      // free(pts_recv);  // Memory moved to leaf
+      free(ngh_recv);
       MPI_Allreduce(&nrecv, &nrecv_total, 1, MPI_UNSIGNED, MPI_SUM,
 		    MPI_COMM_WORLD);
     }
@@ -449,7 +492,7 @@ public:
 			   uint64_t *idx_recv, double *pts_recv,
 			   uint32_t *ngh_recv) {
     uint64_t nrecv = 0;
-    uint64_t nprev_pts = 0, nprev_ngh;
+    uint64_t nprev_pts = 0, nprev_ngh = 0;
     uint64_t *iidx;
     double *ipts;
     uint32_t *ingh;
@@ -460,7 +503,7 @@ public:
       ingh = ngh_recv + nprev_ngh;
       dst = map_id2idx[dst_recv[i]];
       leaves[dst].incoming_points(src_recv[i], cnt_recv[i], nct_recv[i],
-				  iidx, ipts, ingh);
+      				  iidx, ipts, ingh);
       nprev_pts += cnt_recv[i];
       nprev_ngh += nct_recv[i];
     }
@@ -468,10 +511,10 @@ public:
     return nrecv;
   }
 
-  int outgoing_points(uint32_t *src_recv, uint32_t *dst_recv,
-		      uint32_t *cnt_recv, uint32_t *nct_recv,
-		      uint64_t *idx_recv, double *pts_recv,
-		      uint32_t *ngh_recv) {
+  int outgoing_points(uint32_t **src_recv, uint32_t **dst_recv,
+		      uint32_t **cnt_recv, uint32_t **nct_recv,
+		      uint64_t **idx_recv, double **pts_recv,
+		      uint32_t **ngh_recv) {
     int i, j;
     // Get output from each leaf
     std::vector<std::vector<uint32_t>> src_out, dst_out, cnt_out, nct_out;
@@ -489,7 +532,7 @@ public:
     }
     for (i = 0; i < nleaves; i++)
       leaves[i].outgoing_points(src_out, dst_out, cnt_out, nct_out,
-				idx_out, pts_out, ngh_out);
+    				idx_out, pts_out, ngh_out);
     // Send expected counts
     int *count_send = (int*)malloc(size*sizeof(int));
     int *count_recv = (int*)malloc(size*sizeof(int));
@@ -498,8 +541,8 @@ public:
     for (i = 0; i < size; i++)
       count_send[i] = (int)(src_out[i].size());
     MPI_Alltoall(count_send, 1, MPI_INT,
-		 count_recv, 1, MPI_INT,
-		 MPI_COMM_WORLD);
+    		 count_recv, 1, MPI_INT,
+    		 MPI_COMM_WORLD);
     int count_send_tot = 0, count_recv_tot = 0;
     for (i = 0; i < size; i++) {
       count_send_tot += count_send[i];
@@ -510,36 +553,40 @@ public:
     uint32_t *dst_send = (uint32_t*)malloc(count_send_tot*sizeof(uint32_t));
     uint32_t *cnt_send = (uint32_t*)malloc(count_send_tot*sizeof(uint32_t));
     uint32_t *nct_send = (uint32_t*)malloc(count_send_tot*sizeof(uint32_t));
-    src_recv = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
-    dst_recv = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
-    cnt_recv = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
-    nct_recv = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
+    (*src_recv) = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
+    (*dst_recv) = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
+    (*cnt_recv) = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
+    (*nct_recv) = (uint32_t*)malloc(count_recv_tot*sizeof(uint32_t));
     int prev_send = 0, prev_recv = 0;
     for (i = 0; i < size; i++) {
       offset_send[i] = prev_send;
       offset_recv[i] = prev_recv;
       for (j = 0; j < count_send[i]; j++) {
-	src_send[prev_send] = src_out[i][j];
-	dst_send[prev_send] = dst_out[i][j];
-	cnt_send[prev_send] = cnt_out[i][j];
-	nct_send[prev_send] = nct_out[i][j];
-	prev_send++;
+    	src_send[prev_send] = src_out[i][j];
+    	dst_send[prev_send] = dst_out[i][j];
+    	cnt_send[prev_send] = cnt_out[i][j];
+    	nct_send[prev_send] = nct_out[i][j];
+    	prev_send++;
       }
       prev_recv += count_recv[i];
     }
     MPI_Alltoallv(src_send, count_send, offset_send, MPI_UNSIGNED,
-		  src_recv, count_recv, offset_recv, MPI_UNSIGNED,
-		  MPI_COMM_WORLD);
+    		  *src_recv, count_recv, offset_recv, MPI_UNSIGNED,
+    		  MPI_COMM_WORLD);
     MPI_Alltoallv(dst_send, count_send, offset_send, MPI_UNSIGNED,
-		  dst_recv, count_recv, offset_recv, MPI_UNSIGNED,
-		  MPI_COMM_WORLD);
+    		  *dst_recv, count_recv, offset_recv, MPI_UNSIGNED,
+    		  MPI_COMM_WORLD);
     MPI_Alltoallv(cnt_send, count_send, offset_send, MPI_UNSIGNED,
-		  cnt_recv, count_recv, offset_recv, MPI_UNSIGNED,
-		  MPI_COMM_WORLD);
+    		  *cnt_recv, count_recv, offset_recv, MPI_UNSIGNED,
+    		  MPI_COMM_WORLD);
     MPI_Alltoallv(nct_send, count_send, offset_send, MPI_UNSIGNED,
-		  nct_recv, count_recv, offset_recv, MPI_UNSIGNED,
-		  MPI_COMM_WORLD);
-    // Send arrays
+    		  *nct_recv, count_recv, offset_recv, MPI_UNSIGNED,
+    		  MPI_COMM_WORLD);
+    free(src_send);
+    free(dst_send);
+    free(offset_send);
+    free(offset_recv);
+    // Get counts/offsets for sending arrays
     int *count_idx_send = (int*)malloc(size*sizeof(int));
     int *count_idx_recv = (int*)malloc(size*sizeof(int));
     int *count_pts_send = (int*)malloc(size*sizeof(int));
@@ -568,25 +615,30 @@ public:
       offset_ngh_send[i] = prev_neigh_send;
       offset_ngh_recv[i] = prev_neigh_recv;
       for (j = 0; j < count_send[i]; j++) {
-	count_idx_send[i] += cnt_send[prev_send];
-	count_ngh_send[i] += nct_send[prev_send];
-	prev_send++;
+    	count_idx_send[i] += cnt_send[prev_send];
+    	count_ngh_send[i] += nct_send[prev_send];
+    	prev_send++;
       }
       count_pts_send[i] = ndim*count_idx_send[i];
       prev_array_send += count_idx_send[i];
       prev_neigh_send += count_ngh_send[i];
       for (j = 0; j < count_recv[i]; j++) {
-	count_idx_recv[i] += cnt_recv[prev_recv];
-	count_ngh_recv[i] += nct_recv[prev_recv];
-	prev_recv++;
+    	count_idx_recv[i] += (*cnt_recv)[prev_recv];
+    	count_ngh_recv[i] += (*nct_recv)[prev_recv];
+    	prev_recv++;
       }
       count_pts_recv[i] = ndim*count_idx_recv[i];
       prev_array_recv += count_idx_recv[i];
       prev_neigh_recv += count_ngh_recv[i];
     }
-    idx_recv = (uint64_t*)malloc(prev_array_recv*sizeof(uint64_t));
-    pts_recv = (double*)malloc(ndim*prev_array_recv*sizeof(double));
-    ngh_recv = (uint32_t*)malloc(prev_neigh_recv*sizeof(uint32_t));
+    free(count_send);
+    free(count_recv);
+    free(cnt_send);
+    free(nct_send);
+    // Allocate for arrays
+    (*idx_recv) = (uint64_t*)malloc(prev_array_recv*sizeof(uint64_t));
+    (*pts_recv) = (double*)malloc(ndim*prev_array_recv*sizeof(double));
+    (*ngh_recv) = (uint32_t*)malloc(prev_neigh_recv*sizeof(uint32_t));
     uint64_t *idx_send = (uint64_t*)malloc(prev_array_send*sizeof(uint64_t));
     double *pts_send = (double*)malloc(ndim*prev_array_send*sizeof(double));
     uint32_t *ngh_send = (uint32_t*)malloc(prev_neigh_send*sizeof(uint32_t));
@@ -595,57 +647,44 @@ public:
     uint32_t *ngh_send_curr = ngh_send;
     for (i = 0; i < size; i++) {
       if (count_idx_send[i] > 0) {
-	memmove(idx_send_curr, idx_out[i], count_idx_send[i]*sizeof(uint64_t));
-	memmove(pts_send_curr, pts_out[i], count_pts_send[i]*sizeof(double));
-	idx_send_curr += count_idx_send[i];
-	pts_send_curr += count_pts_send[i];
+    	memmove(idx_send_curr, idx_out[i], count_idx_send[i]*sizeof(uint64_t));
+    	memmove(pts_send_curr, pts_out[i], count_pts_send[i]*sizeof(double));
+    	idx_send_curr += count_idx_send[i];
+    	pts_send_curr += count_pts_send[i];
       }
       if (count_ngh_send[i] > 0) {
-	memmove(ngh_send_curr, ngh_out[i], count_ngh_send[i]*sizeof(uint32_t));
-	ngh_send_curr += count_ngh_send[i];
+    	memmove(ngh_send_curr, ngh_out[i], count_ngh_send[i]*sizeof(uint32_t));
+    	ngh_send_curr += count_ngh_send[i];
       }
+      idx_out[i] = NULL;
+      pts_out[i] = NULL;
+      ngh_out[i] = NULL;
     }
+    // Send arrays
     MPI_Alltoallv(idx_send, count_idx_send, offset_idx_send, MPI_UNSIGNED_LONG,
-    		  idx_recv, count_idx_recv, offset_idx_recv, MPI_UNSIGNED_LONG,
+    		  *idx_recv, count_idx_recv, offset_idx_recv, MPI_UNSIGNED_LONG,
     		  MPI_COMM_WORLD);
     MPI_Alltoallv(pts_send, count_pts_send, offset_pts_send, MPI_DOUBLE,
-    		  pts_recv, count_pts_recv, offset_pts_recv, MPI_DOUBLE,
+    		  *pts_recv, count_pts_recv, offset_pts_recv, MPI_DOUBLE,
     		  MPI_COMM_WORLD);
     MPI_Alltoallv(ngh_send, count_ngh_send, offset_ngh_send, MPI_UNSIGNED,
-		  ngh_recv, count_ngh_recv, offset_ngh_recv, MPI_UNSIGNED,
-		  MPI_COMM_WORLD);
-    // Free things
-    free(count_send);
-    free(offset_send);
-    free(src_send);
-    free(dst_send);
-    free(cnt_send);
-    free(nct_send);
+    		  *ngh_recv, count_ngh_recv, offset_ngh_recv, MPI_UNSIGNED,
+    		  MPI_COMM_WORLD);
     free(count_idx_send);
     free(count_pts_send);
     free(count_ngh_send);
-    free(offset_idx_send);
-    free(offset_pts_send);
-    free(offset_ngh_send);
-    free(count_recv);
-    free(offset_recv);
-    free(src_recv);
-    free(dst_recv);
-    free(cnt_recv);
-    free(nct_recv);
     free(count_idx_recv);
     free(count_pts_recv);
     free(count_ngh_recv);
+    free(offset_idx_send);
+    free(offset_pts_send);
+    free(offset_ngh_send);
     free(offset_idx_recv);
     free(offset_pts_recv);
     free(offset_ngh_recv);
     free(idx_send);
     free(pts_send);
     free(ngh_send);
-    free(src_send);
-    free(dst_send);
-    free(cnt_send);
-    free(nct_send);
     return count_recv_tot;
   }
 

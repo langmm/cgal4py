@@ -20,4 +20,4 @@ else:
     re = np.empty(0, 'float64')
     
 T = ParallelDelaunay()
-T.insert(pts, le, re, periodic=periodic)
+T.run(pts, le, re, periodic=periodic)

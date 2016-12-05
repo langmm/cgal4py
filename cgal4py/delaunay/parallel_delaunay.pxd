@@ -9,6 +9,6 @@ cdef extern from "c_parallel_delaunay.hpp":
 
     cdef cppclass CParallelDelaunay nogil:
         CParallelDelaunay()
-        void insert(uint64_t npts, uint32_t ndim, double *pts,
-                    double *le, double *re, cbool *periodic)
+        void run(uint64_t npts, uint32_t ndim, double *pts,
+                 double *le, double *re, cbool *periodic)
         

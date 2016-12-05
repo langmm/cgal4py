@@ -23,10 +23,10 @@ cdef class ParallelDelaunay:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def insert(self, np.ndarray[np.float64_t, ndim=2] pts,
-               np.ndarray[np.float64_t, ndim=1] le,
-               np.ndarray[np.float64_t, ndim=1] re,
-               object periodic=False):
+    def run(self, np.ndarray[np.float64_t, ndim=2] pts,
+            np.ndarray[np.float64_t, ndim=1] le,
+            np.ndarray[np.float64_t, ndim=1] re,
+            object periodic=False):
         cdef np.uint64_t npts = pts.shape[0]
         cdef np.uint32_t ndim = pts.shape[1]
         cdef cbool* per = <cbool *>malloc(ndim*sizeof(cbool));
@@ -37,5 +37,5 @@ cdef class ParallelDelaunay:
             for i in range(ndim):
                 per[i] = <cbool>periodic[i]
         with nogil, cython.boundscheck(False), cython.wraparound(False):
-            self.T.insert(npts, ndim, &pts[0,0], &le[0], &re[0], per)
+            self.T.run(npts, ndim, &pts[0,0], &le[0], &re[0], per)
         
