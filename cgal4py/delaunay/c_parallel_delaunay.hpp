@@ -405,9 +405,9 @@ public:
     // Domain decomp
     domain_decomp(le, re, periodic);
     // Insert points into leaves
-    tessellate();
+    // tessellate();
     // Exchange points
-    exchange();
+    // exchange();
     printf("Done on %d of %d\n", rank, size);
   }
 
