@@ -32,14 +32,14 @@ public:
   double *domain_width = NULL;
   int nneigh;
   uint32_t *neigh = NULL;
-  std::set<uint32_t> all_neigh;
   double *neigh_le;
   double *neigh_re;
   double *leaves_le;
   double *leaves_re; 
-  std::vector<std::set<uint32_t>> lneigh;
-  std::vector<std::set<uint32_t>> rneigh;
   Delaunay *T = NULL;
+  std::set<uint32_t> *all_neigh;
+  std::vector<std::set<uint32_t>> *lneigh;
+  std::vector<std::set<uint32_t>> *rneigh;
 
   Leaf(uint32_t nleaves0, uint32_t ndim0, int src) {
     uint32_t k;
@@ -53,9 +53,12 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
+    all_neigh = new std::set<uint32_t>();
+    lneigh = new std::vector<std::set<uint32_t>>();
+    rneigh = new std::vector<std::set<uint32_t>>();
     for (k = 0; k < ndim; k++) {
-      lneigh.push_back(std::set<uint32_t>());
-      rneigh.push_back(std::set<uint32_t>());
+      lneigh->push_back(std::set<uint32_t>());
+      rneigh->push_back(std::set<uint32_t>());
     }
     // Receive leaf info from root process
     recv(src);
@@ -80,9 +83,12 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
+    all_neigh = new std::set<uint32_t>();
+    lneigh = new std::vector<std::set<uint32_t>>();
+    rneigh = new std::vector<std::set<uint32_t>>();
     for (k = 0; k < ndim; k++) {
-      lneigh.push_back(std::set<uint32_t>());
-      rneigh.push_back(std::set<uint32_t>());
+      lneigh->push_back(std::set<uint32_t>());
+      rneigh->push_back(std::set<uint32_t>());
     }
     // Transfer leaf information
     Node* node = tree->leaves[index];
@@ -98,52 +104,52 @@ public:
     re = node->right_edge;
     periodic_le = (int*)malloc(ndim*sizeof(int));
     periodic_re = (int*)malloc(ndim*sizeof(int));
-    memcpy(domain_width, tree->domain_width, ndim*sizeof(double));
+    domain_width = tree->domain_width;
     nneigh = (int)(node->all_neighbors.size());
-    for (k = 0; k < ndim; k++) {
-      lneigh[k].insert(node->left_neighbors[k].begin(),
-		       node->left_neighbors[k].end());
-      rneigh[k].insert(node->right_neighbors[k].begin(),
-		       node->right_neighbors[k].end());
-    }
     for (j = 0; j < npts; j++) {
       for (k = 0; k < ndim; k++) {
-	pts[ndim*j+k] = tree->all_pts[ndim*tree->all_idx[node->left_idx+j]+k];
+    	pts[ndim*j+k] = tree->all_pts[ndim*tree->all_idx[node->left_idx+j]+k];
       }
+    }
+    for (k = 0; k < nleaves; k++) {
+      memcpy(leaves_le+ndim*k, tree->leaves[k]->left_edge,
+    	     ndim*sizeof(double));
+      memcpy(leaves_re+ndim*k, tree->leaves[k]->right_edge,
+    	     ndim*sizeof(double));
+    }
+    for (i = 0; i < nneigh; i++) {
+      neigh[i] = node->all_neighbors[i];
     }
     for (k = 0; k < ndim; k++) {
       periodic_le[k] = node->periodic_left[k];
       periodic_re[k] = node->periodic_right[k];
     }
-    for (k = 0; k < nleaves; k++) {
-      memcpy(leaves_le+ndim*k, tree->leaves[k]->left_edge,
-	     ndim*sizeof(double));
-      memcpy(leaves_re+ndim*k, tree->leaves[k]->right_edge,
-	     ndim*sizeof(double));
-    }
-    for (i = 0; i < nneigh; i++) {
-      neigh[i] = node->all_neighbors[i];
+    for (k = 0; k < ndim; k++) {
+      (*lneigh)[k].insert(node->left_neighbors[k].begin(),
+			  node->left_neighbors[k].end());
+      (*rneigh)[k].insert(node->right_neighbors[k].begin(),
+			  node->right_neighbors[k].end());
     }
     // Shift edges of periodic neighbors
     for (k = 0; k < ndim; k++) {
       if (periodic_le[k]) {
-	for (std::set<uint32_t>::iterator it = lneigh[k].begin();
-	     it != lneigh[k].end(); it++) {
-	  leaves_le[*it, k] -= domain_width[k];
-	  leaves_re[*it, k] -= domain_width[k];
-	}
+    	for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    	     it != (*lneigh)[k].end(); it++) {
+    	  leaves_le[*it, k] -= domain_width[k];
+    	  leaves_re[*it, k] -= domain_width[k];
+    	}
       }
       if (periodic_re[k]) {
-	for (std::set<uint32_t>::iterator it = rneigh[k].begin();
-	     it != rneigh[k].end(); it++) {
-	  leaves_le[*it, k] += domain_width[k];
-	  leaves_re[*it, k] += domain_width[k];
-	}
+    	for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    	     it != (*rneigh)[k].end(); it++) {
+    	  leaves_le[*it, k] += domain_width[k];
+    	  leaves_re[*it, k] += domain_width[k];
+    	}
       }
     }
     // Select edges of neighbors
     for (i = 0; i < nneigh; i++) {
-      n = neigh[k];
+      n = neigh[i];
       memcpy(neigh_le+ndim*i, leaves_le+ndim*n, ndim*sizeof(double));
       memcpy(neigh_re+ndim*i, leaves_re+ndim*n, ndim*sizeof(double));
     }
@@ -169,22 +175,22 @@ public:
     int ndum;
     for (k = 0; k < ndim; k++) {
       // left neighbors
-      ndum = (int)(lneigh[k].size());
+      ndum = (int)((*lneigh)[k].size());
       j = 0;
-      for (std::set<uint32_t>::iterator it = lneigh[k].begin();
-	   it != lneigh[k].end(); it++) {
-	dummy[j] = *it;
-	j++;
+      for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    	   it != (*lneigh)[k].end(); it++) {
+    	dummy[j] = *it;
+    	j++;
       }
       MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
       MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
       // right neighbors
-      ndum = (int)(rneigh[k].size());
+      ndum = (int)((*rneigh)[k].size());
       j = 0;
-      for (std::set<uint32_t>::iterator it = rneigh[k].begin();
-	   it != rneigh[k].end(); it++) {
-	dummy[j] = *it;
-	j++;
+      for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    	   it != (*rneigh)[k].end(); it++) {
+    	dummy[j] = *it;
+    	j++;
       }
       MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
       MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
@@ -203,6 +209,9 @@ public:
     pts = (double*)malloc(ndim*npts*sizeof(double));
     le = (double*)malloc(ndim*sizeof(double));
     re = (double*)malloc(ndim*sizeof(double));
+    periodic_le = (int*)malloc(ndim*sizeof(int));
+    periodic_re = (int*)malloc(ndim*sizeof(int));
+    domain_width = (double*)malloc(ndim*sizeof(double));
     MPI_Recv(idx, npts, MPI_UNSIGNED_LONG, src, i++, MPI_COMM_WORLD,
     	     MPI_STATUS_IGNORE);
     MPI_Recv(pts, ndim*npts, MPI_DOUBLE, src, i++, MPI_COMM_WORLD,
@@ -230,19 +239,19 @@ public:
     for (k = 0; k < ndim; k++) {
       // left neighbors
       MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
+    	       MPI_STATUS_IGNORE);
       MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
+    	       MPI_STATUS_IGNORE);
       for (j = 0; j < ndum; j++) {
-	lneigh[k].insert(dummy[j]);
+    	(*lneigh)[k].insert(dummy[j]);
       }
       // right neighbors
       MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
+    	       MPI_STATUS_IGNORE);
       MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
+    	       MPI_STATUS_IGNORE);
       for (j = 0; j < ndum; j++) {
-	rneigh[k].insert(dummy[j]);
+    	(*rneigh)[k].insert(dummy[j]);
       }
     }
     free(dummy);
@@ -250,6 +259,7 @@ public:
 
   void tessellate() {
     T = new Delaunay();
+    printf("%d: npts = %d\n", id, npts);
     T->insert(pts, idx, npts);
     npts_orig = npts;
   }
@@ -317,7 +327,7 @@ public:
     // Transfer neighbors to log
     for (i = 0; i < nneigh; i++) {
       n = neigh[i];
-      all_neigh.insert(n);
+      all_neigh->insert(n);
     }
     nneigh = 0;
   }
@@ -332,16 +342,16 @@ public:
     uint32_t k;
     if (src == id) {
       for (k = 0; k < ndim; k++) {
-	if (periodic_le[k] and periodic_re[k]) {
-	  for (j = 0; j < nnpts_recv; j++) {
-	    if ((pts_recv[ndim*j+k] - le[k]) < (re[k] - pts_recv[ndim*j+k])) {
-	      pts_recv[ndim*j+k] += domain_width[k];
-	    }
-	    if ((re[k] - pts_recv[ndim*j+k]) < (pts_recv[ndim*j+k] - le[k])) {
-	      pts_recv[ndim*j+k] -= domain_width[k];
-	    }
-	  }
-	}
+	// if (periodic_le[k] and periodic_re[k]) {
+	//   for (j = 0; j < nnpts_recv; j++) {
+	//     if ((pts_recv[ndim*j+k] - le[k]) < (re[k] - pts_recv[ndim*j+k])) {
+	//       pts_recv[ndim*j+k] += domain_width[k];
+	//     }
+	//     if ((re[k] - pts_recv[ndim*j+k]) < (pts_recv[ndim*j+k] - le[k])) {
+	//       pts_recv[ndim*j+k] -= domain_width[k];
+	//     }
+	//   }
+	// }
       }
     } else {
       for (k = 0; k < ndim; k++) {
@@ -424,8 +434,8 @@ public:
       ngh_recv = NULL;
       nexch = outgoing_points(src_recv, dst_recv, cnt_recv, nct_recv,
 			      idx_recv, pts_recv, ngh_recv);
-      nrecv = incoming_points(nexch, src_recv, dst_recv, cnt_recv, nct_recv,
-			      idx_recv, pts_recv, ngh_recv);
+      // nrecv = incoming_points(nexch, src_recv, dst_recv, cnt_recv, nct_recv,
+      // 			      idx_recv, pts_recv, ngh_recv);
       MPI_Allreduce(&nrecv, &nrecv_total, 1, MPI_UNSIGNED, MPI_SUM,
 		    MPI_COMM_WORLD);
     }
@@ -679,8 +689,9 @@ public:
 	task = i % size;
 	Leaf ileaf(nleaves_total, ndim, tree, i);
 	if (task == rank) {
+	  printf("%d of %d\n", iroot, nleaves);
 	  leaves[iroot] = ileaf;
-	  map_id2idx[leaves[iroot].id] = i;
+	  map_id2idx[leaves[iroot].id] = iroot;
 	  iroot++;
 	} else {
 	  ileaf.send(task);
