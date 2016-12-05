@@ -1512,13 +1512,13 @@ class ParallelLeaf(object):
         re = copy.deepcopy(right_edges)
         for i in xrange(self.ndim):
             if self.periodic_left[i]:
-                for k in leaf.left_neighbors:
-                    le[k, i] -= self.domain_width
-                    re[k, i] -= self.domain_width
+                for k in leaf.left_neighbors[i]:
+                    le[k, i] -= self.domain_width[i]
+                    re[k, i] -= self.domain_width[i]
             if self.periodic_right[i]:
-                for k in leaf.right_neighbors:
-                    le[k, i] += self.domain_width
-                    re[k, i] += self.domain_width
+                for k in leaf.right_neighbors[i]:
+                    le[k, i] += self.domain_width[i]
+                    re[k, i] += self.domain_width[i]
         self.left_edges = le[self.neighbors, :]
         self.right_edges = re[self.neighbors, :]
         self.unique_str = unique_str
@@ -1754,12 +1754,12 @@ class ParallelLeaf(object):
                     pos[idx_right, i] -= self.domain_width[i]
         else:
             for i in range(self.ndim):
-                if self.periodic_right[i] and leafid in self.right_neighbors:
+                if self.periodic_right[i] and leafid in self.right_neighbors[i]:
                     idx_left = ((pos[:, i] + self.domain_width[i] -
                                  self.right_edge[i]) <
                                 (self.left_edge[i] - pos[:, i]))
                     pos[idx_left, i] += self.domain_width[i]
-                if self.periodic_left[i] and leafid in self.left_neighbors:
+                if self.periodic_left[i] and leafid in self.left_neighbors[i]:
                     idx_right = ((self.left_edge[i] - pos[:, i] +
                                   self.domain_width[i]) <
                                  (pos[:, i] - self.right_edge[i]))
