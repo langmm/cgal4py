@@ -37,9 +37,9 @@ public:
   double *leaves_le;
   double *leaves_re; 
   Delaunay *T = NULL;
-  std::set<uint32_t> *all_neigh;
-  std::vector<std::set<uint32_t>> *lneigh;
-  std::vector<std::set<uint32_t>> *rneigh;
+  // std::set<uint32_t> *all_neigh;
+  // std::vector<std::set<uint32_t>> *lneigh;
+  // std::vector<std::set<uint32_t>> *rneigh;
 
   Leaf(uint32_t nleaves0, uint32_t ndim0, int src) {
     uint32_t k;
@@ -53,13 +53,16 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    all_neigh = new std::set<uint32_t>();
-    lneigh = new std::vector<std::set<uint32_t>>();
-    rneigh = new std::vector<std::set<uint32_t>>();
-    for (k = 0; k < ndim; k++) {
-      lneigh->push_back(std::set<uint32_t>());
-      rneigh->push_back(std::set<uint32_t>());
-    }
+    // all_neigh = new std::set<uint32_t>();
+    // lneigh = new std::vector<*std::set<uint32_t>>();
+    // rneigh = new std::vector<*std::set<uint32_t>>();
+    // all_neigh->reserve(nleaves);
+    // for (k = 0; k < ndim; k++) {
+    //   lneigh->push_back(new std::set<uint32_t>());
+    //   (*lneigh)[k]->reserve(nleaves);
+    //   rneigh->push_back(new std::set<uint32_t>());
+    //   (*rneigh)[k]->reserve(nleaves);
+    // }
     // Receive leaf info from root process
     recv(src);
     int i;
@@ -83,13 +86,13 @@ public:
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    all_neigh = new std::set<uint32_t>();
-    lneigh = new std::vector<std::set<uint32_t>>();
-    rneigh = new std::vector<std::set<uint32_t>>();
-    for (k = 0; k < ndim; k++) {
-      lneigh->push_back(std::set<uint32_t>());
-      rneigh->push_back(std::set<uint32_t>());
-    }
+    // all_neigh = new std::set<uint32_t>();
+    // lneigh = new std::vector<std::set<uint32_t>>();
+    // rneigh = new std::vector<std::set<uint32_t>>();
+    // for (k = 0; k < ndim; k++) {
+    //   lneigh->push_back(std::set<uint32_t>());
+    //   rneigh->push_back(std::set<uint32_t>());
+    // }
     // Transfer leaf information
     Node* node = tree->leaves[index];
     std::vector<uint32_t>::iterator it;
@@ -124,29 +127,29 @@ public:
       periodic_le[k] = node->periodic_left[k];
       periodic_re[k] = node->periodic_right[k];
     }
-    for (k = 0; k < ndim; k++) {
-      (*lneigh)[k].insert(node->left_neighbors[k].begin(),
-			  node->left_neighbors[k].end());
-      (*rneigh)[k].insert(node->right_neighbors[k].begin(),
-			  node->right_neighbors[k].end());
-    }
+    // for (k = 0; k < ndim; k++) {
+    //   (*lneigh)[k].insert(node->left_neighbors[k].begin(),
+    // 			  node->left_neighbors[k].end());
+    //   (*rneigh)[k].insert(node->right_neighbors[k].begin(),
+    // 			  node->right_neighbors[k].end());
+    // }
     // Shift edges of periodic neighbors
-    for (k = 0; k < ndim; k++) {
-      if (periodic_le[k]) {
-    	for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
-    	     it != (*lneigh)[k].end(); it++) {
-    	  leaves_le[*it, k] -= domain_width[k];
-    	  leaves_re[*it, k] -= domain_width[k];
-    	}
-      }
-      if (periodic_re[k]) {
-    	for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
-    	     it != (*rneigh)[k].end(); it++) {
-    	  leaves_le[*it, k] += domain_width[k];
-    	  leaves_re[*it, k] += domain_width[k];
-    	}
-      }
-    }
+    // for (k = 0; k < ndim; k++) {
+    //   if (periodic_le[k]) {
+    // 	for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    // 	     it != (*lneigh)[k].end(); it++) {
+    // 	  leaves_le[*it, k] -= domain_width[k];
+    // 	  leaves_re[*it, k] -= domain_width[k];
+    // 	}
+    //   }
+    //   if (periodic_re[k]) {
+    // 	for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    // 	     it != (*rneigh)[k].end(); it++) {
+    // 	  leaves_le[*it, k] += domain_width[k];
+    // 	  leaves_re[*it, k] += domain_width[k];
+    // 	}
+    //   }
+    // }
     // Select edges of neighbors
     for (i = 0; i < nneigh; i++) {
       n = neigh[i];
@@ -171,31 +174,31 @@ public:
     MPI_Send(neigh, nneigh, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
     MPI_Send(leaves_le, nleaves*ndim, MPI_DOUBLE, dst, i++, MPI_COMM_WORLD);
     MPI_Send(leaves_re, nleaves*ndim, MPI_DOUBLE, dst, i++, MPI_COMM_WORLD);
-    uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
-    int ndum;
-    for (k = 0; k < ndim; k++) {
-      // left neighbors
-      ndum = (int)((*lneigh)[k].size());
-      j = 0;
-      for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
-    	   it != (*lneigh)[k].end(); it++) {
-    	dummy[j] = *it;
-    	j++;
-      }
-      MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
-      MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
-      // right neighbors
-      ndum = (int)((*rneigh)[k].size());
-      j = 0;
-      for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
-    	   it != (*rneigh)[k].end(); it++) {
-    	dummy[j] = *it;
-    	j++;
-      }
-      MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
-      MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
-    }
-    free(dummy);
+    // uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
+    // int ndum;
+    // for (k = 0; k < ndim; k++) {
+    //   // left neighbors
+    //   ndum = (int)((*lneigh)[k].size());
+    //   j = 0;
+    //   for (std::set<uint32_t>::iterator it = (*lneigh)[k].begin();
+    // 	   it != (*lneigh)[k].end(); it++) {
+    // 	dummy[j] = *it;
+    // 	j++;
+    //   }
+    //   MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
+    //   MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
+    //   // right neighbors
+    //   ndum = (int)((*rneigh)[k].size());
+    //   j = 0;
+    //   for (std::set<uint32_t>::iterator it = (*rneigh)[k].begin();
+    // 	   it != (*rneigh)[k].end(); it++) {
+    // 	dummy[j] = *it;
+    // 	j++;
+    //   }
+    //   MPI_Send(&ndum, 1, MPI_INT, dst, i++, MPI_COMM_WORLD);
+    //   MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
+    // }
+    // free(dummy);
   };
 
   void recv(int src) {
@@ -234,27 +237,27 @@ public:
     	     MPI_STATUS_IGNORE);
     MPI_Recv(leaves_re, nleaves*ndim, MPI_DOUBLE, src, i++, MPI_COMM_WORLD,
     	     MPI_STATUS_IGNORE);
-    uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
-    int ndum;
-    for (k = 0; k < ndim; k++) {
-      // left neighbors
-      MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-    	       MPI_STATUS_IGNORE);
-      MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-    	       MPI_STATUS_IGNORE);
-      for (j = 0; j < ndum; j++) {
-    	(*lneigh)[k].insert(dummy[j]);
-      }
-      // right neighbors
-      MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
-    	       MPI_STATUS_IGNORE);
-      MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
-    	       MPI_STATUS_IGNORE);
-      for (j = 0; j < ndum; j++) {
-    	(*rneigh)[k].insert(dummy[j]);
-      }
-    }
-    free(dummy);
+    // uint32_t *dummy = (uint32_t*)malloc(nneigh*sizeof(uint32_t));
+    // int ndum;
+    // for (k = 0; k < ndim; k++) {
+    //   // left neighbors
+    //   MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
+    // 	       MPI_STATUS_IGNORE);
+    //   MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
+    // 	       MPI_STATUS_IGNORE);
+    //   for (j = 0; j < ndum; j++) {
+    // 	(*lneigh)[k].insert(dummy[j]);
+    //   }
+    //   // right neighbors
+    //   MPI_Recv(&ndum, 1, MPI_INT, src, i++, MPI_COMM_WORLD,
+    // 	       MPI_STATUS_IGNORE);
+    //   MPI_Recv(dummy, ndum, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
+    // 	       MPI_STATUS_IGNORE);
+    //   for (j = 0; j < ndum; j++) {
+    // 	(*rneigh)[k].insert(dummy[j]);
+    //   }
+    // }
+    // free(dummy);
   }
 
   void tessellate() {
@@ -327,7 +330,7 @@ public:
     // Transfer neighbors to log
     for (i = 0; i < nneigh; i++) {
       n = neigh[i];
-      all_neigh->insert(n);
+      // all_neigh->insert(n);
     }
     nneigh = 0;
   }
