@@ -25,10 +25,10 @@ for key, value in cfg_vars.items():
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 # Needed for line_profiler - disable for production code
-if not RTDFLAG:
-    from Cython.Compiler.Options import directive_defaults
-    directive_defaults['linetrace'] = True
-    directive_defaults['binding'] = True
+# if not RTDFLAG:
+#     from Cython.Compiler.Options import directive_defaults
+#     directive_defaults['linetrace'] = True
+#     directive_defaults['binding'] = True
 
 # Set generic extension options
 ext_options = dict(language="c++",
@@ -143,6 +143,7 @@ if include_parallel_delaunay:
     ext_modules.append(
         Extension("cgal4py.delaunay.parallel_delaunay",
                   sources=[pyx_file, cpp_file,
+                           # "cgal4py/delaunay/c_tools.cpp",
                            "cgal4py/delaunay/c_delaunay2.cpp",
                            cykdtree_cpp, cykdtree_utils_cpp],
                   **ext_options_mpicgal))
