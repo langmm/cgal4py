@@ -10,8 +10,8 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 periodic = False
-npts = int(1e6)
-ndim = 2
+npts = int(1e4)
+ndim = 3
 
 if rank == 0:
     pts, le, re = make_points(npts, ndim)
