@@ -13,9 +13,9 @@ import os
 import pyximport
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
-import parallel_delaunay
 from periodic_delaunay2 import is_valid as is_valid_P2
 from periodic_delaunay3 import is_valid as is_valid_P3
+import parallel_delaunay
 if is_valid_P2():
     from periodic_delaunay2 import PeriodicDelaunay2
 else:
@@ -379,6 +379,7 @@ def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
                                  bit64=bit64)
     return getattr(importlib.import_module(modname),clsname)
+
 
 
 def Delaunay(pts, use_double=False, periodic=False,

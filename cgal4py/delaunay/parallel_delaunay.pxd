@@ -13,8 +13,16 @@ cdef extern from "c_parallel_delaunay.hpp":
         CParallelDelaunay(uint32_t ndim0, double *le0, double *re0,
                           cbool *periodic0)
 
+        int rank
+        int size
         uint32_t ndim
+        uint64_t npts_total
+        uint64_t *idx_total
+        Info *info_total
+        double *pts_total
 
         void insert(uint64_t npts, double *pts)
-        
-        void consolidate_tess()
+
+        uint64_t num_cells()
+        uint64_t consolidate_tess(uint64_t tot_ncells_total, Info *tot_idx_inf,
+                                  Info *allverts, Info *allneigh)

@@ -31,18 +31,18 @@
 #include <CGAL/Unique_hash_map.h>
 #endif
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel           K;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel            K3;
 #if (CGAL_VERSION_NR >= 1040401000)
-typedef CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<K> Cb3;
+typedef CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<K3> Cb3;
 #else
-typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K>          Cb3;
+typedef CGAL::Triangulation_cell_base_with_circumcenter_3<K3>          Cb3;
 #endif
 
 template <typename Info_>
 class Delaunay_with_info_3
 {
  public:
-  typedef CGAL::Delaunay_triangulation_3<K, CGAL::Triangulation_data_structure_3<CGAL::Triangulation_vertex_base_with_info_3<Info_, K>, Cb3>> Delaunay;
+  typedef CGAL::Delaunay_triangulation_3<K3, CGAL::Triangulation_data_structure_3<CGAL::Triangulation_vertex_base_with_info_3<Info_, K3>, Cb3>> Delaunay;
   typedef typename Delaunay::Point                     Point;
   typedef typename Delaunay::Vertex_handle             Vertex_handle;
   typedef typename Delaunay::Edge                      Edge_handle;  // not really a handle, just for disambiguation

@@ -38,16 +38,16 @@
 #endif
 #endif
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel           K;
-typedef CGAL::Periodic_3_Delaunay_triangulation_traits_3<K>           Gt;
-typedef CGAL::Periodic_3_triangulation_ds_vertex_base_3<>             VbDS;
-typedef CGAL::Triangulation_vertex_base_3<Gt,VbDS>                    Vbb;
-typedef CGAL::Periodic_3_triangulation_ds_cell_base_3<>               CbDS;
-typedef CGAL::Triangulation_cell_base_3<Gt,CbDS>                      Cbb;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel           K3p;
+typedef CGAL::Periodic_3_Delaunay_triangulation_traits_3<K3p>         Gt3p;
+typedef CGAL::Periodic_3_triangulation_ds_vertex_base_3<>             VbDS3p;
+typedef CGAL::Triangulation_vertex_base_3<Gt3p,VbDS3p>                Vbb3p;
+typedef CGAL::Periodic_3_triangulation_ds_cell_base_3<>               CbDS3p;
+typedef CGAL::Triangulation_cell_base_3<Gt3p,CbDS3p>                  Cbb3p;
 #if (CGAL_VERSION_NR >= 1040401000)
-typedef CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<Gt,Cbb> Cb3;
+typedef CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<Gt3p,Cbb3p> Cb3p;
 #else
-typedef CGAL::Triangulation_cell_base_with_circumcenter_3<Gt,Cbb>          Cb3;
+typedef CGAL::Triangulation_cell_base_with_circumcenter_3<Gt3p,Cbb3p>          Cb3p;
 #endif
 
 
@@ -55,9 +55,9 @@ template <typename Info_>
 class PeriodicDelaunay_with_info_3
 {
  public:
-  typedef CGAL::Triangulation_vertex_base_with_info_3<Info_, Gt, Vbb> Vb;
-  typedef CGAL::Triangulation_data_structure_3<Vb, Cb3>               Tds;
-  typedef CGAL::Periodic_3_Delaunay_triangulation_3<Gt, Tds>          Delaunay;
+  typedef CGAL::Triangulation_vertex_base_with_info_3<Info_, Gt3p, Vbb3p> Vb;
+  typedef CGAL::Triangulation_data_structure_3<Vb, Cb3p>                  Tds;
+  typedef CGAL::Periodic_3_Delaunay_triangulation_3<Gt3p, Tds>            Delaunay;
   typedef Info_ Info;
   typedef typename Delaunay::Point                     Point;
   typedef typename Delaunay::Segment                   Segment;

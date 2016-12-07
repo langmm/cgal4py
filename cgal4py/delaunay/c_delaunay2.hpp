@@ -24,14 +24,13 @@
 #include <CGAL/Unique_hash_map.h>
 #endif
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel         K;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel         K2;
 
 template <typename Info_>
 class Delaunay_with_info_2
-// class Delaunay_with_info_2 : public CGAL::Delaunay_triangulation_2<K, CGAL::Triangulation_data_structure_2<CGAL::Triangulation_vertex_base_with_info_2<Info_, K>>>
 {
 public:
-  typedef CGAL::Delaunay_triangulation_2<K, CGAL::Triangulation_data_structure_2<CGAL::Triangulation_vertex_base_with_info_2<Info_, K>>> Delaunay;
+  typedef CGAL::Delaunay_triangulation_2<K2, CGAL::Triangulation_data_structure_2<CGAL::Triangulation_vertex_base_with_info_2<Info_, K2>>> Delaunay;
   typedef Info_ Info;
   typedef typename Delaunay::Point                     Point;
   typedef typename Delaunay::Vertex_handle             Vertex_handle;
