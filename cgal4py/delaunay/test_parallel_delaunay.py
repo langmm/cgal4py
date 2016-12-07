@@ -10,7 +10,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 periodic = False
-npts = int(0)
+npts = int(1e6)
 ndim = 2
 
 if rank == 0:
@@ -27,7 +27,7 @@ TP.insert(pts)
 # TP.insert(pts2)
 T_new = TP.consolidate_tess()
 if rank == 0:
-    T_old = triangulate(pts, le, re)#, nproc=size)
+    T_old = triangulate(pts, le, re, nproc=size)
     c_old, n_old, inf_old = T_old.serialize(sort=True)
     c_new, n_new, inf_new = T_new.serialize(sort=True)
     try:

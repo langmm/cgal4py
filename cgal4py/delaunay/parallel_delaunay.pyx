@@ -9,8 +9,6 @@ from cpython cimport bool as pybool
 from cython.operator cimport dereference
 from cython.operator cimport preincrement, predecrement
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t
-# from delaunay2 import Delaunay2
-# from delaunay3 import Delaunay3
 
 
 ctypedef uint32_t info_t
@@ -76,12 +74,6 @@ cdef class ParallelDelaunay:
         if self.T.rank == 0:
             Delaunay = _get_Delaunay(self.T.ndim, bit64=(np_info==np.uint64))
             T = Delaunay()
-            # if (self.T.ndim == 2):
-            #     T = Delaunay2()
-            # elif (self.T.ndim == 3):
-            #     T = Delaunay3()
-            # else:
-            #     raise Exception("{} dimensions not supported.".format(self.T.ndim))
             T.deserialize_with_info(self.pts_total, info_total,
                                     allverts, allneigh, idx_inf)
         return T

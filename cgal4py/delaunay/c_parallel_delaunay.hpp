@@ -22,6 +22,34 @@
 #endif
 
 
+void print_array_double(double *arr, int nrow, int ncol) {
+  int i, j;
+  printf("[\n");
+  for (i = 0; i < nrow; i++) {
+    printf(" [");
+    for (j = 0; j < ncol; j++) {
+      printf("%f ", arr[ncol*i+j]);
+    }
+    printf("]\n");
+  }
+  printf("]\n");
+}
+
+template <typename I>
+void print_array_I(I *arr, int nrow, int ncol) {
+  int i, j;
+  printf("[\n");
+  for (i = 0; i < nrow; i++) {
+    printf(" [");
+    for (j = 0; j < ncol; j++) {
+      printf("%lu ", (uint64_t)arr[ncol*i+j]);
+    }
+    printf("]\n");
+  }
+  printf("]\n");
+}
+
+
 template <typename Info_>
 class CGeneralDelaunay
 {
@@ -776,7 +804,7 @@ public:
 	free(ipts);
     }
     // Exchange points
-    // exchange();
+    exchange();
     npts_prev += npts0;
   }
 
