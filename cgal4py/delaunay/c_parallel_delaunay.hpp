@@ -665,7 +665,6 @@ public:
 		    bool *periodic0) {
     MPI_Comm_size ( MPI_COMM_WORLD, &size);
     MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
-    printf("Hello from %d of %d.\n", rank, size);
     ndim = ndim0;
     le = le0;
     re = re0;
@@ -700,7 +699,6 @@ public:
       domain_decomp();
       for (i = 0; i < nleaves; i++)
 	leaves[i]->init_triangulation();
-      printf("%d Initialized triangulations.\n", rank);
     } else {
       Info *iidx = NULL;
       double *ipts = NULL;
@@ -780,7 +778,6 @@ public:
     // Exchange points
     // exchange();
     npts_prev += npts0;
-    printf("Inserted %lu points on %d of %d\n", npts0, rank, size);
   }
 
   void exchange() {
@@ -1037,7 +1034,6 @@ public:
       for (j = 0; j < npts_total; j++)
 	info_total[j] = idx_total[j];
       nleaves_total = tree->num_leaves;
-      printf("%d leaves in total\n", nleaves_total);
     }
     MPI_Bcast(&nleaves_total, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -1080,7 +1076,6 @@ public:
       MPI_Recv(&tree_exists, 1, MPI_INT, 0, 33, MPI_COMM_WORLD,
 	       MPI_STATUS_IGNORE);
     }
-    printf("Received %d leaves on %d of %d\n", nleaves, rank, size);
     if (nleaves_per_proc != NULL)
       free(nleaves_per_proc);
   }
@@ -1215,7 +1210,6 @@ public:
     free(neigh);
     free(idx_verts);
     free(idx_cells);
-    printf("%d: Finished consolidation\n", rank);
     return out;
   }
 
