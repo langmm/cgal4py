@@ -12,8 +12,6 @@ except ImportError:
 else:
     use_cython = True
 
-include_parallel_delaunay = True
-
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
 # RTDFLAG = True
@@ -48,26 +46,54 @@ else:
     ext_options_cgal['extra_link_args'] += ["-lgmp"]
 
 
-def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
+ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
+import cykdtree
+cykdtree_cpp = os.path.join(
+    os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+cykdtree_utils_cpp = os.path.join(
+    os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+if False:  # OpenMPI
+    mpi_compile_args = os.popen(
+        "mpic++ --showme:compile").read().strip().split(' ')
+    mpi_link_args = os.popen(
+        "mpic++ --showme:link").read().strip().split(' ')
+else:  # MPICH
+    mpi_compile_args = os.popen(
+        "mpic++ -compile_info").read().strip().split(' ')[1:]
+    mpi_link_args = os.popen(
+        "mpic++ -link_info").read().strip().split(' ')[1:]
+ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
+ext_options_mpicgal['extra_link_args'] += mpi_link_args
+ext_options_mpicgal['include_dirs'].append(
+    os.path.dirname(cykdtree.__file__))
+cykdtree_cpp = os.path.join(
+    os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+cykdtree_utils_cpp = os.path.join(
+    os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+
+
+def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
     _delaunay_dir = 'cgal4py/delaunay'
     ver = str(dim)
-    perstr = '' ; bitstr = ''
+    perstr = ''
     relpath = True
     if periodic:
         perstr = 'periodic_'
-    if bit64:
-        bitstr = '_64bit'
+    if parallel:
+        perstr = 'parallel_'
+        if dim in [2, 3]:
+            ver = 'D'
     if ftype == 'ext':
-        fname = "cgal4py.delaunay.{}delaunay{}{}".format(perstr, ver, bitstr)
+        fname = "cgal4py.delaunay.{}delaunay{}".format(perstr, ver)
         relpath = False
     elif ftype == 'pyx':
-        fname = "{}delaunay{}{}.pyx".format(perstr, ver, bitstr)
+        fname = "{}delaunay{}.pyx".format(perstr, ver)
     elif ftype == 'pxd':
-        fname = "{}delaunay{}{}.pxd".format(perstr, ver, bitstr)
+        fname = "{}delaunay{}.pxd".format(perstr, ver)
     elif ftype == 'cpp':
-        fname = "c_{}delaunay{}{}.cpp".format(perstr, ver, bitstr)
+        fname = "c_{}delaunay{}.cpp".format(perstr, ver)
     elif ftype == 'hpp':
-        fname = "c_{}delaunay{}{}.hpp".format(perstr, ver, bitstr)
+        fname = "c_{}delaunay{}.hpp".format(perstr, ver)
     else:
         raise ValueError("Unsupported file type {}.".format(ftype))
     if relpath:
@@ -76,19 +102,28 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
 
 
 # Add Delaunay cython extensions
-def add_delaunay(ext_modules, ver, periodic=False, bit64=False):
-    ver = int(ver)
-    ext_name = _delaunay_filename('ext', ver, periodic=periodic, bit64=bit64)
-    pyx_file = _delaunay_filename('pyx', ver, periodic=periodic, bit64=bit64)
-    cpp_file = _delaunay_filename('cpp', ver, periodic=periodic, bit64=bit64)
+def add_delaunay(ext_modules, ver, periodic=False, parallel=False):
+    ext_name = _delaunay_filename('ext', ver, periodic=periodic,
+                                  parallel=parallel)
+    pyx_file = _delaunay_filename('pyx', ver, periodic=periodic,
+                                  parallel=parallel)
+    cpp_file = _delaunay_filename('cpp', ver, periodic=periodic,
+                                  parallel=parallel)
     if not os.path.isfile(pyx_file):
-        print("Extension {} does not exist and will not be compiled".format(ext_name))
+        print("Extension {} ".format(ext_name) +
+              "does not exist and will not be compiled")
         return
     if not os.path.isfile(cpp_file):
         open(cpp_file,'a').close()
         assert(os.path.isfile(cpp_file))
-    ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file],
-                                 **ext_options_cgal))
+    if parallel:
+        ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file,
+                                                        cykdtree_cpp,
+                                                        cykdtree_utils_cpp],
+                                    **ext_options_mpicgal))
+    else:
+        ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file],
+                                    **ext_options_cgal))
 
 # Add extensions
 cmdclass = { }
@@ -98,6 +133,7 @@ ext_modules = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, ver)
     add_delaunay(ext_modules, ver, periodic=True)
+add_delaunay(ext_modules, 2, parallel=True)
 
 # Add other packages
 ext_modules += [
@@ -113,41 +149,38 @@ ext_modules += [
               sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
               **ext_options)
     ]
-if include_parallel_delaunay:
-    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
-    import cykdtree
-    cykdtree_cpp = os.path.join(
-        os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
-    cykdtree_utils_cpp = os.path.join(
-        os.path.dirname(cykdtree.__file__), "c_utils.cpp")
-    # OpenMPI
-    if False:
-        mpi_compile_args = os.popen(
-            "mpic++ --showme:compile").read().strip().split(' ')
-        mpi_link_args = os.popen(
-            "mpic++ --showme:link").read().strip().split(' ')
-    else:
-        mpi_compile_args = os.popen(
-            "mpic++ -compile_info").read().strip().split(' ')[1:]
-        mpi_link_args = os.popen(
-            "mpic++ -link_info").read().strip().split(' ')[1:]
-    ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
-    ext_options_mpicgal['extra_link_args'] += mpi_link_args
-    ext_options_mpicgal['include_dirs'].append(
-        os.path.dirname(cykdtree.__file__))
-    ext_options_mpicgal['include_dirs'].append(
-        '/usr/include/eigen3')
-    pyx_file = "cgal4py/delaunay/parallel_delaunay.pyx"
-    cpp_file = "cgal4py/delaunay/c_parallel_delaunay.cpp"
-    if not os.path.isfile(cpp_file):
-        open(cpp_file,'a').close()
-    assert(os.path.isfile(cpp_file))
-    ext_modules.append(
-        Extension("cgal4py.delaunay.parallel_delaunay",
-                  sources=[pyx_file, cpp_file,
-                           "cgal4py/delaunay/c_delaunay2.cpp",
-                           cykdtree_cpp, cykdtree_utils_cpp],
-                  **ext_options_mpicgal))
+
+#     ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
+#     import cykdtree
+#     cykdtree_cpp = os.path.join(
+#         os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+#     cykdtree_utils_cpp = os.path.join(
+#         os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+#     # OpenMPI
+#     if False:
+#         mpi_compile_args = os.popen(
+#             "mpic++ --showme:compile").read().strip().split(' ')
+#         mpi_link_args = os.popen(
+#             "mpic++ --showme:link").read().strip().split(' ')
+#     else:
+#         mpi_compile_args = os.popen(
+#             "mpic++ -compile_info").read().strip().split(' ')[1:]
+#         mpi_link_args = os.popen(
+#             "mpic++ -link_info").read().strip().split(' ')[1:]
+#     ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
+#     ext_options_mpicgal['extra_link_args'] += mpi_link_args
+#     ext_options_mpicgal['include_dirs'].append(
+#         os.path.dirname(cykdtree.__file__))
+#     pyx_file = "cgal4py/delaunay/parallel_delaunayD.pyx"
+#     cpp_file = "cgal4py/delaunay/c_parallel_delaunayD.cpp"
+#     if not os.path.isfile(cpp_file):
+#         open(cpp_file,'a').close()
+#     assert(os.path.isfile(cpp_file))
+#     ext_modules.append(
+#         Extension("cgal4py.delaunay.parallel_delaunayD",
+#                   sources=[pyx_file, cpp_file,
+#                            cykdtree_cpp, cykdtree_utils_cpp],
+#                   **ext_options_mpicgal))
 
 
 if use_cython:

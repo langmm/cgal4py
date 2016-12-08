@@ -77,8 +77,8 @@ def _final_leaf_tess_filename(leaf_id, unique_str=None):
 
 
 def write_mpi_script(fname, read_func, taskname, unique_str=None,
-                     use_double=False, use_buffer=False, overwrite=False,
-                     profile=False, limit_mem=False):
+                     use_double=False, use_python=False, use_buffer=False,
+                     overwrite=False, profile=False, limit_mem=False):
     r"""Write an MPI script for calling MPI parallelized triangulation.
 
     Args:
@@ -101,6 +101,9 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
+        use_python (bool, optional): If True, communications are done in python
+            using mpi4py. Otherwise, communications are done in C++ using MPI.
+            Defaults to False.
         use_buffer (bool, optional): If True, communications are done by way of
             buffers rather than pickling python objects. Defaults to False.
         overwrite (bool): If True, any existing script with the same name is
@@ -122,30 +125,37 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         else:
             return
     readcmds = isinstance(read_func, list)
+    # Import lines
     lines = [
         "import numpy as np",
-        "from mpi4py import MPI",
-        "from cgal4py import domain_decomp, parallel"]
+        "from mpi4py import MPI"]
+    if profile:
+        lines += [
+            "import cProfile",
+            "import pstats"]
+    if use_python:
+        lines += ["from cgal4py import domain_decomp, parallel"]
+    else:
+        lines += ["from cgal4py.delaunay import _get_Delaunay"]
     if not readcmds:
         lines.append(
             "from {} import {} as load_func".format(read_func.__module__,
                                                     read_func.__name__))
+    # Lines establishing variables
     lines += [
         "",
         "comm = MPI.COMM_WORLD",
         "size = comm.Get_size()",
         "rank = comm.Get_rank()",
         "",
-        "use_double = {}".format(use_double),
-        "use_buffer = {}".format(use_buffer),
         "unique_str = '{}'".format(unique_str),
-        "",
+        "use_double = {}".format(use_double),
+        "limit_mem = {}".format(limit_mem),
+        "use_buffer = {}".format(use_buffer),
+        ""]
+    # Commands to read in data
+    lines += [
         "if rank == 0:"]
-    if profile:
-        lines += [
-            "    import cProfile",
-            "    import pstats",
-            ""]
     if readcmds:
         lines += ["    "+l for l in read_func]
     else:
@@ -157,28 +167,56 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "    right_edge = load_dict.get('right_edge', np.max(pts, axis=0))",
         "    periodic = load_dict.get('periodic', False)",
         "    tree = load_dict.get('tree', None)",
-        "    if tree is None:",
-        "        tree = domain_decomp.tree('kdtree', pts, ",
-        "                                  left_edge, right_edge,",
-        "                                  periodic=periodic, nleaves=size)",
         "else:",
-        "    pts = None",
-        "    tree = None",
-        ""]
+        "    pts = None"]
+    # Create domain decomposition tree
+    if use_python:
+        lines += [
+            "if rank == 0:",
+            "    if tree is None:",
+            "        tree = domain_decomp.tree('kdtree', pts, ",
+            "                                  left_edge, right_edge,",
+            "                                  periodic=periodic, nleaves=size)",
+            "else:",
+            "    tree = None",
+            ""]
+    # Start profiler if desired
     if profile:
         lines += [
             "if (rank == 0):",
             "    pr = cProfile.Profile()",
             "    pr.enable()",
             ""]
-    lines += [
-        "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
-        "                                pts, tree,",
-        "                                use_double=use_double,",
-        "                                use_buffer=use_buffer,",
-        "                                unique_str=unique_str,",
-        "                                limit_mem={})".format(limit_mem),
-        "p.run()"]
+    # Run
+    if use_python:
+        lines += [
+            "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
+            "                                pts, tree,",
+            "                                use_double=use_double,",
+            "                                use_buffer=use_buffer,",
+            "                                unique_str=unique_str,",
+            "                                limit_mem=limit_mem)",
+            "p.run()"]
+    else:
+        lines += [
+            "Delaunay = _get_Delaunay(pts.shape[1], parallel=True)",
+            "p = Delaunay(left_edge, right_edge, periodic=periodic,",
+            "             limit_mem=limit_mem)",
+            "p.insert(pts)"]
+        if taskname == 'triangulate':
+            lines += [
+                "T = p.consolidate_tess()",
+                "if (rank == 0):",
+                "    ftess = _tess_filename(unique_str=unique_str)",
+                "    with open(ftess, 'wb') as fd:",
+                "        T.serialize_to_buffer(fd, pts)"]
+        elif taskname == 'volumes':
+            lines += [
+                "vols = p.consolidate_vols()",
+                "if (rank == 0):",
+                "    fvols = _vols_filename(unique_str=unique_str)",
+                "    with open(fvols, 'wb') as fd:",
+                "        fd.write(vols.tobytes())"]
     if profile:
         lines += [
             "",
@@ -270,7 +308,8 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
 
 
 def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
-                        use_buffer=False, limit_mem=False, profile=False):
+                        limit_mem=False, use_python=False, use_buffer=False,
+                        profile=False):
     r"""Return a triangulation that is constructed in parallel using MPI.
 
     Args:
@@ -289,13 +328,16 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
             use 64bit integers reguardless of if there are too many points for
             32bit. Otherwise 32bit integers are used so long as the number of
             points is <=4294967295. Defaults to False.
-        use_buffer (bool, optional): If True, communications are done by way of
-            buffers rather than pickling python objects. Defaults to False.
         limit_mem (bool, optional): If False, the triangulation results from
             each process are moved to local memory using `multiprocessing`
             pipes. If True, each process writes out tessellation info to
             files which are then incrementally loaded as consolidation occurs.
             Defaults to False.
+        use_python (bool, optional): If True, communications are done in python
+            using mpi4py. Otherwise, communications are done in C++ using MPI.
+            Defaults to False.
+        use_buffer (bool, optional): If True, communications are done by way of
+            buffers rather than pickling python objects. Defaults to False.
         profile (bool, optional): If True, cProfile is used to profile the code
             and output is printed to the screen. This can also be a string
             specifying the full path to the file where the output should be
@@ -315,7 +357,8 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
     fscript = '{}_mpi.py'.format(unique_str)
     write_mpi_script(fscript, read_func, 'triangulate', limit_mem=limit_mem,
                      unique_str=unique_str, use_double=use_double,
-                     use_buffer=use_buffer, profile=profile)
+                     use_python=use_python, use_buffer=use_buffer,
+                     profile=profile)
     cmd = 'mpiexec -np {} python {}'.format(nproc, fscript)
     os.system(cmd)
     os.remove(fscript)

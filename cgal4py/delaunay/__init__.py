@@ -11,11 +11,12 @@ import importlib
 import tools
 import os
 import pyximport
+import distutils
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
 from periodic_delaunay3 import is_valid as is_valid_P3
-import parallel_delaunay
+import parallel_delaunayD
 if is_valid_P2():
     from periodic_delaunay2 import PeriodicDelaunay2
 else:
@@ -61,15 +62,15 @@ def _create_pyxdep_file(fname, includes=[], overwrite=False):
             new_file.write('{}\n'.format(incl))
     return True
 
-def _create_pyxbld_file(fname, sources=[], overwrite=False):
+def _create_pyxbld_file(fname, overwrite=False, **kwargs):
     r"""Create a .pyxbld files for an extension.
 
     Args:
         fname (str): Full path to file that will be created.
-        sources (list, optional): List of source files for extension.
-            Defaults to [].
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
+        \*\*kwargs: Additional kwargs are treated as additional input
+            arguments to `distutils.extension.Extension`.
 
     Returns:
         bool: If True, a new file was created. If False, there was an
@@ -87,19 +88,26 @@ def _create_pyxbld_file(fname, sources=[], overwrite=False):
         "    from distutils.extension import Extension",
         "    import numpy",
         "    return Extension(name=modname,",
-        "                     sources=[pyxfilename]+{},".format(sources),
-        "                     include_dirs=[numpy.get_include()],",
-        "                     libraries=['gmp','CGAL'],",
+        "                     sources=[pyxfilename] + " + \
+            "{},".format(kwargs.get('sources', [])),
+        "                     include_dirs=[numpy.get_include()] + " + \
+            "{},".format(kwargs.get('include_dirs', [])),
+        "                     libraries=['gmp','CGAL'] + " + \
+            "{},".format(kwargs.get('libraries', [])),
         "                     language='c++',",
-        "                     extra_compile_args=['-std=c++14'],",
-        "                     extra_link_args=['-lgmp'],",
-        "                     define_macros=[('CGAL_EIGEN3_ENABLED','1')])"]
+        "                     extra_compile_args=['-std=c++14'] + " + \
+            "{},".format(kwargs.get('extra_compile_args', [])),
+        "                     extra_link_args=['-lgmp'] + " + \
+            "{},".format(kwargs.get('extra_link_args', [])),
+        "                     define_macros=[('CGAL_EIGEN3_ENABLED','1')] + " + \
+            "{})".format(kwargs.get('define_macros', []))]
     with open(fname, 'w') as new_file:
         for line in lines:
             new_file.write('{}\n'.format(line))
     return True
 
-def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
+def _create_ext_file(fname0, fname1, replace=[], insert=[], header=[],
+                     overwrite=False):
     r"""Create an alternate version of an extension by making the appropriate
     replacements and insertions.
 
@@ -113,6 +121,8 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
         insert (list): List of 2 element tuples where the first element is a
             string contained in the line after which the second string should
             be inserted. Defaults to [].
+        header (list): List of lines to include at the very beginning of the
+            file. Defaults to [].
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
 
@@ -145,6 +155,8 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
             os.remove(fname1)
         with open(fname1,'w') as new_file:
             with open(fname0,'r') as old_file:
+                for line in header:
+                    new_file.write(line)
                 new_file.write(gen_file_warn)
                 for line in old_file:
                     # Make replacements
@@ -204,6 +216,8 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False,
         perstr = 'periodic_'
     if parallel:
         perstr = 'parallel_'
+        if dim in [2, 3]:
+            ver = 'D'
     if bit64:
         bitstr = '_64bit'
     if ftype == 'ext':
@@ -241,10 +255,12 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False,
         fname = '{}Delaunay_with_info_{}{}'.format(
             perstr.title().rstrip('_'), ver, bitstr)
     elif ftype == 'pyxdep':
-        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64)
+        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel)
         fname += 'dep'
     elif ftype == 'pyxbld':
-        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64)
+        fname = _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel)
         fname += 'bld'
     else:
         raise ValueError("Unsupported file type {}.".format(ftype))
@@ -268,6 +284,10 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             extension is used. Defaults to False.
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
+
+    Returns:
+        bool: True if extension is generated and will be compiled the next
+            time it is imported. False otherwise.
 
     Raises:
         ValueError: If dim < 2.
@@ -316,7 +336,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
         # Parallel files
         if parallel:
             # hpp
-            fnameD = _delaunay_filename('hpp', '', parallel=parallel)
+            fnameD = _delaunay_filename('hpp', 'D', parallel=parallel)
             fnameN = _delaunay_filename('hpp', str(dim), parallel=parallel)
             replace = [('c_delaunayD.hpp', 'c_delaunay{}.hpp'.format(dim)),
                        ('Delaunay_with_info_D',
@@ -324,19 +344,19 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             is_new += _create_ext_file(fnameD, fnameN, replace=replace,
                                        overwrite=overwrite)
             # pxd
-            fnameD = _delaunay_filename('pxd', '', parallel=parallel)
+            fnameD = _delaunay_filename('pxd', 'D', parallel=parallel)
             fnameN = _delaunay_filename('pxd', str(dim), parallel=parallel)
-            replace = [('c_parallel_delaunay.hpp',
+            replace = [('c_parallel_delaunayD.hpp',
                         'c_parallel_delaunay{}.hpp'.format(dim)),
-                       ('ParallelDelaunay_with_info',
+                       ('ParallelDelaunay_with_info_D',
                         'ParallelDelaunay_with_info_{}'.format(dim))]
             is_new += _create_ext_file(fnameD, fnameN, replace=replace,
                                        overwrite=overwrite)
             # pyx
             fnameD = _delaunay_filename('pyx', 'D', parallel=parallel)
-            fnameN = _delaunay_filename('pyx', str(dim), paralle=parallel)
-            replace = [('ParallelDelaunay', 'ParallelDelaunay{}'.format(dim)),
-                       ('ParallelDelaunay_with_info',
+            fnameN = _delaunay_filename('pyx', str(dim), parallel=parallel)
+            replace = [('ParallelDelaunayD', 'ParallelDelaunay{}'.format(dim)),
+                       ('ParallelDelaunay_with_info_D',
                         'ParallelDelaunay_with_info_{}'.format(dim))]
             is_new += _create_ext_file(fnameD, fnameN, replace=replace,
                                        overwrite=overwrite)
@@ -364,6 +384,9 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
                                    insert=insert, overwrite=overwrite)
     # Create pyxdep & pyxbld for generated files
     if generated:
+        extra_compile_args = []
+        extra_link_args = []
+        include_dirs = []
         if bit64:
             includes = [
                 _delaunay_filename('pyx', dim, periodic=periodic,
@@ -390,6 +413,23 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             sources = [
                 _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64,
                                    parallel=parallel)]
+        if parallel:
+            if False:  # OpenMPI
+                extra_compile_args += os.popen(
+                    "mpic++ --showme:compile").read().strip().split(' ')
+                extra_link_args += os.popen(
+                    "mpic++ --showme:link").read().strip().split(' ')
+            else:  # MPICH
+                extra_compile_args += os.popen(
+                    "mpic++ -compile_info").read().strip().split(' ')[1:]
+                extra_link_args += os.popen(
+                    "mpic++ -link_info").read().strip().split(' ')[1:]
+            import cykdtree
+            cykdtree_dir = os.path.dirname(cykdtree.__file__)
+            include_dirs.append(cykdtree_dir)
+            sources += [
+                os.path.join(cykdtree_dir, "c_kdtree.cpp"),
+                os.path.join(cykdtree_dir, "c_utils.cpp")]
         for cpp_file in sources:
             if not os.path.isfile(cpp_file):
                 open(cpp_file,'a').close()
@@ -401,22 +441,30 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
         is_new += _create_pyxdep_file(dep, includes=includes,
                                       overwrite=overwrite)
         is_new += _create_pyxbld_file(bld, sources=sources,
+                                      extra_compile_args=extra_compile_args,
+                                      extra_link_args=extra_link_args,
+                                      include_dirs=include_dirs,
                                       overwrite=overwrite)
     if is_new:
         modname = _delaunay_filename('module', dim, periodic=periodic,
                                      bit64=bit64, parallel=parallel)
-        warnings.warn("\n\nExtension {} is not a built in. ".format(modname) +
-                      "It was automatically generated and will be compiled " +
-                      "at import using pyximport.\n\n")
+        warnings.warn("Extension {} is not a built in.\n".format(modname) +
+                      "It will be automatically generated and compiled " +
+                      "at import using pyximport. Please ignore any " +
+                      "compilation warnings from numpy.")
+    return is_new
         
 
-def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
+def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
+                  overwrite=False):
     r"""Dynamically import module for nD Delaunay triangulation and return
     the associated class.
 
     Args:
         ndim (int): Dimensionality that module should have.
         periodic (bool, optional): If True, the periodic triangulation class is
+            returned. Defaults to False.
+        parallel (bool, optional): If True, the parallel triangulation class is
             returned. Defaults to False.
         bit64 (bool, optional): If True, the 64bit triangulation class is
             returned. Defaults to False.
@@ -427,11 +475,18 @@ def _get_Delaunay(ndim, periodic=False, bit64=False, overwrite=False):
         class: Delaunay triangulation class.
 
     """
-    _make_ext(ndim, periodic=periodic, bit64=bit64, overwrite=overwrite)
     modname = _delaunay_filename('module', ndim, periodic=periodic,
-                                 bit64=bit64)
+                                 parallel=parallel, bit64=bit64)
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
-                                 bit64=bit64)
+                                 parallel=parallel, bit64=bit64)
+    # Create extension
+    gen = _make_ext(ndim, periodic=periodic, parallel=parallel,
+                    bit64=bit64, overwrite=overwrite)
+    # Stop obnoxious -Wstrict-prototypes warning with c++
+    cfg_vars = distutils.sysconfig.get_config_vars()
+    for key, value in cfg_vars.items():
+        if type(value) == str:
+            cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
     return getattr(importlib.import_module(modname),clsname)
 
 

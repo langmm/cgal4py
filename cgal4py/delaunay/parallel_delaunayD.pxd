@@ -6,7 +6,8 @@ from libcpp cimport bool as cbool
 from libc.stdint cimport uint32_t, uint64_t, int32_t, int64_t, uint8_t
 
 
-cdef extern from "c_parallel_delaunay.hpp":
+cdef extern from "c_parallel_delaunayD.hpp":
+    cdef int VALID
 
     cdef cppclass ParallelDelaunay_with_info_D[Info] nogil:
         ParallelDelaunay_with_info_D()
