@@ -60,6 +60,7 @@ public:
   typedef typename Delaunay::Vertex_const_handle       Vertex_const_handle;
   typedef typename Delaunay::Full_cell_const_handle    Cell_const_handle;
   typedef typename Delaunay::Vertex_iterator           Vertex_iterator;
+  typedef typename Delaunay::Vertex_const_iterator     Vertex_const_iterator;
   typedef typename Delaunay::Facet_iterator            Facet_iterator;
   typedef typename Delaunay::Full_cell_iterator        Cell_iterator;
   typedef typename Delaunay::Full_cell_const_iterator  Cell_const_iterator;
@@ -71,6 +72,8 @@ public:
   typedef typename K::Cartesian_const_iterator_d       Cartesian_const_iterator_d;
   typedef typename CGAL::Unique_hash_map<Vertex_handle,int>  Vertex_hash;
   typedef typename CGAL::Unique_hash_map<Cell_const_iterator,int>    Cell_hash;
+  typedef typename CGAL::Unique_hash_map<Vertex_const_handle,int>  Vertex_const_hash;
+  typedef typename CGAL::Unique_hash_map<Cell_const_iterator,int>    Cell_const_hash;
   typedef Info_ Info;
   Delaunay T = Delaunay(D);
   bool updated = false;
@@ -724,6 +727,7 @@ public:
     }
   }
 
+  // // Write works, read dosn't
   // void write_to_file(const char* filename) const
   // {
   //   std::ofstream os(filename, std::ios::binary);
@@ -732,8 +736,6 @@ public:
   //     os << T;
   //   }
   // }
-
-  // // Write works, read dosn't
   // void read_from_file(const char* filename)
   // {
   //   std::ifstream is(filename, std::ios::binary);
@@ -742,6 +744,159 @@ public:
   //     is >> T;
   //   }
   // }
+
+  void write_to_file(const char* filename) const
+  {
+    std::ofstream os(filename, std::ios::binary);
+    if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
+    else {
+      write_to_buffer(os);
+      os.close();
+    }
+  }
+  
+  void write_to_buffer(std::ofstream &os) const {
+
+    // Header
+    int n = static_cast<int>(T.number_of_vertices());
+    int m = static_cast<int>(T.number_of_full_cells());
+    int d = static_cast<int>(T.current_dimension());
+    int dim = (d == -1 ? 1 :  d + 1);
+    if ((n == 0) || (m == 0)) {
+      return;
+    }
+
+    Vertex_const_hash V;
+    Cell_hash C;
+
+    // first (infinite) vertex
+    Vertex_handle vit;
+    int inum = 0, i;
+    Vertex_const_handle v = T.infinite_vertex();
+    V[v] = -1;
+
+    // other vertices
+    Info info;
+    double x;
+    for ( Vertex_const_iterator vit = T.vertices_begin();
+	  vit != T.vertices_end(); ++vit) {
+      if ( v != vit ) {
+        V[vit] = inum++;
+	info = vit->data();
+	os.write((char*)&info, sizeof(Info));
+  	for (i = 0; i < d; i++) {
+	  x = (double)(vit->point()[i]);
+	  os.write((char*)&x, sizeof(double));
+  	}
+      }
+    }
+
+    // vertices of the cells
+    inum = 0;
+    int index;
+    for( Cell_const_iterator ib = T.full_cells_begin();
+  	 ib != T.full_cells_end(); ++ib) {
+      C[ib] = inum++;
+      for (int j = 0; j < dim ; ++j) {
+        index = V[ib->vertex(j)];
+        os.write((char*)&index, sizeof(int));
+      }
+    }
+
+    // neighbor pointers of the cells
+    for( Cell_const_iterator it = T.full_cells_begin();
+  	 it != T.full_cells_end(); ++it) {
+      for (int j = 0; j < d+1; ++j) {
+        index = C[it->neighbor(j)];
+        os.write((char*)&index, sizeof(int));
+      }
+    }
+
+  }
+
+  void read_from_file(const char* filename)
+  {
+    std::ifstream is(filename, std::ios::binary);
+    if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
+    else {
+      read_from_buffer(is);
+      is.close();
+    }
+  }
+  
+  void read_from_buffer(std::ifstream &is) {
+    updated = true;
+
+    if (T.number_of_vertices() != 0)
+      T.clear();
+
+    // header
+    int n, m, d;
+    is.read((char*)&n, sizeof(int));
+    is.read((char*)&m, sizeof(int));
+    is.read((char*)&d, sizeof(int));
+
+    if (n==0) {
+      return;
+    }
+
+    T.tds().set_current_dimension(d);
+
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Cell_handle> C(m);
+
+    // infinite vertex
+    V[n] = T.infinite_vertex();
+
+    // read vertices
+    int i;
+    Info info;
+    double x;
+    std::vector<double> vp;
+    for(i = 0; i < n; ++i) {
+      is.read((char*)&info, sizeof(Info));
+      vp.clear();
+      for (int j = 0; j < d; j++)
+	is.read((char*)&x, sizeof(double));
+      vp.push_back(x);
+      V[i] = T.tds().new_vertex();
+      V[i]->set_point(Point(vp.begin(), vp.end()));
+      V[i]->data() = info;
+    }
+
+    // First cell
+    int index;
+    int dim = (d == -1 ? 1 : d + 1);
+    i = 0;
+    if (T.full_cells_begin() != T.full_cells_end()) {
+      C[i] = T.full_cells_begin();
+      for(int j = 0; j < dim ; ++j){
+	is.read((char*)&index, sizeof(int));
+        C[i]->set_vertex(j, V[index]);
+        V[index]->set_full_cell(C[i]);
+      }
+      i++;
+    }
+
+    // Creation of the cells
+    for( ; i < m; ++i) {
+      C[i] = T.tds().new_full_cell() ;
+      for(int j = 0; j < dim ; ++j){
+	is.read((char*)&index, sizeof(int));
+        C[i]->set_vertex(j, V[index]);
+        V[index]->set_full_cell(C[i]);
+      }
+    }
+
+    // Setting the neighbor pointers
+    for(i = 0; i < m; ++i) {
+      for(int j = 0; j < d+1; ++j) {
+	is.read((char*)&index, sizeof(int));
+        C[i]->set_neighbor(j, C[index]);
+      }
+    }
+
+  }
 
   template <typename I>
   I serialize(I &n, I &m, int32_t &d,

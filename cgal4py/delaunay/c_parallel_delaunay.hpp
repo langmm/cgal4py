@@ -4,12 +4,16 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <stdexcept>
+#include <iostream>
+#include <fstream>
 #include "c_kdtree.hpp"
 #include "c_tools.hpp"
 #include "c_delaunay2.hpp"
 #include "c_delaunay3.hpp"
 #include "c_periodic_delaunay2.hpp"
 #include "c_periodic_delaunay3.hpp"
+#include "c_delaunayD.hpp"
 #if (CGAL_VERSION_NR < 1040900900)
 #define VALID_PERIODIC_2 0
 #else
@@ -20,6 +24,8 @@
 #else
 #define VALID_PERIODIC_3 1
 #endif
+#define MAXLEN_FILENAME  1000
+#define DEBUG false
 
 
 void print_array_double(double *arr, int nrow, int ncol) {
@@ -59,6 +65,7 @@ public:
   typedef Delaunay_with_info_3<Info> Delaunay3;
   typedef PeriodicDelaunay_with_info_2<Info> PeriodicDelaunay2;
   typedef PeriodicDelaunay_with_info_3<Info> PeriodicDelaunay3;
+  typedef Delaunay_with_info_D<Info> DelaunayD;
   int ndim;
   bool periodic;
   void *T;
@@ -77,6 +84,27 @@ public:
 	T = (void*)(new PeriodicDelaunay3(domain));
       else
 	T = (void*)(new Delaunay3());
+    } else if (ndim == D) {
+      T = (void*)(new DelaunayD());
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
+    }
+  }
+  ~CGeneralDelaunay() {
+    if (ndim == 2) {
+      if (periodic)
+	delete((PeriodicDelaunay2*)T);
+      else
+	delete((Delaunay2*)T);
+    } else if (ndim == 3) {
+      if (periodic)
+	delete((PeriodicDelaunay3*)T);
+      else
+	delete((Delaunay3*)T);
+    } else if (ndim == D) {
+      delete((DelaunayD*)T);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
   }
 
@@ -92,6 +120,10 @@ public:
 	out = ((PeriodicDelaunay3*)T)->num_finite_verts();
       else
 	out = ((Delaunay3*)T)->num_finite_verts();
+    } else if (ndim == D) {
+      out = ((DelaunayD*)T)->num_finite_verts();
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
     return out;
   }
@@ -122,6 +154,10 @@ public:
 	((PeriodicDelaunay3*)T)->insert(pts, val, n);
       else
 	((Delaunay3*)T)->insert(pts, val, n);
+    } else if (ndim == D) {
+      ((DelaunayD*)T)->insert(pts, val, n);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
   }
 
@@ -149,6 +185,11 @@ public:
       else
 	out = ((Delaunay3*)T)->serialize_info2idx(n, m, d, cells, neighbors,
 						  max_info, idx);
+    } else if (ndim == D) {
+      out = ((DelaunayD*)T)->serialize_info2idx(n, m, d, cells, neighbors,
+						max_info, idx);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
     return out;
   }
@@ -177,6 +218,11 @@ public:
       else
 	((Delaunay3*)T)->deserialize(n, m, d, vert_pos, vert_info,
 				     cells, neighbors, idx_inf);
+    } else if (ndim == D) {
+      ((DelaunayD*)T)->deserialize(n, m, d, vert_pos, vert_info,
+				   cells, neighbors, idx_inf);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
   }
 
@@ -194,8 +240,66 @@ public:
 	out = ((PeriodicDelaunay3*)T)->outgoing_points(nbox, left_edges, right_edges);
       else
 	out = ((Delaunay3*)T)->outgoing_points(nbox, left_edges, right_edges);
+    } else if (ndim == D) {
+      out = ((DelaunayD*)T)->outgoing_points(nbox, left_edges, right_edges);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
     }
     return out;
+  }
+
+  void write_to_buffer(std::ofstream &os) {
+    if (ndim == 2) {
+      if (periodic)
+	((PeriodicDelaunay2*)T)->write_to_buffer(os);
+      else
+	((Delaunay2*)T)->write_to_buffer(os);
+    } else if (ndim == 3) {
+      if (periodic)
+	((PeriodicDelaunay3*)T)->write_to_buffer(os);
+      else
+	((Delaunay3*)T)->write_to_buffer(os);
+    } else if (ndim == D) {
+      ((DelaunayD*)T)->write_to_buffer(os);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
+    }
+  }
+
+  void read_from_buffer(std::ifstream &os) {
+    if (ndim == 2) {
+      if (periodic)
+	((PeriodicDelaunay2*)T)->read_from_buffer(os);
+      else
+	((Delaunay2*)T)->read_from_buffer(os);
+    } else if (ndim == 3) {
+      if (periodic)
+	((PeriodicDelaunay3*)T)->read_from_buffer(os);
+      else
+	((Delaunay3*)T)->read_from_buffer(os);
+    } else if (ndim == D) {
+      ((DelaunayD*)T)->read_from_buffer(os);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
+    }
+  }
+
+  void dual_volumes(double *vols) {
+    if (ndim == 2) {
+      if (periodic)
+	((PeriodicDelaunay2*)T)->dual_areas(vols);
+      else
+	((Delaunay2*)T)->dual_areas(vols);
+    } else if (ndim == 3) {
+      if (periodic)
+	((PeriodicDelaunay3*)T)->dual_volumes(vols);
+      else
+	((Delaunay3*)T)->dual_volumes(vols);
+    } else if (ndim == D) {
+      ((DelaunayD*)T)->dual_volumes(vols);
+    } else {
+      throw std::runtime_error("Incorrect number of dimensions.");
+    }
   }
 
 };
@@ -209,6 +313,8 @@ public:
   typedef CGeneralDelaunay<Info> Delaunay;
   // typedef Delaunay_with_info_2<Info> Delaunay;
   bool from_node;
+  bool in_memory = false;
+  bool tess_exists = false;
   int size;
   int rank;
   uint32_t id;
@@ -216,6 +322,7 @@ public:
   uint32_t ndim;
   uint64_t npts_orig = 0;
   uint64_t npts = 0;
+  uint64_t ncells = 0;
   Info *idx = NULL;
   double *pts = NULL;
   double *le = NULL;
@@ -233,14 +340,19 @@ public:
   std::set<uint32_t> *all_neigh;
   std::vector<std::set<uint32_t>> *lneigh;
   std::vector<std::set<uint32_t>> *rneigh;
+  char OutputFile[MAXLEN_FILENAME];
 
-  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, int src) {
+  void begin_init(uint32_t nleaves0, uint32_t ndim0) {
     uint32_t k;
     MPI_Comm_size ( MPI_COMM_WORLD, &size);
     MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
-    from_node = false;
     nleaves = nleaves0;
     ndim = ndim0;
+    le = (double*)malloc(ndim*sizeof(double));
+    re = (double*)malloc(ndim*sizeof(double));
+    periodic_le = (int*)malloc(ndim*sizeof(int));
+    periodic_re = (int*)malloc(ndim*sizeof(int));
+    domain_width = (double*)malloc(ndim*sizeof(double));
     neigh = (uint32_t*)malloc(nleaves*sizeof(uint32_t));
     neigh_le = (double*)malloc(nleaves*ndim*sizeof(double*));
     neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
@@ -253,6 +365,16 @@ public:
       lneigh->push_back(std::set<uint32_t>());
       rneigh->push_back(std::set<uint32_t>());
     }
+  }    
+
+  void end_init() {
+    sprintf(OutputFile, "leafoutput%u.dat", id);
+    in_memory = true;
+  }
+
+  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, int src) {
+    from_node = false;
+    begin_init(nleaves0, ndim0);
     // Receive leaf info from root process
     recv(src);
     int i;
@@ -262,42 +384,27 @@ public:
       memcpy(neigh_le+ndim*i, leaves_le+ndim*n, ndim*sizeof(double));
       memcpy(neigh_re+ndim*i, leaves_re+ndim*n, ndim*sizeof(double));
     }
+    if (DEBUG)
+      printf("%d: Initialized from transfer on %d\n", id, rank);
+    end_init();
   };
 
   CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, KDTree* tree, int index) {
-    uint32_t k;
-    MPI_Comm_size ( MPI_COMM_WORLD, &size);
-    MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
     from_node = true;
-    nleaves = nleaves0;
-    ndim = ndim0;
-    neigh = (uint32_t*)malloc(nleaves*sizeof(uint32_t));
-    neigh_le = (double*)malloc(nleaves*ndim*sizeof(double*));
-    neigh_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    leaves_le = (double*)malloc(nleaves*ndim*sizeof(double*));
-    leaves_re = (double*)malloc(nleaves*ndim*sizeof(double*));
-    all_neigh = new std::set<uint32_t>();
-    lneigh = new std::vector<std::set<uint32_t>>();
-    rneigh = new std::vector<std::set<uint32_t>>();
-    for (k = 0; k < ndim; k++) {
-      lneigh->push_back(std::set<uint32_t>());
-      rneigh->push_back(std::set<uint32_t>());
-    }
+    begin_init(nleaves0, ndim0);
     // Transfer leaf information
     Node* node = tree->leaves[index];
     std::vector<uint32_t>::iterator it;
     int i;
     uint64_t j;
-    uint32_t n;
+    uint32_t k, n;
     id = node->leafid;
     npts = node->children;
     idx = (Info*)malloc(npts*sizeof(Info));
     pts = (double*)malloc(ndim*npts*sizeof(double));
-    le = node->left_edge;
-    re = node->right_edge;
-    periodic_le = (int*)malloc(ndim*sizeof(int));
-    periodic_re = (int*)malloc(ndim*sizeof(int));
-    domain_width = tree->domain_width;
+    memcpy(le, node->left_edge, ndim*sizeof(double));
+    memcpy(re, node->right_edge, ndim*sizeof(double));
+    memcpy(domain_width, tree->domain_width, ndim*sizeof(double));
     nneigh = (int)(node->all_neighbors.size());
     for (j = 0; j < npts; j++) {
       idx[j] = (Info)(node->left_idx + j);
@@ -347,28 +454,64 @@ public:
       memcpy(neigh_le+ndim*i, leaves_le+ndim*n, ndim*sizeof(double));
       memcpy(neigh_re+ndim*i, leaves_re+ndim*n, ndim*sizeof(double));
     }
+    if (DEBUG)
+      printf("%d: Initialized directly on %d\n", id, rank);
+    end_init();
   }
 
   ~CParallelLeaf() {
-    // free(neigh);
-    // free(neigh_le);
-    // free(neigh_re);
-    // free(leaves_le);
-    // free(leaves_re);
-    // if (from_node) {
-    //   free(pts);
-    //   free(idx);
-    //   free(periodic_le);
-    //   free(periodic_re);
-    // } else {
-    //   free(pts);
-    //   free(idx);
-    //   free(periodic_le);
-    //   free(periodic_re);
-    //   free(le);
-    //   free(re);
-    //   free(domain_width);
-    // }
+    free(neigh);
+    free(neigh_le);
+    free(neigh_re);
+    free(leaves_le);
+    free(leaves_re);
+    delete(all_neigh);
+    delete(lneigh);
+    delete(rneigh);
+    delete(T);
+    if (pts != NULL)
+      free(pts);
+    if (pts != NULL)
+      free(idx);
+    free(periodic_le);
+    free(periodic_re);
+    free(le);
+    free(re);
+    free(domain_width);
+  }
+
+  void dump() {
+    if (in_memory) { // Don't write empty pointers
+      std::ofstream fd (OutputFile, std::ios::out | std::ios::binary);
+      fd.write((char*)idx, npts*sizeof(Info));
+      fd.write((char*)pts, npts*ndim*sizeof(double));
+      free(idx);
+      free(pts);
+      if (tess_exists) {
+	T->write_to_buffer(fd);
+	delete(T);
+	T = NULL;
+      }
+      idx = NULL;
+      pts = NULL;
+      fd.close();
+      in_memory = false;
+    }
+  }
+  void load() {
+    if (!(in_memory)) { // Don't read if already loaded
+      std::ifstream fd (OutputFile, std::ios::in | std::ios::binary);
+      idx = (Info*)malloc(npts*sizeof(Info));
+      pts = (double*)malloc(npts*ndim*sizeof(double));
+      fd.read((char*)idx, npts*sizeof(Info));
+      fd.read((char*)pts, npts*ndim*sizeof(double));
+      if (tess_exists) {
+	T = new Delaunay(ndim, false);
+	T->read_from_buffer(fd);
+      }
+      fd.close();
+      in_memory = true;
+    }
   }
 
   uint32_t num_cells() {
@@ -419,6 +562,8 @@ public:
       MPI_Send(dummy, ndum, MPI_UNSIGNED, dst, i++, MPI_COMM_WORLD);
     }
     free(dummy);
+    if (DEBUG)
+      printf("%d: Sent to %d from %d\n", id, dst, rank);
   };
 
   void recv(int src) {
@@ -430,11 +575,6 @@ public:
     	     MPI_STATUS_IGNORE);
     idx = (Info*)malloc(npts*sizeof(Info));
     pts = (double*)malloc(ndim*npts*sizeof(double));
-    le = (double*)malloc(ndim*sizeof(double));
-    re = (double*)malloc(ndim*sizeof(double));
-    periodic_le = (int*)malloc(ndim*sizeof(int));
-    periodic_re = (int*)malloc(ndim*sizeof(int));
-    domain_width = (double*)malloc(ndim*sizeof(double));
     if (sizeof(Info) == sizeof(uint32_t))
       MPI_Recv(idx, npts, MPI_UNSIGNED, src, i++, MPI_COMM_WORLD,
 	       MPI_STATUS_IGNORE);
@@ -482,6 +622,8 @@ public:
       }
     }
     free(dummy);
+    if (DEBUG)
+      printf("%d: Received from %d on %d\n", id, src, rank);
   }
 
   void init_triangulation() {
@@ -493,6 +635,10 @@ public:
     T->insert(pts, idx_dum, npts);
     free(idx_dum);
     npts_orig = npts;
+    ncells = (uint64_t)(T->num_cells());
+    if (DEBUG)
+      printf("%d: Triangulation of %lu points initialized on %d\n", id, npts, rank);
+    tess_exists = true;
   }
 
   void insert(double *pts_new, Info *idx_new, uint64_t npts_new) {
@@ -510,6 +656,9 @@ public:
     memcpy(pts+ndim*npts, pts_new, ndim*npts_new*sizeof(double));
     // Advance count
     npts += npts_new;
+    ncells = (uint64_t)(T->num_cells());
+    if (DEBUG)
+      printf("%d: %lu points inserted on %d\n", id, npts_new, rank);
   }
   
   template <typename I>
@@ -534,6 +683,8 @@ public:
       }
       arg_sortSerializedTess(cells, m, d+1, idx_verts, idx_cells);
     }
+    if (DEBUG)
+      printf("%d: %lu cells serialized on %d\n", id, (uint64_t)m, rank);
     return idx_inf;
   };
 
@@ -604,19 +755,21 @@ public:
       all_neigh->insert(n);
     }
     nneigh = 0;
+    if (DEBUG)
+      printf("%d: %lu outgoing points on %d\n", id, (uint64_t)ntot, rank);
   }
 
-  void incoming_points(uint32_t src, uint32_t nnpts_recv,
+  void incoming_points(uint32_t src, uint32_t npts_recv,
 		       uint32_t nneigh_recv, Info *idx_recv,
 		       double *pts_recv, uint32_t *neigh_recv) {
-    if (nnpts_recv == 0)
+    if (npts_recv == 0)
       return;
     uint64_t j;
     uint32_t k;
     if (src == id) {
       for (k = 0; k < ndim; k++) {
 	if (periodic_le[k] and periodic_re[k]) {
-	  for (j = 0; j < nnpts_recv; j++) {
+	  for (j = 0; j < npts_recv; j++) {
 	    if ((pts_recv[ndim*j+k] - le[k]) < (re[k] - pts_recv[ndim*j+k])) {
 	      pts_recv[ndim*j+k] += domain_width[k];
 	    }
@@ -629,14 +782,14 @@ public:
     } else {
       for (k = 0; k < ndim; k++) {
 	if (periodic_re[k] and ((*rneigh)[k].count(src) > 0)) {
-	  for (j = 0; j < nnpts_recv; j++) {
+	  for (j = 0; j < npts_recv; j++) {
 	    if ((pts_recv[ndim*j+k] + domain_width[k] - re[k]) <
 		(le[k] - pts_recv[ndim*j+k]))
 	      pts_recv[ndim*j+k] += domain_width[k];
 	  }
 	}
 	if (periodic_le[k] and ((*lneigh)[k].count(src) > 0)) {
-	  for (j = 0; j < nnpts_recv; j++) {
+	  for (j = 0; j < npts_recv; j++) {
 	    if ((le[k] - pts_recv[ndim*j+k] + domain_width[k]) <
 		(pts_recv[ndim*j+k] - re[k]))
 	      pts_recv[ndim*j+k] -= domain_width[k];
@@ -645,7 +798,7 @@ public:
       }
     }
     // Add points to tessellation, then arrays
-    insert(pts_recv, idx_recv, nnpts_recv);
+    insert(pts_recv, idx_recv, npts_recv);
     // Add neighbors
     uint32_t n;
     for (k = 0; k < nneigh_recv; k++) {
@@ -657,13 +810,21 @@ public:
 	nneigh++;
       }
     }
+    if (DEBUG)
+      printf("%d: %lu incoming points on %d\n", id, (uint64_t)npts_recv, rank);
+  }
+
+  uint64_t voronoi_volumes(double **vols) {
+    (*vols) = (double*)realloc(*vols, npts*sizeof(double));
+    T->dual_volumes(*vols);
+    return npts;
   }
 
 };
 
 
 template <typename Info_>
-class CParallelDelaunay
+class ParallelDelaunay_with_info_D
 {
 public:
   typedef Info_ Info;
@@ -671,6 +832,7 @@ public:
   int size;
   uint32_t ndim;
   int tree_exists = 0;
+  int limit_mem = 0;
   // Things only valid for root
   double *le;
   double *re;
@@ -685,35 +847,41 @@ public:
   // Things for each process
   int nleaves;
   std::vector<CParallelLeaf<Info>*> leaves;
-  // CParallelLeaf<Info> *leaves = NULL;
   std::map<int,uint32_t> map_id2idx;
 
-  CParallelDelaunay() {}
-  CParallelDelaunay(uint32_t ndim0, double *le0, double *re0,
-		    bool *periodic0) {
+  ParallelDelaunay_with_info_D() {}
+  ParallelDelaunay_with_info_D(uint32_t ndim0, double *le0, double *re0,
+			       bool *periodic0, int limit_mem0 = 0) {
     MPI_Comm_size ( MPI_COMM_WORLD, &size);
     MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
     ndim = ndim0;
     le = le0;
     re = re0;
     periodic = periodic0;
+    limit_mem = limit_mem0;
     if (rank == 0) {
-      for (int task = 1; task < size; task ++)
+      for (int task = 1; task < size; task ++) {
 	MPI_Send(&ndim, 1, MPI_UNSIGNED, task, 0, MPI_COMM_WORLD);
+	MPI_Send(&limit_mem, 1, MPI_INT, task, 1, MPI_COMM_WORLD);
+      }
     } else {
       MPI_Recv(&ndim, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD,
+	       MPI_STATUS_IGNORE);
+      MPI_Recv(&limit_mem, 1, MPI_INT, 0, 1, MPI_COMM_WORLD,
 	       MPI_STATUS_IGNORE);
     }
   }
 
-  ~CParallelDelaunay() {
-    // int i;
-    // if (idx_total != NULL)
-    //   free(idx_total);
-    // for (i = 0; i < nleaves; i++) {
-    //   delete(leaves.pop());
-    // }
-    // delete(tree);
+  ~ParallelDelaunay_with_info_D() {
+    int i;
+    if (idx_total != NULL)
+      free(idx_total);
+    if (info_total != NULL)
+      free(info_total);
+    for (i = 0; i < nleaves; i++) {
+      delete(leaves.pop()); // leaves used
+    }
+    delete(tree);
   }
 
   void insert(uint64_t npts0, double *pts0) {
@@ -725,8 +893,13 @@ public:
       npts_total = npts0;
       pts_total = pts0;
       domain_decomp();
-      for (i = 0; i < nleaves; i++)
-	leaves[i]->init_triangulation();
+      for (i = 0; i < nleaves; i++) {
+	if (limit_mem > 1)
+	  leaves[i]->load();
+	leaves[i]->init_triangulation(); // leaves used
+	if (limit_mem > 1)
+	  leaves[i]->dump();
+      }
     } else {
       Info *iidx = NULL;
       double *ipts = NULL;
@@ -764,7 +937,11 @@ public:
 	      ipts[ndim*j+k] = pts0[ndim*dist[i][j]+k];
 	  }
       	  if (task == rank) {
-	    leaves[iroot]->insert(ipts, iidx, nsend);
+	    if (limit_mem > 1)
+	      leaves[iroot]->load();
+	    leaves[iroot]->insert(ipts, iidx, nsend); // leaves used
+	    if (limit_mem > 1)
+	      leaves[iroot]->dump();
 	    iroot++;
       	  } else {
       	    MPI_Send(&nsend, 1, MPI_INT, task, 20+task, MPI_COMM_WORLD);
@@ -795,7 +972,11 @@ public:
 		     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	  MPI_Recv(ipts, ndim*nrecv, MPI_DOUBLE, 0, 22+rank,
 		   MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	  leaves[i]->insert(ipts, iidx, nrecv);
+	  if (limit_mem > 0)
+	    leaves[i]->load();
+	  leaves[i]->insert(ipts, iidx, nrecv); // leaves used
+	  if (limit_mem > 0)
+	    leaves[i]->dump();
       	}
       }
       if (iidx != NULL)
@@ -851,8 +1032,14 @@ public:
       ipts = pts_recv + ndim*nprev_pts;
       ingh = ngh_recv + nprev_ngh;
       dst = map_id2idx[dst_recv[i]];
-      leaves[dst]->incoming_points(src_recv[i], cnt_recv[i], nct_recv[i],
-				   iidx, ipts, ingh);
+      if (cnt_recv[i] > 0) {
+	if (limit_mem > 1)
+	  leaves[dst]->load();
+	leaves[dst]->incoming_points(src_recv[i], cnt_recv[i], nct_recv[i],
+				     iidx, ipts, ingh); // leaves used
+	if (limit_mem > 1)
+	  leaves[dst]->dump();
+      }
       nprev_pts += cnt_recv[i];
       nprev_ngh += nct_recv[i];
     }
@@ -879,9 +1066,14 @@ public:
       pts_out.push_back(NULL);
       ngh_out.push_back(NULL);
     }
-    for (i = 0; i < nleaves; i++)
+    for (i = 0; i < nleaves; i++) {
+      if (limit_mem > 1)
+	leaves[i]->load();
       leaves[i]->outgoing_points(src_out, dst_out, cnt_out, nct_out,
-				 idx_out, pts_out, ngh_out);
+				 idx_out, pts_out, ngh_out); // leaves used
+      if (limit_mem > 1)
+	leaves[i]->dump();
+    }
     // Send expected counts
     int *count_send = (int*)malloc(size*sizeof(int));
     int *count_recv = (int*)malloc(size*sizeof(int));
@@ -1052,6 +1244,8 @@ public:
       uint32_t leafsize;
       nleaves_total = size;
       nleaves_total = (int)(pow(2,ceil(log2((float)(nleaves_total)))));
+      if (limit_mem > 1)
+	nleaves_total *= limit_mem;
       leafsize = (uint32_t)(npts_total/nleaves_total + 1);
       idx_total = (uint64_t*)malloc(npts_total*sizeof(uint64_t));
       for (j = 0; j < npts_total; j++)
@@ -1064,7 +1258,6 @@ public:
       nleaves_total = tree->num_leaves;
     }
     MPI_Bcast(&nleaves_total, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
     // Send number of leaves
     if (rank == 0) {
       nleaves_per_proc = (int*)malloc(sizeof(int)*size);
@@ -1077,7 +1270,8 @@ public:
     MPI_Scatter(nleaves_per_proc, 1, MPI_INT,
 		&nleaves, 1, MPI_INT,
 		0, MPI_COMM_WORLD);
-    // leaves = (CParallelLeaf<Info>*)malloc(nleaves*sizeof(CParallelLeaf<Info>));
+    if (nleaves == 1)
+      limit_mem = 1;
     // Send leaves
     if (rank == 0) {
       int task;
@@ -1085,7 +1279,10 @@ public:
       for (i = 0; i < nleaves_total; i++) {
 	task = i % size;
 	if (task == rank) {
+	  // leaves used
 	  leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim, tree, i));
+	  if (limit_mem > 1)
+	    leaves[iroot]->dump();
 	  map_id2idx[leaves[iroot]->id] = iroot;
 	  iroot++;
 	} else {
@@ -1098,7 +1295,10 @@ public:
 	MPI_Send(&tree_exists, 1, MPI_INT, task, 33, MPI_COMM_WORLD);
     } else {
       for (i = 0; i < nleaves; i++) {
+	// leaves used
 	leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim, 0)); // calls recv
+	if (limit_mem > 1)
+	  leaves[i]->dump();
 	map_id2idx[leaves[i]->id] = i;
       }
       MPI_Recv(&tree_exists, 1, MPI_INT, 0, 33, MPI_COMM_WORLD,
@@ -1113,10 +1313,51 @@ public:
     uint32_t tot_ncells = 0;
     uint32_t tot_ncells_total = 0;
     for (i = 0; i < nleaves; i++)
-      tot_ncells += leaves[i]->num_cells();
+      tot_ncells += leaves[i]->ncells; // leaves used
     MPI_Reduce(&tot_ncells, &tot_ncells_total, 1, MPI_UNSIGNED,
 	       MPI_SUM, 0, MPI_COMM_WORLD);
     return tot_ncells_total;
+  }
+
+  void consolidate_vols(double *vols) {
+    int i, iroot, task;
+    double *ivols = NULL;
+    int j;
+    int nvols;
+    if (rank == 0) {
+      iroot = 0;
+      for (i = 0; i < nleaves_total; i++) {
+	nvols = tree->leaves[i]->children;
+	task = i % size;
+	if (task == rank) {
+	  // Local
+	  if (limit_mem > 1)
+	    leaves[iroot]->load();
+	  leaves[iroot]->voronoi_volumes(&ivols);
+	  if (limit_mem > 1)
+	    leaves[iroot]->dump();
+	  iroot++;
+	} else {
+	  ivols = (double*)realloc(ivols, nvols*sizeof(double));
+	  MPI_Recv(ivols, nvols, MPI_DOUBLE, task, 0, MPI_COMM_WORLD,
+		   MPI_STATUS_IGNORE);
+	}
+	for (j = 0; j < nvols; j++) {
+	  vols[tree->all_idx[tree->leaves[i]->left_idx+j]] = ivols[j];
+	}
+      }
+    } else {
+      for (i = 0; i < nleaves_total; i++) {
+	nvols = leaves[i]->npts_orig;
+	if (limit_mem > 1)
+	  leaves[i]->load();
+	leaves[i]->voronoi_volumes(&ivols);
+	if (limit_mem > 1)
+	  leaves[i]->dump();
+	MPI_Send(ivols, nvols, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+      }
+    }
+
   }
 
   uint64_t consolidate_tess(uint64_t tot_ncells_total, Info *tot_idx_inf,
@@ -1135,7 +1376,7 @@ public:
     uint64_t incells;
     uint64_t out = 0;
     for (i = 0; i < nleaves; i++) {
-      incells = leaves[i]->num_cells();
+      incells = leaves[i]->ncells; // leaves used
       if (incells > max_ncells)
 	max_ncells = incells;
     }
@@ -1164,8 +1405,13 @@ public:
       for (i = 0; i < nleaves_total; i++) {
     	task = i % size;
     	if (task == rank) {
+	  // leaves used
+	  if (limit_mem > 1)
+	    leaves[i/size]->load();
     	  idx_inf = leaves[i/size]->serialize(tn, tm, verts, neigh,
 					      idx_verts, idx_cells);
+	  if (limit_mem > 1)
+	    leaves[i/size]->dump();
     	} else {
     	  s = 0;
 	  if (sizeof(Info) == sizeof(uint32_t))
@@ -1192,6 +1438,7 @@ public:
     		   MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     	}
     	// Insert serialized leaf
+	// leaves used
     	idx_start = tree->leaves[i]->left_idx;
     	idx_stop = idx_start + tree->leaves[i]->children;
     	sleaf = SerializedLeaf<Info>(i, ndim, (int64_t)tm, idx_inf,
@@ -1215,8 +1462,13 @@ public:
       (*tot_idx_inf) = 0;
       // Send leaves to root
       for (i = 0; i < nleaves; i++) {
+	// leaves used
+	if (limit_mem > 1)
+	  leaves[i]->load();
     	idx_inf = leaves[i]->serialize(tn, tm, verts, neigh,
     				       idx_verts, idx_cells);
+	if (limit_mem > 1)
+	  leaves[i]->dump();
     	header[0] = tn, header[1] = tm, header[2] = idx_inf;
     	s = 0;
 	if (sizeof(Info) == sizeof(uint32_t)) {

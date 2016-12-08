@@ -163,7 +163,8 @@ def _create_ext_file(fname0, fname1, replace=[], insert=[], overwrite=False):
     return created_file
 
 
-def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
+def _delaunay_filename(ftype, dim, periodic=False, bit64=False,
+                       parallel=False):
     r"""Get a filename for a specific Delaunay extension.
 
     Args:
@@ -182,9 +183,12 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
                 'pyxdep': The .pyxdep pyximport dependency file.
                 'pyxbld': The .pyxbld pyximport build file.
         dim (int): The dimensionality of the requested extension.
-        periodic (bool): If True, the names for the periodic extension are
-            returned.
-        bit64 (bool): If True, the names for the 64bit extension are returned.
+        periodic (bool, optional): If True, the names for the periodic
+            extension are returned. Defaults to False.
+        bit64 (bool, optional): If True, the names for the 64bit extension are
+            returned. Defaults to False.
+        parallel (bool, optional): If True, the names for the parallel version
+            are returned. Defaults to False.
 
     Returns:
         str: File name replative to cgal4py package directory.
@@ -198,6 +202,8 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
     perstr = '' ; bitstr = ''
     if periodic:
         perstr = 'periodic_'
+    if parallel:
+        perstr = 'parallel_'
     if bit64:
         bitstr = '_64bit'
     if ftype == 'ext':
@@ -247,7 +253,8 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False):
     return fname
 
 
-def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
+def _make_ext(dim, periodic=False, bit64=False, parallel=False,
+              overwrite=False):
     r"""Create the necessary files for an arbitrary Delaunay extension.
 
     Args:
@@ -257,6 +264,8 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
             extension is used. This is invalid for dim > 3. Defaults to False.
         bit64 (bool, optional): If True, the 64bit version of the extension is
             created. Defaults to False.
+        parallel (bool, optional): If True, the periodic version of the base
+            extension is used. Defaults to False.
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
 
@@ -272,7 +281,9 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
     if dim < 2:
         raise ValueError("Triangulations are not supported in " +
                          "{} dimensions".format(dim))
-    if dim not in [2,3]:
+    if parallel:
+        periodic = False
+    if dim not in [2, 3]:
         generated = True
         if periodic:
             raise NotImplementedError(
@@ -302,14 +313,45 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
                     'Delaunay_with_info_{}'.format(dim))]
         is_new += _create_ext_file(fnameD, fnameN, replace=replace,
                                    overwrite=overwrite)
+        # Parallel files
+        if parallel:
+            # hpp
+            fnameD = _delaunay_filename('hpp', '', parallel=parallel)
+            fnameN = _delaunay_filename('hpp', str(dim), parallel=parallel)
+            replace = [('c_delaunayD.hpp', 'c_delaunay{}.hpp'.format(dim)),
+                       ('Delaunay_with_info_D',
+                        'Delaunay_with_info_{}'.format(dim))]
+            is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                       overwrite=overwrite)
+            # pxd
+            fnameD = _delaunay_filename('pxd', '', parallel=parallel)
+            fnameN = _delaunay_filename('pxd', str(dim), parallel=parallel)
+            replace = [('c_parallel_delaunay.hpp',
+                        'c_parallel_delaunay{}.hpp'.format(dim)),
+                       ('ParallelDelaunay_with_info',
+                        'ParallelDelaunay_with_info_{}'.format(dim))]
+            is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                       overwrite=overwrite)
+            # pyx
+            fnameD = _delaunay_filename('pyx', 'D', parallel=parallel)
+            fnameN = _delaunay_filename('pyx', str(dim), paralle=parallel)
+            replace = [('ParallelDelaunay', 'ParallelDelaunay{}'.format(dim)),
+                       ('ParallelDelaunay_with_info',
+                        'ParallelDelaunay_with_info_{}'.format(dim))]
+            is_new += _create_ext_file(fnameD, fnameN, replace=replace,
+                                       overwrite=overwrite)
     # Create 64bit version if requested
     if bit64:
         generated = True
-        fname32 = _delaunay_filename('pyx', dim, periodic=periodic)
-        fname64 = _delaunay_filename('pyx', dim, periodic=periodic, bit64=True)
-        class32 = _delaunay_filename('pyclass', dim)
-        class64 = _delaunay_filename('pyclass', dim, bit64=True)
-        import_line = _delaunay_filename('import', dim, periodic=periodic)
+        fname32 = _delaunay_filename('pyx', dim, periodic=periodic,
+                                     parallel=parallel)
+        fname64 = _delaunay_filename('pyx', dim, periodic=periodic,
+                                     parallel=parallel, bit64=True)
+        class32 = _delaunay_filename('pyclass', dim, parallel=parallel)
+        class64 = _delaunay_filename('pyclass', dim, parallel=parallel,
+                                     bit64=True)
+        import_line = _delaunay_filename('import', dim, periodic=periodic,
+                                         parallel=parallel)
         replace = [
             ("ctypedef uint32_t info_t","ctypedef uint64_t info_t"),
             ("cdef object np_info = np.uint32",
@@ -324,33 +366,45 @@ def _make_ext(dim, periodic=False, bit64=False, overwrite=False):
     if generated:
         if bit64:
             includes = [
-                _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64),
-                _delaunay_filename('pxd', dim, periodic=periodic),
-                _delaunay_filename('hpp', dim, periodic=periodic),
-                _delaunay_filename('cpp', dim, periodic=periodic)]
+                _delaunay_filename('pyx', dim, periodic=periodic,
+                                   parallel=parallel, bit64=bit64),
+                _delaunay_filename('pxd', dim, periodic=periodic,
+                                   parallel=parallel),
+                _delaunay_filename('hpp', dim, periodic=periodic,
+                                   parallel=parallel),
+                _delaunay_filename('cpp', dim, periodic=periodic,
+                                   parallel=parallel)]
             sources = [
-                _delaunay_filename('cpp', dim, periodic=periodic)]
+                _delaunay_filename('cpp', dim, periodic=periodic,
+                                   parallel=parallel)]
         else:
             includes = [
-                _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64),
-                _delaunay_filename('pxd', dim, periodic=periodic, bit64=bit64),
-                _delaunay_filename('hpp', dim, periodic=periodic, bit64=bit64),
-                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64)]
+                _delaunay_filename('pyx', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel),
+                _delaunay_filename('pxd', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel),
+                _delaunay_filename('hpp', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel),
+                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel)]
             sources = [
-                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64)]
+                _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64,
+                                   parallel=parallel)]
         for cpp_file in sources:
             if not os.path.isfile(cpp_file):
                 open(cpp_file,'a').close()
             assert(os.path.isfile(cpp_file))
-        dep = _delaunay_filename('pyxdep', dim, periodic=periodic, bit64=bit64)
-        bld = _delaunay_filename('pyxbld', dim, periodic=periodic, bit64=bit64)
+        dep = _delaunay_filename('pyxdep', dim, periodic=periodic, bit64=bit64,
+                                 parallel=parallel)
+        bld = _delaunay_filename('pyxbld', dim, periodic=periodic, bit64=bit64,
+                                 parallel=parallel)
         is_new += _create_pyxdep_file(dep, includes=includes,
                                       overwrite=overwrite)
         is_new += _create_pyxbld_file(bld, sources=sources,
                                       overwrite=overwrite)
     if is_new:
         modname = _delaunay_filename('module', dim, periodic=periodic,
-                                     bit64=bit64)
+                                     bit64=bit64, parallel=parallel)
         warnings.warn("\n\nExtension {} is not a built in. ".format(modname) +
                       "It was automatically generated and will be compiled " +
                       "at import using pyximport.\n\n")

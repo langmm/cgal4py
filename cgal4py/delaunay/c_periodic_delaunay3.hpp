@@ -1114,29 +1114,36 @@ class PeriodicDelaunay_with_info_3
     std::ofstream os(filename, std::ios::binary);
     if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
     else {
-      std::streambuf* oldCoutStreamBuf = std::cout.rdbuf();
-      std::ostringstream newCoutStream;
-      std::cout.rdbuf( newCoutStream.rdbuf() );
-      os << T;
-      // T.save(os);
-      std::cout.rdbuf( oldCoutStreamBuf );
+      write_to_buffer(os);
       os.close();
     }
   }
+  void write_to_buffer(std::ofstream &os) const {
+    std::streambuf* oldCoutStreamBuf = std::cout.rdbuf();
+    std::ostringstream newCoutStream;
+    std::cout.rdbuf( newCoutStream.rdbuf() );
+    os << T;
+    // T.save(os);
+    std::cout.rdbuf( oldCoutStreamBuf );
+  }
+
   void read_from_file(const char* filename)
   {
     std::ifstream is(filename, std::ios::binary);
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
-      updated = true;
-      std::streambuf* oldCoutStreamBuf = std::cout.rdbuf();
-      std::ostringstream newCoutStream;
-      std::cout.rdbuf( newCoutStream.rdbuf() );
-      is >> T;
-      // T.load(is);
-      std::cout.rdbuf( oldCoutStreamBuf );
+      read_from_buffer(is);
       is.close();
     }
+  }
+  void read_from_buffer(std::ifstream &is) {
+    updated = true;
+    std::streambuf* oldCoutStreamBuf = std::cout.rdbuf();
+    std::ostringstream newCoutStream;
+    std::cout.rdbuf( newCoutStream.rdbuf() );
+    is >> T;
+    // T.load(is);
+    std::cout.rdbuf( oldCoutStreamBuf );
   }
 
   template <typename I>

@@ -85,7 +85,6 @@ def triangulate(pts, left_edge=None, right_edge=None, periodic=False,
                 dd_kwargs['nleaves'] = nproc
         tree = domain_decomp.tree(dd_method, pts, left_edge, right_edge,
                                   periodic, **dd_kwargs)
-        print tree.num_leaves
         T = parallel.ParallelDelaunay(pts, tree, nproc, limit_mem=limit_mem,
                                       use_double=use_double, **kwargs)
     # Serial

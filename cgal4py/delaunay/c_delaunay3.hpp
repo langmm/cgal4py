@@ -743,145 +743,155 @@ class Delaunay_with_info_3
     std::ofstream os(filename, std::ios::binary);
     if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
     else {
-      // Header
-      int n = static_cast<int>(T.number_of_vertices());
-      int m = static_cast<int>(T.tds().number_of_cells());
-      int d = static_cast<int>(T.dimension());
-      os.write((char*)&n, sizeof(int));
-      os.write((char*)&m, sizeof(int));
-      os.write((char*)&d, sizeof(int));
-      if (n==0) {
-	os.close();
-	return;
-      }
-      // printf("Wrote %d vertices, %d cells, for %d dimensions\n",n,m,d);
-
-      Vertex_hash V;
-      Cell_hash C;
-      
-      // first (infinite) vertex 
-      int inum = 0;
-      Vertex_handle v = T.infinite_vertex();
-      if ( v != Vertex_handle()) {
-	V[v] = inum++;
-      }
-      
-      // other vertices
-      Info info;
-      double x, y, z;
-      for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
-	if ( v != vit ) {
-	  V[vit] = inum++;
-	  info = static_cast<Info>(vit->info());
-	  x = static_cast<double>(vit->point().x());
-	  y = static_cast<double>(vit->point().y());
-	  z = static_cast<double>(vit->point().z());
-	  os.write((char*)&info, sizeof(Info));
-	  os.write((char*)&x, sizeof(double));
-	  os.write((char*)&y, sizeof(double));
-	  os.write((char*)&z, sizeof(double));
-	}
-      }
-      // printf("%d nverts, %d inum\n",T.number_of_vertices(),inum);
-      
-      // vertices of the cells
-      inum = 0;
-      int dim = (d == -1 ? 1 :  d + 1);
-      int index;
-      for( Cell_iterator ib = T.tds().cells_begin(); 
-	   ib != T.tds().cells_end(); ++ib) {
-	C[ib] = inum++;
-	for(int j = 0; j < dim ; ++j) {
-	  index = V[ib->vertex(j)];
-	  os.write((char*)&index, sizeof(int));
-	}
-      }
-      // printf("%d ncells, %d inum\n",T.tds().number_of_cells(),inum);
-  
-      // neighbor pointers of the cells
-      for( Cell_iterator it = T.tds().cells_begin();
-	   it != T.tds().cells_end(); ++it) {
-	for(int j = 0; j < d+1; ++j){
-	  index = C[it->neighbor(j)];
-	  os.write((char*)&index, sizeof(int));
-	}
-      }
-
+      write_to_buffer(os);
       os.close();
     }
   }
+
+  void write_to_buffer(std::ofstream &os) const {
+    // Header
+    int n = static_cast<int>(T.number_of_vertices());
+    int m = static_cast<int>(T.tds().number_of_cells());
+    int d = static_cast<int>(T.dimension());
+    os.write((char*)&n, sizeof(int));
+    os.write((char*)&m, sizeof(int));
+    os.write((char*)&d, sizeof(int));
+    if (n==0) {
+      return;
+    }
+    // printf("Wrote %d vertices, %d cells, for %d dimensions\n",n,m,d);
+    
+    Vertex_hash V;
+    Cell_hash C;
+    
+    // first (infinite) vertex 
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+    if ( v != Vertex_handle()) {
+      V[v] = inum++;
+    }
+    
+    // other vertices
+    Info info;
+    double x, y, z;
+    for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
+      if ( v != vit ) {
+	V[vit] = inum++;
+	info = static_cast<Info>(vit->info());
+	x = static_cast<double>(vit->point().x());
+	y = static_cast<double>(vit->point().y());
+	z = static_cast<double>(vit->point().z());
+	os.write((char*)&info, sizeof(Info));
+	os.write((char*)&x, sizeof(double));
+	os.write((char*)&y, sizeof(double));
+	os.write((char*)&z, sizeof(double));
+      }
+    }
+    // printf("%d nverts, %d inum\n",T.number_of_vertices(),inum);
+    
+    // vertices of the cells
+    inum = 0;
+    int dim = (d == -1 ? 1 :  d + 1);
+    int index;
+    for( Cell_iterator ib = T.tds().cells_begin(); 
+	 ib != T.tds().cells_end(); ++ib) {
+      C[ib] = inum++;
+      for(int j = 0; j < dim ; ++j) {
+	index = V[ib->vertex(j)];
+	os.write((char*)&index, sizeof(int));
+      }
+    }
+    // printf("%d ncells, %d inum\n",T.tds().number_of_cells(),inum);
+    
+    // neighbor pointers of the cells
+    for( Cell_iterator it = T.tds().cells_begin();
+	 it != T.tds().cells_end(); ++it) {
+      for(int j = 0; j < d+1; ++j){
+	index = C[it->neighbor(j)];
+	os.write((char*)&index, sizeof(int));
+      }
+    }
+
+  }
+
+
   void read_from_file(const char* filename)
   {
     std::ifstream is(filename, std::ios::binary);
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
-
-      if (T.number_of_vertices() != 0)  
-	T.clear();
-  
-      // header
-      int n, m, d;
-      is.read((char*)&n, sizeof(int));
-      is.read((char*)&m, sizeof(int));
-      is.read((char*)&d, sizeof(int));
-
-      if (n==0) {
-	return;
-      }
-
-      T.tds().set_dimension(d);
-      All_cells_iterator to_delete = T.tds().cells_begin();
-
-      std::vector<Vertex_handle> V(n+1);
-      std::vector<Cell_handle> C(m);
-
-      // infinite vertex
-      int i = 0;
-      V[0] = T.infinite_vertex();
-      ++i;
-
-      // read vertices
-      Info info;
-      double x, y, z;
-      for( ; i <= n; ++i) {
-	V[i] = T.tds().create_vertex();
-	is.read((char*)&info, sizeof(Info));
-	is.read((char*)&x, sizeof(double));
-	is.read((char*)&y, sizeof(double));
-	is.read((char*)&z, sizeof(double));
-	(*(V[i])).point() = Point(x,y,z);
-	(*(V[i])).info() = info;
-      }
-
-      // Creation of the cells
-      int index;
-      int dim = (d == -1 ? 1 : d + 1);
-      {
-	for(i = 0; i < m; ++i) {
-	  C[i] = T.tds().create_cell() ;
-	  for(int j = 0; j < dim ; ++j){
-	    is.read((char*)&index, sizeof(int));
-	    C[i]->set_vertex(j, V[index]);
-	    V[index]->set_cell(C[i]);
-	  }
-	}
-      }
-
-      // Setting the neighbor pointers
-      {
-	for(i = 0; i < m; ++i) {
-	  for(int j = 0; j < d+1; ++j){
-	    is.read((char*)&index, sizeof(int));
-	    C[i]->set_neighbor(j, C[index]);
-	  }
-	}
-      }
-
-      // delete flat cell
-      T.tds().delete_cell(to_delete);
-
+      read_from_buffer(is);
       is.close();
     }
+  }
+
+  void read_from_buffer(std::ifstream &is) {
+    
+    updated = true;
+    if (T.number_of_vertices() != 0)  
+      T.clear();
+    
+    // header
+    int n, m, d;
+    is.read((char*)&n, sizeof(int));
+    is.read((char*)&m, sizeof(int));
+    is.read((char*)&d, sizeof(int));
+    
+    if (n==0) {
+      return;
+    }
+    
+    T.tds().set_dimension(d);
+    All_cells_iterator to_delete = T.tds().cells_begin();
+    
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Cell_handle> C(m);
+    
+    // infinite vertex
+    int i = 0;
+    V[0] = T.infinite_vertex();
+    ++i;
+
+    // read vertices
+    Info info;
+    double x, y, z;
+    for( ; i <= n; ++i) {
+      V[i] = T.tds().create_vertex();
+      is.read((char*)&info, sizeof(Info));
+      is.read((char*)&x, sizeof(double));
+      is.read((char*)&y, sizeof(double));
+      is.read((char*)&z, sizeof(double));
+      (*(V[i])).point() = Point(x,y,z);
+      (*(V[i])).info() = info;
+    }
+    
+    // Creation of the cells
+    int index;
+    int dim = (d == -1 ? 1 : d + 1);
+    {
+      for(i = 0; i < m; ++i) {
+	C[i] = T.tds().create_cell() ;
+	for(int j = 0; j < dim ; ++j){
+	  is.read((char*)&index, sizeof(int));
+	  C[i]->set_vertex(j, V[index]);
+	  V[index]->set_cell(C[i]);
+	}
+      }
+    }
+    
+    // Setting the neighbor pointers
+    {
+      for(i = 0; i < m; ++i) {
+	for(int j = 0; j < d+1; ++j){
+	  is.read((char*)&index, sizeof(int));
+	  C[i]->set_neighbor(j, C[index]);
+	}
+      }
+    }
+    
+    // delete flat cell
+    T.tds().delete_cell(to_delete);
+    
   }
 
   template <typename I>

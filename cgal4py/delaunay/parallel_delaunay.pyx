@@ -16,9 +16,9 @@ cdef object np_info = np.uint32
 ctypedef np.uint32_t np_info_t
 
 
-cdef class ParallelDelaunay:
+cdef class ParallelDelaunayD:
 
-    cdef CParallelDelaunay[info_t] *T
+    cdef ParallelDelaunay_with_info_D[info_t] *T
     cdef object pts_total
     # cdef np.ndarray[np.float64_t, ndim=2] pts_total
 
@@ -26,7 +26,7 @@ cdef class ParallelDelaunay:
     @cython.wraparound(False)
     def __cinit__(self, np.ndarray[np.float64_t, ndim=1] le,
                   np.ndarray[np.float64_t, ndim=1] re,
-                  object periodic=False):
+                  object periodic=False, int limit_mem=0):
         cdef np.uint32_t ndim = le.size
         cdef cbool* per = <cbool *>malloc(ndim*sizeof(cbool));
         if isinstance(periodic, pybool):
@@ -36,7 +36,8 @@ cdef class ParallelDelaunay:
             for i in range(ndim):
                 per[i] = <cbool>periodic[i]
         with nogil, cython.boundscheck(False), cython.wraparound(False):
-            self.T = new CParallelDelaunay[info_t](ndim, &le[0], &re[0], per)
+            self.T = new ParallelDelaunay_with_info_D[info_t](
+                ndim, &le[0], &re[0], per, limit_mem)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -47,6 +48,15 @@ cdef class ParallelDelaunay:
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.insert(npts, &pts[0,0])
         self.pts_total = pts
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def consolidate_vols(self):
+        cdef np.ndarray[np.float64_t, ndim=1] vols
+        vols = np.empty(self.T.npts_total, 'float64')
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.T.consolidate_vols(&vols[0])
+        return vols
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

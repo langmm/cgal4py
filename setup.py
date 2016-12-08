@@ -135,6 +135,8 @@ if include_parallel_delaunay:
     ext_options_mpicgal['extra_link_args'] += mpi_link_args
     ext_options_mpicgal['include_dirs'].append(
         os.path.dirname(cykdtree.__file__))
+    ext_options_mpicgal['include_dirs'].append(
+        '/usr/include/eigen3')
     pyx_file = "cgal4py/delaunay/parallel_delaunay.pyx"
     cpp_file = "cgal4py/delaunay/c_parallel_delaunay.cpp"
     if not os.path.isfile(cpp_file):
@@ -143,7 +145,6 @@ if include_parallel_delaunay:
     ext_modules.append(
         Extension("cgal4py.delaunay.parallel_delaunay",
                   sources=[pyx_file, cpp_file,
-                           # "cgal4py/delaunay/c_tools.cpp",
                            "cgal4py/delaunay/c_delaunay2.cpp",
                            cykdtree_cpp, cykdtree_utils_cpp],
                   **ext_options_mpicgal))

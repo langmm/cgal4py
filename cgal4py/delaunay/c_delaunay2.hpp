@@ -628,69 +628,72 @@ public:
     std::ofstream os(filename, std::ios::binary);
     if (!os) std::cerr << "Error cannot create file: " << filename << std::endl;
     else {
-      // Header
-      int n = static_cast<int>(T.number_of_vertices());
-      int m = static_cast<int>(T.tds().number_of_full_dim_faces());
-      int d = static_cast<int>(T.dimension());
-      os.write((char*)&n, sizeof(int));
-      os.write((char*)&m, sizeof(int));
-      os.write((char*)&d, sizeof(int));
-      if (n==0) {
-  	os.close();
-  	return;
-      }
-
-      Vertex_hash V;
-      Face_hash F;
-      
-      // first (infinite) vertex 
-      Info info;
-      double x, y;
-      int inum = 0;
-      Vertex_handle v = T.infinite_vertex();
-      if ( v != Vertex_handle()) {
-  	V[v] = inum++;
-      }
-      
-      // other vertices
-      for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
-  	if ( v != vit ) {
-  	  V[vit] = inum++;
-  	  info = static_cast<Info>(vit->info());
-  	  x = static_cast<double>(vit->point().x());
-  	  y = static_cast<double>(vit->point().y());
-  	  os.write((char*)&info, sizeof(Info));
-  	  os.write((char*)&x, sizeof(double));
-  	  os.write((char*)&y, sizeof(double));
-  	}
-      }
-      
-      // vertices of the faces
-      inum = 0;
-      int dim = (d == -1 ? 1 :  d + 1);
-      int index;
-      int nvert = 0;
-      for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
-  	   ib != T.tds().face_iterator_base_end(); ++ib) {
-  	F[ib] = inum++;
-  	for (int j = 0; j < dim ; ++j) {
-  	  index = V[ib->vertex(j)];
-  	  os.write((char*)&index, sizeof(int));
-  	  nvert++;
-  	}
-      }
-  
-      // neighbor pointers of the faces
-      for (All_faces_iterator it = T.tds().face_iterator_base_begin();
-  	   it != T.tds().face_iterator_base_end(); ++it) {
-  	for (int j = 0; j < d+1; ++j){
-  	  index = F[it->neighbor(j)];
-  	  os.write((char*)&index, sizeof(int));
-  	}
-      }
-
+      write_to_buffer(os);
       os.close();
     }
+  }
+
+  void write_to_buffer(std::ofstream &os) const {
+    // Header
+    int n = static_cast<int>(T.number_of_vertices());
+    int m = static_cast<int>(T.tds().number_of_full_dim_faces());
+    int d = static_cast<int>(T.dimension());
+    os.write((char*)&n, sizeof(int));
+    os.write((char*)&m, sizeof(int));
+    os.write((char*)&d, sizeof(int));
+    if (n==0) {
+      return;
+    }
+    
+    Vertex_hash V;
+    Face_hash F;
+    
+    // first (infinite) vertex 
+    Info info;
+    double x, y;
+    int inum = 0;
+    Vertex_handle v = T.infinite_vertex();
+    if ( v != Vertex_handle()) {
+      V[v] = inum++;
+    }
+    
+    // other vertices
+    for( All_vertices_iterator vit = T.tds().vertices_begin(); vit != T.tds().vertices_end() ; ++vit) {
+      if ( v != vit ) {
+	V[vit] = inum++;
+	info = static_cast<Info>(vit->info());
+	x = static_cast<double>(vit->point().x());
+	y = static_cast<double>(vit->point().y());
+	os.write((char*)&info, sizeof(Info));
+	os.write((char*)&x, sizeof(double));
+	os.write((char*)&y, sizeof(double));
+      }
+    }
+    
+    // vertices of the faces
+    inum = 0;
+    int dim = (d == -1 ? 1 :  d + 1);
+    int index;
+    int nvert = 0;
+    for (All_faces_iterator ib = T.tds().face_iterator_base_begin();
+	 ib != T.tds().face_iterator_base_end(); ++ib) {
+      F[ib] = inum++;
+      for (int j = 0; j < dim ; ++j) {
+	index = V[ib->vertex(j)];
+	os.write((char*)&index, sizeof(int));
+	nvert++;
+      }
+    }
+  
+    // neighbor pointers of the faces
+    for (All_faces_iterator it = T.tds().face_iterator_base_begin();
+	 it != T.tds().face_iterator_base_end(); ++it) {
+      for (int j = 0; j < d+1; ++j){
+	index = F[it->neighbor(j)];
+	os.write((char*)&index, sizeof(int));
+      }
+    }
+
   }
 
   void read_from_file(const char* filename)
@@ -698,80 +701,85 @@ public:
     std::ifstream is(filename, std::ios::binary);
     if (!is) std::cerr << "Error cannot open file: " << filename << std::endl;
     else {
-      updated = true;
-
-      if (T.number_of_vertices() != 0) 
-      	T.clear();
-  
-      // header
-      int n, m, d;
-      is.read((char*)&n, sizeof(int));
-      is.read((char*)&m, sizeof(int));
-      is.read((char*)&d, sizeof(int));
-
-      if (n==0) {
-  	T.set_infinite_vertex(Vertex_handle());
-  	return;
-      }
-
-      T.tds().set_dimension(d);
-
-      All_faces_iterator to_delete = T.tds().face_iterator_base_begin();
-
-      std::vector<Vertex_handle> V(n+1);
-      std::vector<Face_handle> F(m);
-
-      // infinite vertex
-      int i = 0;
-      V[0] = T.infinite_vertex();
-      ++i;
-
-      // read vertices
-      Info info;
-      double x, y;
-      for( ; i < (n+1); ++i) {
-  	V[i] = T.tds().create_vertex();
-  	is.read((char*)&info, sizeof(Info));
-  	is.read((char*)&x, sizeof(double));
-  	is.read((char*)&y, sizeof(double));
-	V[i]->point() = Point(x,y);
-	V[i]->info() = info;
-      }
-
-      // Creation of the faces
-      int index;
-      int dim = (d == -1 ? 1 : d + 1);
-      {
-  	int nvert = 0;
-  	for(i = 0; i < m; ++i) {
-  	  F[i] = T.tds().create_face() ;
-  	  for(int j = 0; j < dim ; ++j){
-  	    is.read((char*)&index, sizeof(int));
-  	    F[i]->set_vertex(j, V[index]);
-  	    // The face pointer of vertices is set too often,
-  	    // but otherwise we had to use a further map 
-  	    V[index]->set_face(F[i]);
-  	    nvert++;
-  	  }
-  	}
-      }
-
-      // Setting the neighbor pointers
-      {
-  	for(i = 0; i < m; ++i) {
-  	  for(int j = 0; j < d+1; ++j){
-  	    is.read((char*)&index, sizeof(int));
-  	    F[i]->set_neighbor(j, F[index]);
-  	  }
-  	}
-      }
-
-      // Remove flat face
-      T.tds().delete_face(to_delete);
-
-      T.set_infinite_vertex(V[0]);
+      read_from_buffer(is);
       is.close();
     }
+  }
+
+  void read_from_buffer(std::ifstream &is) {
+
+    updated = true;
+
+    if (T.number_of_vertices() != 0) 
+      T.clear();
+  
+    // header
+    int n, m, d;
+    is.read((char*)&n, sizeof(int));
+    is.read((char*)&m, sizeof(int));
+    is.read((char*)&d, sizeof(int));
+    
+    if (n==0) {
+      T.set_infinite_vertex(Vertex_handle());
+      return;
+    }
+    
+    T.tds().set_dimension(d);
+    
+    All_faces_iterator to_delete = T.tds().face_iterator_base_begin();
+    
+    std::vector<Vertex_handle> V(n+1);
+    std::vector<Face_handle> F(m);
+    
+    // infinite vertex
+    int i = 0;
+    V[0] = T.infinite_vertex();
+    ++i;
+    
+    // read vertices
+    Info info;
+    double x, y;
+    for( ; i < (n+1); ++i) {
+      V[i] = T.tds().create_vertex();
+      is.read((char*)&info, sizeof(Info));
+      is.read((char*)&x, sizeof(double));
+      is.read((char*)&y, sizeof(double));
+      V[i]->point() = Point(x,y);
+      V[i]->info() = info;
+    }
+    
+    // Creation of the faces
+    int index;
+    int dim = (d == -1 ? 1 : d + 1);
+    {
+      int nvert = 0;
+      for(i = 0; i < m; ++i) {
+	F[i] = T.tds().create_face() ;
+	for(int j = 0; j < dim ; ++j){
+	  is.read((char*)&index, sizeof(int));
+	  F[i]->set_vertex(j, V[index]);
+	  // The face pointer of vertices is set too often,
+	  // but otherwise we had to use a further map 
+	  V[index]->set_face(F[i]);
+	  nvert++;
+	}
+      }
+    }
+    
+    // Setting the neighbor pointers
+    {
+      for(i = 0; i < m; ++i) {
+	for(int j = 0; j < d+1; ++j){
+	  is.read((char*)&index, sizeof(int));
+	  F[i]->set_neighbor(j, F[index]);
+	}
+      }
+    }
+
+    // Remove flat face
+    T.tds().delete_face(to_delete);
+    
+    T.set_infinite_vertex(V[0]);
   }
 
   template <typename I>
