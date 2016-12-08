@@ -10,25 +10,25 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 periodic = False
-npts = int(1e8)
+npts = int(1e3)
 ndim = 3
-limit_mem = 4
+limit_mem = 1
 test_result = False
-task = 'vols'
+task = 'tess'
 
-if rank == 0:
-    ParallelDelaunay = _get_Delaunay(ndim, parallel=True)
-comm.Barrier()
+# if rank == 0:
+#     ParallelDelaunay = _get_Delaunay(ndim, parallel=True)
+# comm.Barrier()
 ParallelDelaunay = _get_Delaunay(ndim, parallel=True)
 
 if rank == 0:
     pts, le, re = make_points(npts, ndim)
     pts2, le, re = make_points(10, ndim)
 else:
-    pts = np.empty((0,ndim), 'float64')
-    le = np.empty(0, 'float64')
-    re = np.empty(0, 'float64')
-    pts2 = np.empty((0,ndim), 'float64')
+    pts = None
+    le = None
+    re = None
+    pts2 = None
     
 TP = ParallelDelaunay(le, re, periodic=periodic, limit_mem=limit_mem)
 TP.insert(pts)

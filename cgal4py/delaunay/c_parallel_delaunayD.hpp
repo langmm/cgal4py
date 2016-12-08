@@ -47,6 +47,8 @@ void *my_realloc(void *in, size_t size, const char* msg = "") {
   return out;
 }
 
+
+
 void print_array_double(double *arr, int nrow, int ncol) {
   int i, j;
   printf("[\n");
@@ -1304,7 +1306,7 @@ public:
     free(pts_send);
     free(ngh_send);
     if (DEBUG)
-      printf("%d: Finishing outgoing_points", rank);
+      printf("%d: Finishing outgoing_points\n", rank);
     return count_recv_tot;
   }
 
@@ -1323,7 +1325,7 @@ public:
       nleaves_total = (int)(pow(2,ceil(log2((float)(nleaves_total)))));
       if (limit_mem > 1)
 	nleaves_total *= limit_mem;
-      leafsize = std::max((uint32_t)(npts_total/nleaves_total + 1), 2*(ndim+1));
+      leafsize = std::max((uint32_t)(npts_total/nleaves_total + 1), (ndim+1));
       idx_total = (uint64_t*)my_malloc(npts_total*sizeof(uint64_t));
       for (j = 0; j < npts_total; j++)
 	idx_total[j] = j;
@@ -1352,15 +1354,17 @@ public:
     // Make sure leaves meet minimum criteria
     if (rank == 0) {
       for (i = 0; i < nleaves_total; i++) {
-	if (tree->leaves[i]->children < (2*(ndim+1))) {
-	  leafsize_limit = 1;
+	if (tree->leaves[i]->children < (ndim+1)) {
+	  leafsize_limit = tree->leaves[i]->children;
 	  break;
 	}
       }
     }
     MPI_Bcast(&leafsize_limit, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if (leafsize_limit)
-      throw std::runtime_error("Leafsize is too small.");
+      printf("Leafsize is too small (%d in %dD).", leafsize_limit, ndim);
+      // throw std::runtime_error("Leafsize is too small (%d in %dD).",
+      // 			       leafsize_limit, );
     // Send leaves
     if (rank == 0) {
       int task;

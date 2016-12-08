@@ -82,8 +82,8 @@ def make_test(npts, ndim, distrib='uniform', periodic=False,
 
 @nt.nottest
 def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
-             profile=False, use_mpi=False, use_buffer=False,
-             limit_mem=False, **kwargs):
+             profile=False, use_mpi=False, use_python=False, use_buffer=False,
+             limit_mem=False, suppress_final_output=False, **kwargs):
     r"""Run a rountine with a designated number of points & dimensions on a
     selected number of processors.
 
@@ -99,12 +99,17 @@ def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
         use_mpi (bool, optional): If True, the MPI parallelized version is used
             instead of the version using the multiprocessing package. Defaults
             to False.
+        use_python (bool, optional): If True and `use_mpi == True`, then
+            communications are done in python using mpi4py. Defaults to False.
         use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
             versions of MPI communications will be used rather than indirect
             communications of python objects via pickling. Defaults to False.
         limit_mem (bool, optional): If True, memory usage is limited by
             writing things to file at a cost to performance. Defaults to
             False.
+        suppress_final_output (bool, optional): If True, the final output
+            from spawned MPI processes is suppressed. This is mainly for
+            timing purposes. Defaults to False.
 
     Raises:
         ValueError: If `func` is not one of the supported values.
@@ -123,7 +128,9 @@ def run_test(npts, ndim, nproc=0, func_name='tess', distrib='uniform',
         kwargs['use_mpi'] = use_mpi
         kwargs['limit_mem'] = limit_mem
         if use_mpi:
+            kwargs['use_python'] = use_python
             kwargs['use_buffer'] = use_buffer
+            kwargs['suppress_final_output'] = suppress_final_output
             if profile:
                 kwargs['profile'] = '{}_mpi_profile.dat'.format(unique_str)
     # Run

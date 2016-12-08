@@ -157,21 +157,38 @@ class TestDelaunayProcessMPI(MyTestCase):
         ndim = 2
         periodic = False
         pts, tree = make_test(0, ndim, periodic=periodic)
-        self._dummy1 = self._func(taskname1, pts, tree)
-        self._dummy2 = self._func(taskname1, pts, tree, use_buffer=True)
-        self._dummy3 = self._func(taskname2, pts, tree)
-        self._dummy4 = self._func(taskname2, pts, tree, use_buffer=True)
-        self._leaves = self._dummy1._leaves
+        le = tree.left_edge
+        re = tree.right_edge
+        self._pts = pts
+        self._tree = tree
+        # self._dummy3 = self._func(taskname2, pts, tree)
+        # self._dummy4 = self._func(taskname2, pts, tree, use_buffer=True)
+        # self._leaves = self._dummy1._leaves
         # TODO: use_buffer curregntly segfaults when run with coverage
         self.param_runs = [
-            ((taskname1, pts, tree), {}),
-            ((taskname1, pts, GenericTree.from_tree(tree)), {}),
-            ((taskname1, pts, tree), {'use_double':True}),
-            # ((taskname1, pts, tree), {'use_buffer':True}),
-            ((taskname1, pts, tree), {'limit_mem':True}),
-            ((taskname2, pts, tree), {}),
-            # ((taskname2, pts, tree), {'use_buffer':True}),
-            ((taskname2, pts, tree), {'limit_mem':True}),
+            # Using C++ communications
+            # ((taskname1, pts), {}),
+            # ((taskname1, pts, left_edge=le, right_edge=re), {}),
+            # ((taskname1, pts), {'use_double':True}),
+            # ((taskname1, pts), {'limit_mem':True}),
+            # ((taskname2, pts), {}),
+            # ((taskname2, pts), {'limit_mem':True}),
+            # Using Python communications
+            ((taskname1, pts), {'use_python':True}),
+            ((taskname1, pts, tree), {'use_python':True}),
+            ((taskname1, pts, GenericTree.from_tree(tree)),
+                 {'use_python':True}),
+            ((taskname1, pts, tree), {'use_python':True,
+                                      'use_double':True}),
+            # ((taskname1, pts, tree), {'use_python':True},
+            #                           'use_buffer':True}),
+            ((taskname1, pts, tree), {'use_python':True,
+                                      'limit_mem':True}),
+            ((taskname2, pts, tree), {'use_python':True}),
+            # ((taskname2, pts, tree), {'use_python':True},
+            #                           'use_buffer':True}),
+            ((taskname2, pts, tree), {'use_python':True,
+                                      'limit_mem':True}),
             ]
         self.param_raises = [
             (ValueError, ('null', pts, tree), {})
@@ -185,9 +202,16 @@ class TestDelaunayProcessMPI(MyTestCase):
             os.remove(fname)
 
     def test_gather_leaf_arrays(self):
-        arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in self._leaves}
-        self._dummy1.gather_leaf_arrays(arr)
-        self._dummy2.gather_leaf_arrays(arr)
+        taskname1 = 'triangulate'
+        pts = self._pts
+        tree = self._tree
+        dummy1 = self.func(taskname1, pts, tree, use_python=True)
+        dummy2 = self.func(taskname1, pts, tree, use_python=True,
+                           use_buffer=True)
+        leaves = tree.leaves
+        arr = {leaf.id: np.arange(5*(leaf.id+1)) for leaf in leaves}
+        dummy1.gather_leaf_arrays(arr)
+        dummy2.gather_leaf_arrays(arr)
 
 
 class TestDelaunayProcessMulti(MyTestCase):
@@ -293,10 +317,15 @@ class TestParallelDelaunay(MyTestCase):
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': False}),
+                              'profile': profile, 'use_python':True,
+                              'use_buffer': False}),
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': True})
+                              'profile': profile, 'use_python':True,
+                              'use_buffer': True}),
+                        # (ans, (pts, tree, args[2]),
+                        #      {'use_mpi': True, 'limit_mem': limit_mem,
+                        #       'profile': profile, 'use_python':False})
                         ]
 
     def check_returns(self, result, args, kwargs):
@@ -359,10 +388,15 @@ class TestParallelVoronoiVolumes(MyTestCase):
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': False}),
+                              'profile': profile, 'use_python':True,
+                              'use_buffer': False}),
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': True, 'limit_mem': limit_mem,
-                              'profile': profile, 'use_buffer': True})
+                              'profile': profile, 'use_python':True,
+                              'use_buffer': True}),
+                        # (ans, (pts, tree, args[2]),
+                        #      {'use_mpi': True, 'limit_mem': limit_mem,
+                        #       'profile': profile, 'use_python':False})
                         ]
 
     def check_returns(self, result, args, kwargs):

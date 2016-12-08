@@ -2,6 +2,7 @@
 import cython
 import numpy as np
 cimport numpy as np
+from mpi4py import MPI
 
 from libc.stdlib cimport malloc, free
 from libcpp cimport bool as cbool
@@ -20,33 +21,54 @@ cdef class ParallelDelaunayD:
 
     cdef ParallelDelaunay_with_info_D[info_t] *T
     cdef object pts_total
-    # cdef np.ndarray[np.float64_t, ndim=2] pts_total
+    cdef int rank
+    cdef int size
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def __cinit__(self, np.ndarray[np.float64_t, ndim=1] le,
-                  np.ndarray[np.float64_t, ndim=1] re,
+    def __cinit__(self, np.ndarray[np.float64_t, ndim=1] le = None,
+                  np.ndarray[np.float64_t, ndim=1] re = None,
                   object periodic=False, int limit_mem=0):
-        cdef np.uint32_t ndim = le.size
-        cdef cbool* per = <cbool *>malloc(ndim*sizeof(cbool));
-        if isinstance(periodic, pybool):
-            for i in range(ndim):
-                per[i] = <cbool>periodic
+        cdef np.uint32_t ndim = 0
+        cdef cbool* per = NULL
+        cdef double* ptr_le = NULL
+        cdef double* ptr_re = NULL
+        cdef object comm = MPI.COMM_WORLD
+        self.size = comm.Get_size()
+        self.rank = comm.Get_rank()
+        if self.rank == 0:
+            ndim = le.size
+            ptr_le = &le[0]
+            ptr_re = &re[0]
+            per = <cbool *>malloc(ndim*sizeof(cbool))
+            if isinstance(periodic, pybool):
+                for i in range(ndim):
+                    per[i] = <cbool>periodic
+            else:
+                for i in range(ndim):
+                    per[i] = <cbool>periodic[i]
         else:
-            for i in range(ndim):
-                per[i] = <cbool>periodic[i]
+            assert(le == None)
+            assert(re == None)
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T = new ParallelDelaunay_with_info_D[info_t](
-                ndim, &le[0], &re[0], per, limit_mem)
+                ndim, ptr_le, ptr_re, per, limit_mem)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def insert(self, np.ndarray[np.float64_t, ndim=2] pts):
-        cdef np.uint32_t ndim = pts.shape[1]
-        assert(ndim == self.T.ndim)
-        cdef np.uint64_t npts = pts.shape[0]
+    def insert(self, np.ndarray[np.float64_t, ndim=2] pts = None):
+        cdef np.uint32_t ndim = 0
+        cdef np.uint64_t npts = 0
+        cdef double *ptr_pts = NULL
+        if self.rank == 0:
+            ndim = pts.shape[1]
+            assert(ndim == self.T.ndim)
+            npts = pts.shape[0]
+            ptr_pts = &pts[0,0]
+        else:
+            assert(pts == None)
         with nogil, cython.boundscheck(False), cython.wraparound(False):
-            self.T.insert(npts, &pts[0,0])
+            self.T.insert(npts, ptr_pts)
         self.pts_total = pts
 
     @cython.boundscheck(False)

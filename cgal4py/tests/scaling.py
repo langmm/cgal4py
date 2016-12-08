@@ -11,7 +11,8 @@ np.random.seed(10)
 
 
 def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
-              use_buffer=False, overwrite=False, display=False):
+              use_python=False, use_buffer=False, overwrite=False,
+              display=False, suppress_final_output=False):
     r"""Get timing stats using :package:`cProfile`.
 
     Args:
@@ -26,9 +27,15 @@ def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
         use_mpi (bool, optional): If True, the MPI parallelized version is used
             instead of the version using the multiprocessing package. Defaults
             to False.
+        use_python (bool, optional): If True and `use_mpi == True`, then MPI
+            communications are done in python using `mpi4py`. Defaults to
+            False.
         use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
             versions of MPI communications will be used rather than indirect
             communications of python objects via pickling. Defaults to False.
+        suppress_final_output (bool, optional): If True, the final output 
+            from spawned MPI processes is suppressed. This is mainly for
+            timing purposes. Defaults to False.
         overwrite (bool, optional): If True, the existing file for this
             set of input parameters if overwritten. Defaults to False.
         display (bool, optional): If True, display the profile results.
@@ -40,21 +47,26 @@ def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
         perstr = "_periodic"
     mpistr = ""
     bufstr = ""
+    pycstr = ""
+    outstr = ""
     if use_mpi:
         mpistr = "_mpi"
-        if use_buffer:
-            bufstr = "_buffer"
-    fname_stat = 'stat_{}_{}part_{}proc_{}dim{}{}{}.txt'.format(func, npart,
-                                                                nproc, ndim,
-                                                                perstr, mpistr,
-                                                                bufstr)
+        if suppress_final_output:
+            outstr = "_noout"
+        if use_python:
+            pycstr = "_python"
+            if use_buffer:
+                bufstr = "_buffer"
+    fname_stat = 'stat_{}_{}part_{}proc_{}dim{}{}{}{}{}.txt'.format(
+        func, npart, nproc, ndim, perstr, mpistr, pycstr, bufstr, outstr)
     if overwrite or not os.path.isfile(fname_stat):
         cProfile.run(
             "from cgal4py.tests.test_cgal4py import run_test; "+
-            "run_test({},{}, nproc={}, func_name='{}',".format(
+            "run_test({}, {}, nproc={}, func_name='{}',".format(
                 npart, ndim, nproc, func) +
-            "periodic={},use_mpi={},use_buffer={})".format(
-                periodic, use_mpi, use_buffer),
+            "periodic={},use_mpi={},use_python={},use_buffer={},".format(
+                periodic, use_mpi, use_python, use_buffer) +
+            "suppress_final_output={})".format(suppress_final_output),
             fname_stat)
     if display:
         p = pstats.Stats(fname_stat)
@@ -64,7 +76,7 @@ def stats_run(func, npart, nproc, ndim, periodic=False, use_mpi=False,
 
 
 def time_run(func, npart, nproc, ndim, nrep=1, periodic=False, use_mpi=False,
-             use_buffer=False):
+             use_python=False, use_buffer=False, suppress_final_output=False):
     r"""Get runing times using :package:`time`.
 
     Args:
@@ -81,9 +93,15 @@ def time_run(func, npart, nproc, ndim, nrep=1, periodic=False, use_mpi=False,
         use_mpi (bool, optional): If True, the MPI parallelized version is used
             instead of the version using the multiprocessing package. Defaults
             to False.
+        use_python (bool, optional): If True and `use_mpi == True`, then MPI
+            communications are done in python using `mpi4py`. Defaults to
+            False.
         use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
             versions of MPI communications will be used rather than indirect
             communications of python objects via pickling. Defaults to False.
+        suppress_final_output (bool, optional): If True, the final output 
+            from spawned MPI processes is suppressed. This is mainly for
+            timing purposes. Defaults to False.
 
     """
     times = np.empty(nrep, 'float')
@@ -91,14 +109,16 @@ def time_run(func, npart, nproc, ndim, nrep=1, periodic=False, use_mpi=False,
         t1 = time.time()
         run_test(npart, ndim, nproc=nproc, func_name=func,
                  periodic=periodic, use_mpi=use_mpi,
-                 use_buffer=use_buffer)
+                 use_python=use_python, use_buffer=use_buffer,
+                 suppress_final_output=suppress_final_output)
         t2 = time.time()
         times[i] = t2 - t1
     return np.mean(times), np.std(times)
 
 
 def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
-                   use_buffer=False, overwrite=True):
+                   use_python=False, use_buffer=False, overwrite=True,
+                   suppress_final_output=False):
     r"""Plot the scaling with number of processors for a particular function.
 
     Args:
@@ -113,9 +133,15 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
         use_mpi (bool, optional): If True, the MPI parallelized version is used
             instead of the version using the multiprocessing package. Defaults
             to False.
+        use_python (bool, optional): If True and `use_mpi == True`, then MPI
+            communications are done in python using `mpi4py`. Defaults to
+            False.
         use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
             versions of MPI communications will be used rather than indirect
             communications of python objects via pickling. Defaults to False.
+        suppress_final_output (bool, optional): If True, the final output 
+            from spawned MPI processes is suppressed. This is mainly for
+            timing purposes. Defaults to False.
         overwrite (bool, optional): If True, the existing file for this
             set of input parameters if overwritten. Defaults to False.
 
@@ -125,13 +151,19 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
     if periodic:
         perstr = "_periodic"
     mpistr = ""
+    pycstr = ""
     bufstr = ""
+    outstr = ""
     if use_mpi:
         mpistr = "_mpi"
-        if use_buffer:
-            bufstr = "_buffer"
-    fname_plot = 'plot_strong_scaling_{}_nproc_{}part{}{}{}.png'.format(
-        func, npart, perstr, mpistr, bufstr)
+        if suppress_final_output:
+            outstr = "_noout"
+        if use_python:
+            pycstr = "_python"
+            if use_buffer:
+                bufstr = "_buffer"
+    fname_plot = 'plot_strong_scaling_{}_nproc_{}part{}{}{}{}{}.png'.format(
+        func, npart, perstr, mpistr, pycstr, bufstr, outstr)
     nproc_list = [1, 2, 4, 8, 16]
     ndim_list = [2, 3]
     clr_list = ['b', 'r']
@@ -140,7 +172,9 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
         for i, ndim in enumerate(ndim_list):
             times[j, i, 0], times[j, i, 1] = time_run(
                 func, npart, nproc, ndim, nrep=nrep,
-                periodic=periodic, use_mpi=use_mpi, use_buffer=use_buffer)
+                periodic=periodic, use_mpi=use_mpi,
+                use_python=use_python, use_buffer=use_buffer,
+                suppress_final_output=suppress_final_output)
             print("Finished {}D on {}.".format(ndim, nproc))
     fig, axs = plt.subplots(1, 1)
     for i in range(len(ndim_list)):
@@ -156,7 +190,8 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
 
 
 def weak_scaling(func, npart=1e4, nrep=1, periodic=False, use_mpi=False,
-                 use_buffer=False, overwrite=True):
+                 use_python=False, use_buffer=False, overwrite=True,
+                 suppress_final_output=False):
     r"""Plot the scaling with number of processors with a constant number of
     particles per processor for a particular function.
 
@@ -173,9 +208,15 @@ def weak_scaling(func, npart=1e4, nrep=1, periodic=False, use_mpi=False,
         use_mpi (bool, optional): If True, the MPI parallelized version is used
             instead of the version using the multiprocessing package. Defaults
             to False.
+        use_python (bool, optional): If True and `use_mpi == True`, then MPI
+            communications are done in python using `mpi4py`. Defaults to
+            False.
         use_buffer (bool, optional): If True and `use_mpi == True`, then buffer
             versions of MPI communications will be used rather than indirect
             communications of python objects via pickling. Defaults to False.
+        suppress_final_output (bool, optional): If True, the final output 
+            from spawned MPI processes is suppressed. This is mainly for
+            timing purposes. Defaults to False.
         overwrite (bool, optional): If True, the existing file for this
             set of input parameters if overwritten. Defaults to False.
 
@@ -185,13 +226,19 @@ def weak_scaling(func, npart=1e4, nrep=1, periodic=False, use_mpi=False,
     if periodic:
         perstr = "_periodic"
     mpistr = ""
+    pycstr = ""
     bufstr = ""
+    outstr = ""
     if use_mpi:
         mpistr = "_mpi"
-        if use_buffer:
-            bufstr = "_buffer"
-    fname_plot = 'plot_weak_scaling_{}_nproc_{}part{}{}{}.png'.format(
-        func, npart, perstr, mpistr, bufstr)
+        if suppress_final_output:
+            outstr = "_noout"
+        if use_python:
+            pycstr = "_python"
+            if use_buffer:
+                bufstr = "_buffer"
+    fname_plot = 'plot_weak_scaling_{}_nproc_{}part{}{}{}{}{}.png'.format(
+        func, npart, perstr, mpistr, pycstr, bufstr, outstr)
     nproc_list = [1, 2, 4, 8, 16]
     ndim_list = [2, 3]
     clr_list = ['b', 'r']
@@ -200,7 +247,9 @@ def weak_scaling(func, npart=1e4, nrep=1, periodic=False, use_mpi=False,
         for i, ndim in enumerate(ndim_list):
             times[j, i, 0], times[j, i, 1] = time_run(
                 func, npart*nproc, nproc, ndim, nrep=nrep,
-                periodic=periodic, use_mpi=use_mpi, use_buffer=use_buffer)
+                periodic=periodic, use_mpi=use_mpi,
+                use_python=use_python, use_buffer=use_buffer,
+                suppress_final_output=suppress_final_output)
     fig, axs = plt.subplots(1, 1)
     for i in range(len(ndim_list)):
         ndim = ndim_list[i]

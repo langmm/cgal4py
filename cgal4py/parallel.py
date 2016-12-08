@@ -6,6 +6,7 @@ r"""Routines for running triangulations in paralle.
 
 """
 from cgal4py.delaunay import Delaunay, tools, _get_Delaunay
+from cgal4py import domain_decomp
 from cgal4py.domain_decomp import GenericTree
 import numpy as np
 import os
@@ -78,7 +79,8 @@ def _final_leaf_tess_filename(leaf_id, unique_str=None):
 
 def write_mpi_script(fname, read_func, taskname, unique_str=None,
                      use_double=False, use_python=False, use_buffer=False,
-                     overwrite=False, profile=False, limit_mem=False):
+                     overwrite=False, profile=False, limit_mem=False,
+                     suppress_final_output=False):
     r"""Write an MPI script for calling MPI parallelized triangulation.
 
     Args:
@@ -92,7 +94,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
                 right_edge (np.ndarray of float64): Right edges of the domain.
             A list of lines resulting in the above mentioned dictionary is also
             accepted.
-        taskname (str): Name of task to be apssed to 
+        taskname (str): Name of task to be passed to 
             :class:`cgal4py.parallel.DelaunayProcessMPI`.
         unique_str (str, optional): Unique string identifying the domain
             decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
@@ -117,6 +119,9 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             pipes. If True, each process writes out tessellation info to
             files which are then incrementally loaded as consolidation occurs.
             Defaults to False.
+        suppress_final_output (bool, optional): If True, output of the result
+            to file is suppressed. This is mainly for testing purposes.
+            Defaults to False.
 
     """
     if os.path.isfile(fname):
@@ -133,10 +138,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         lines += [
             "import cProfile",
             "import pstats"]
-    if use_python:
-        lines += ["from cgal4py import domain_decomp, parallel"]
-    else:
-        lines += ["from cgal4py.delaunay import _get_Delaunay"]
+    lines += ["from cgal4py import parallel"]
     if not readcmds:
         lines.append(
             "from {} import {} as load_func".format(read_func.__module__,
@@ -151,7 +153,9 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "unique_str = '{}'".format(unique_str),
         "use_double = {}".format(use_double),
         "limit_mem = {}".format(limit_mem),
+        "use_python = {}".format(use_python),
         "use_buffer = {}".format(use_buffer),
+        "suppress_final_output = {}".format(suppress_final_output),
         ""]
     # Commands to read in data
     lines += [
@@ -168,18 +172,11 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         "    periodic = load_dict.get('periodic', False)",
         "    tree = load_dict.get('tree', None)",
         "else:",
-        "    pts = None"]
-    # Create domain decomposition tree
-    if use_python:
-        lines += [
-            "if rank == 0:",
-            "    if tree is None:",
-            "        tree = domain_decomp.tree('kdtree', pts, ",
-            "                                  left_edge, right_edge,",
-            "                                  periodic=periodic, nleaves=size)",
-            "else:",
-            "    tree = None",
-            ""]
+        "    pts = None",
+        "    left_edge = None",
+        "    right_edge = None",
+        "    periodic = None",
+        "    tree = None"]
     # Start profiler if desired
     if profile:
         lines += [
@@ -188,35 +185,14 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             "    pr.enable()",
             ""]
     # Run
-    if use_python:
-        lines += [
-            "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
-            "                                pts, tree,",
-            "                                use_double=use_double,",
-            "                                use_buffer=use_buffer,",
-            "                                unique_str=unique_str,",
-            "                                limit_mem=limit_mem)",
-            "p.run()"]
-    else:
-        lines += [
-            "Delaunay = _get_Delaunay(pts.shape[1], parallel=True)",
-            "p = Delaunay(left_edge, right_edge, periodic=periodic,",
-            "             limit_mem=limit_mem)",
-            "p.insert(pts)"]
-        if taskname == 'triangulate':
-            lines += [
-                "T = p.consolidate_tess()",
-                "if (rank == 0):",
-                "    ftess = _tess_filename(unique_str=unique_str)",
-                "    with open(ftess, 'wb') as fd:",
-                "        T.serialize_to_buffer(fd, pts)"]
-        elif taskname == 'volumes':
-            lines += [
-                "vols = p.consolidate_vols()",
-                "if (rank == 0):",
-                "    fvols = _vols_filename(unique_str=unique_str)",
-                "    with open(fvols, 'wb') as fd:",
-                "        fd.write(vols.tobytes())"]
+    lines += [
+        "p = parallel.DelaunayProcessMPI('{}',".format(taskname),
+        "    pts, tree, left_edge=left_edge, right_edge=right_edge,",
+        "    periodic=periodic, use_double=use_double, unique_str=unique_str,",
+        "    limit_mem=limit_mem, use_python=use_python,",
+        "    use_buffer=use_buffer,",
+        "    suppress_final_output=suppress_final_output)",
+        "p.run()"]
     if profile:
         lines += [
             "",
@@ -307,12 +283,43 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
     return out
 
 
-def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
-                        limit_mem=False, use_python=False, use_buffer=False,
-                        profile=False):
+def ParallelDelaunayMPI(*args, **kwargs):
     r"""Return a triangulation that is constructed in parallel using MPI.
+    See :func:`cgal4py.parallel.ParallelMPI` for information on arguments.
+
+    Returns:
+        A Delaunay triangulation class like :class:`cgal4py.delaunay.Delaunay2`
+            (but for the appropriate number of dimensions) will be returned.
+
+
+    """
+    return ParallelMPI('triangulate', *args, **kwargs)
+    
+
+def ParallelVoronoiVolumesMPI(*args, **kwargs):
+    r"""Return the voronoi cell volumes after constructing triangulation in
+    parallel using MPI. See :func:`cgal4py.parallel.ParallelMPI` for
+    information on arguments.
+
+    Returns:
+        np.ndarray of float64: (n,) array of n voronoi volumes for the provided
+            points.
+
+    """
+    return ParallelMPI('volumes', *args, **kwargs)
+
+
+def ParallelMPI(task, read_func, ndim, nproc, use_double=False,
+                limit_mem=False, use_python=False, use_buffer=False,
+                profile=False, suppress_final_output=False):
+    r"""Return results form a triangulation that is constructed in parallel
+    using MPI.
 
     Args:
+        task (str): Task for which results should be returned. Values include:
+            'triangulate': Return the Delaunay triangulation class.
+            'volumes': Return the volumes of the Voronoi cells associated with
+                each point.
         read_func (func): Function for reading in points. The function should
             return a dictionary with 'pts' key at a minimum corresponding to
             the 2D array of points that should be triangulated. Additional
@@ -342,105 +349,90 @@ def ParallelDelaunayMPI(read_func, ndim, nproc, use_double=False,
             and output is printed to the screen. This can also be a string
             specifying the full path to the file where the output should be
             saved. Defaults to False.
+        suppress_final_output (bool, optional): If True, output of the result
+            to file is suppressed. This is mainly for testing purposes.
+            Defaults to False.
 
     Returns:
-        :class:`cgal4py.delaunay.Delaunay2` or
-            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
-            triangulation object.
+        Dependent on task. For 'triangulate', a Delaunay triangulation class
+            like :class:`cgal4py.delaunay.Delaunay2` (but for the appropriate
+            number of dimensions will be returned. For 'volumes', a numpy
+            array of floating point volumes will be returned where values
+            less than zero indicate infinite volumes.
 
     Raises:
+        ValueError: If the task is not one of the accepted values listed above.
         RuntimeError: If the MPI script does not result in a file containing
             the triangulation.
 
     """
+    if task not in ['triangulate', 'volumes']:
+        raise ValueError("Unsupported task: {}".format(task))
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     fscript = '{}_mpi.py'.format(unique_str)
-    write_mpi_script(fscript, read_func, 'triangulate', limit_mem=limit_mem,
+    write_mpi_script(fscript, read_func, task, limit_mem=limit_mem,
                      unique_str=unique_str, use_double=use_double,
                      use_python=use_python, use_buffer=use_buffer,
-                     profile=profile)
+                     profile=profile,
+                     suppress_final_output=suppress_final_output)
     cmd = 'mpiexec -np {} python {}'.format(nproc, fscript)
     os.system(cmd)
     os.remove(fscript)
-    ftess = _tess_filename(unique_str=unique_str)
-    if os.path.isfile(ftess):
-        with open(ftess, 'rb') as fd:
-            T = _get_Delaunay(ndim=ndim).from_serial_buffer(fd)
-        os.remove(ftess)
-        return T
+    if suppress_final_output:
+        return
+    if task == 'triangulate':
+        fres = _tess_filename(unique_str=unique_str)
+    elif task == 'volumes':
+        fres = _vols_filename(unique_str=unique_str)
+    if os.path.isfile(fres):
+        with open(fres, 'rb') as fd:
+            if task == 'triangulate':
+                out = _get_Delaunay(ndim=ndim).from_serial_buffer(fd)
+            elif task == 'volumes':
+                out = np.frombuffer(bytearray(fd.read()), dtype='d')
+        os.remove(fres)
+        return out
     else:
         raise RuntimeError("The tessellation file does not exist. " +
                            "There must have been an error while running the " +
                            "parallel script.")
     
 
-def ParallelVoronoiVolumesMPI(read_func, ndim, nproc, use_double=False,
-                              limit_mem=False, use_buffer=False, profile=False):
-    r"""Return the voronoi cell volumes after constructing triangulation in
-    parallel using MPI.
+def ParallelDelaunayMulti(*args, **kwargs):
+    r"""Return a triangulation that is constructed in parallel using the
+    `multiprocessing` package. See :func:`cgal4py.parallel.ParallelMulti`
+    for information on arguments.
 
-    Args:
-        read_func (func): Function for reading in points. The function should
-            return a dictionary with 'pts' key at a minimum corresponding to
-            the 2D array of points that should be triangulated. Additional
-            optional keys include:
-                periodic (bool): True if the domain is periodic.
-                left_edge (np.ndarray of float64): Left edges of the domain.
-                right_edge (np.ndarray of float64): Right edges of the domain.
-            A list of lines resulting in the above mentioned dictionary is also
-            accepted.
-        ndim (int): Number of dimension in the domain.
-        nproc (int): Number of processors that should be used.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
-        limit_mem (bool, optional): If False, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. If True, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to False.
-        use_buffer (bool, optional): If True, communications are done by way of
-            buffers rather than pickling python objects. Defaults to False.
-        profile (bool, optional): If True, cProfile is used to profile the code
-            and output is printed to the screen. This can also be a string
-            specifying the full path to the file where the output should be
-            saved. Defaults to False.
+    Returns:
+        A Delaunay triangulation class like :class:`cgal4py.delaunay.Delaunay2`
+            (but for the appropriate number of dimensions) will be returned.
+
+    """
+    return ParallelMulti('triangulate', *args, **kwargs)
+
+
+def ParallelVoronoiVolumesMulti(*args, **kwargs):
+    r"""Return the voronoi cell volumes after constructing triangulation in
+    parallel. See :func:`cgal4py.parallel.ParallelMulti` for information on
+    arguments.
 
     Returns:
         np.ndarray of float64: (n,) array of n voronoi volumes for the provided
             points.
 
-    Raises:
-        RuntimeError: If the MPI script does not result in a file containing
-            the volumes.
-
     """
-    unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    fscript = '{}_mpi.py'.format(unique_str)
-    write_mpi_script(fscript, read_func, 'volumes', limit_mem=limit_mem,
-                     unique_str=unique_str, use_double=use_double,
-                     use_buffer=use_buffer, profile=profile)
-    cmd = 'mpiexec -np {} python {}'.format(nproc, fscript)
-    os.system(cmd)
-    os.remove(fscript)
-    fvols = _vols_filename(unique_str=unique_str)
-    if os.path.isfile(fvols):
-        with open(fvols, 'rb') as fd:
-            vols = np.frombuffer(bytearray(fd.read()), dtype='d')
-        os.remove(fvols)
-        return vols
-    else:
-        raise RuntimeError("The volumes file does not exist. " +
-                           "There must have been an error while running the " +
-                           "parallel script.")
+    return ParallelMulti('volumes', *args, **kwargs)
 
 
-def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
-    r"""Return a triangulation that is constructed in parallel using the
-    `multiprocessing` package.
+def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
+    r"""Return results from a triangulation that is constructed in parallel
+    using the `multiprocessing` package.
 
     Args:
+        task (str): Task for which results should be returned. Values include:
+            'triangulate': Return the Delaunay triangulation class.
+            'volumes': Return the volumes of the Voronoi cells associated with
+                each point.
         pts (np.ndarray of float64): (n,m) array of n m-dimensional
             coordinates.
         tree (object): Domain decomposition tree for splitting points among the
@@ -457,9 +449,11 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
             Defaults to False.
 
     Returns:
-        :class:`cgal4py.delaunay.Delaunay2` or
-            :class:`cgal4py.delaunay.Delaunay3`: consolidated 2D or 3D
-            triangulation object.
+        Dependent on task. For 'triangulate', a Delaunay triangulation class
+            like :class:`cgal4py.delaunay.Delaunay2` (but for the appropriate
+            number of dimensions) will be returned. For 'volumes', a numpy
+            array of floating point volumes will be returned where values
+            less than zero indicate infinite volumes.
 
     """
     idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
@@ -469,8 +463,8 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
     # Split leaves
     task2leaves = [[] for _ in xrange(nproc)]
     for leaf in tree.leaves:
-        task = leaf.id % nproc
-        task2leaves[task].append(leaf)
+        proc = leaf.id % nproc
+        task2leaves[proc].append(leaf)
     left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
     right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
     # Create & execute processes
@@ -483,7 +477,7 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
         out_pipes[i], in_pipes[i] = mp.Pipe(True)
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     processes = [DelaunayProcessMulti(
-        'triangulate', _, task2leaves[_], ptsArray, idxArray,
+        task, _, task2leaves[_], ptsArray, idxArray,
         left_edges, right_edges, queues, lock, count, in_pipes[_],
         unique_str=unique_str, limit_mem=limit_mem) for _ in xrange(nproc)]
     for p in processes:
@@ -493,12 +487,21 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
     lock.wait()
     lock.release()
     # Setup methods for recieving leaf info
-    serial = [None for _ in xrange(tree.num_leaves)]
-    
-    def recv_leaf(p):
-        iid, s = processes[p].receive_result(out_pipes[p])
-        assert(tree.leaves[iid].id == iid)
-        serial[iid] = s
+    if task == 'triangulate':
+        serial = [None for _ in xrange(tree.num_leaves)]
+
+        def recv_leaf(p):
+            iid, s = processes[p].receive_result(out_pipes[p])
+            assert(tree.leaves[iid].id == iid)
+            serial[iid] = s
+
+    elif task == 'volumes':
+        vol = np.empty(pts.shape[0], pts.dtype)
+
+        def recv_leaf(p):
+            iid, ivol = processes[p].receive_result(out_pipes[p])
+            assert(tree.leaves[iid].id == iid)
+            vol[tree.idx[tree.leaves[iid].slice]] = ivol
 
     # Recieve output from processes
     proc_list = range(nproc)
@@ -515,91 +518,15 @@ def ParallelDelaunayMulti(pts, tree, nproc, use_double=False, limit_mem=False):
     #     for _ in range(len(task2leaves[i])):
     #         recv_leaf(i)
     # Consolidate tessellation
-    out = consolidate_tess(tree, serial, pts, use_double=use_double,
-                           unique_str=unique_str, limit_mem=limit_mem)
+    if task == 'triangulate':
+        out = consolidate_tess(tree, serial, pts, use_double=use_double,
+                               unique_str=unique_str, limit_mem=limit_mem)
+    elif task == 'volumes':
+        out = vol
     # Close queues and processes
     for p in processes:
         p.join()
     return out
-
-
-def ParallelVoronoiVolumesMulti(pts, tree, nproc, use_double=False,
-                                limit_mem=False):
-    r"""Return the voronoi cell volumes after constructing triangulation in
-    parallel.
-
-    Args:
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional
-            coordinates.
-        tree (object): Domain decomposition tree for splitting points among the
-            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
-        nproc (int): Number of processors that should be used.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
-        limit_mem (bool, optional): If False, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. If True, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to False.
-
-    Returns:
-        np.ndarray of float64: (n,) array of n voronoi volumes for the provided
-            points.
-
-    """
-    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-    ptsArray = mp.RawArray('d', pts.size)
-    memoryview(idxArray)[:] = tree.idx
-    memoryview(ptsArray)[:] = pts
-    # Split leaves
-    task2leaves = [[] for _ in xrange(nproc)]
-    for leaf in tree.leaves:
-        task = leaf.id % nproc
-        task2leaves[task].append(leaf)
-    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-    # Create & execute processes
-    count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i')]
-    lock = mp.Condition()
-    queues = [mp.Queue() for _ in xrange(nproc+1)]
-    in_pipes = [None for _ in xrange(nproc)]
-    out_pipes = [None for _ in xrange(nproc)]
-    for i in range(nproc):
-        out_pipes[i], in_pipes[i] = mp.Pipe(True)
-    unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    processes = [DelaunayProcessMulti(
-        'volumes', _, task2leaves[_], ptsArray, idxArray,
-        left_edges, right_edges, queues, lock, count, in_pipes[_],
-        unique_str=unique_str, limit_mem=limit_mem) for _ in xrange(nproc)]
-    for p in processes:
-        p.start()
-    # Get leaves with tessellation
-    vol = np.empty(pts.shape[0], pts.dtype)
-
-    def recv_leaf(p):
-        iid, ivol = processes[p].receive_result(out_pipes[p])
-        assert(tree.leaves[iid].id == iid)
-        vol[tree.idx[tree.leaves[iid].slice]] = ivol
-
-    proc_list = range(nproc)
-    # Version that takes whatever is available
-    total_count = 0
-    max_total_count = tree.num_leaves
-    while total_count != max_total_count:
-        for i in proc_list:
-            while out_pipes[i].poll():
-                recv_leaf(i)
-                total_count += 1
-    # Version that does processors in order
-    # for i in proclist:
-    #     for _ in range(len(task2leaves[i])):
-    #         recv_leaf(i)
-    # Cleanup
-    for p in processes:
-        p.join()
-    return vol
 
 
 # @profile
@@ -690,8 +617,46 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
     return T
 
 
-class DelaunayProcessMPI(object):
-    r"""Class for coordinating MPI operations.
+def DelaunayProcessMPI(taskname, pts, tree=None,
+                       left_edge=None, right_edge=None,
+                       periodic=False, unique_str=None, use_double=False,
+                       use_python=False, use_buffer=False, limit_mem=False,
+                       suppress_final_output=False):
+    r"""Get object for coordinating MPI operations.
+
+    Args:
+        See :class:`cgal4py.parallel.DelaunayProcessMPI_Python` and
+            :class:`cgal4py.parallel.DelaunayProcessMPI_C` for information on
+            arguments.
+
+    Raises:
+        ValueError: if `task` is not one of the accepted values listed above.
+
+    Returns:
+        :class:`cgal4py.parallel.DelaunayProcessMPI_Python` if
+            `use_python == True`, :class:`cgal4py.parallel.DelaunayProcessMPI_C`
+            otherwise.
+
+    """
+    if use_python:
+        out = DelaunayProcessMPI_Python(
+            taskname, pts, tree=tree, left_edge=left_edge,
+            right_edge=right_edge, periodic=periodic, unique_str=unique_str,
+            use_double=use_double, use_buffer=use_buffer,
+            limit_mem=limit_mem, suppress_final_output=suppress_final_output)
+    else:
+        out = DelaunayProcessMPI_C(
+            taskname, pts, left_edge=left_edge,
+            right_edge=right_edge, periodic=periodic, unique_str=unique_str,
+            use_double=use_double, limit_mem=limit_mem,
+            suppress_final_output=suppress_final_output)
+    return out
+
+
+class DelaunayProcessMPI_C(object):
+    r"""Class for coordinating MPI operations in C. This serves as a wrapper
+    for :class:`cagl4py.delaunay.ParallelDelaunayD` to function the same as
+    :class:`cgal4py.parallel.DelaunayProcessMPI_Python`.
 
     Args:
         taskname (str): Key for the task that should be parallelized. Options:
@@ -699,7 +664,109 @@ class DelaunayProcessMPI(object):
                   the output queue.
               'volumes': Perform triangulation and put volumes in output queue.
         pts (np.ndarray of float64): Array of coordinates to triangulate.
-        tree (Tree): Decomain decomposition tree.
+        left_edge (np.ndarray of float64, optional): Array of domain mins in
+            each dimension. If not provided, they are determined from the
+            points. Defaults to None.
+        right_edge (np.ndarray of float64, optional): Array of domain maxes in
+            each dimension. If not provided, they are determined from the
+            points. Defaults to None.
+        periodic (bool, optional): If True, the domain is assumed to be
+            periodic at its left/right edges in each dimension. Defaults to
+            False.
+        unique_str (str, optional): Unique string identifying the domain
+            decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
+            file naming. Defaults to None.
+        use_double (bool, optional): If True, 64 bit integers will be used for
+            the triangulation. Defaults to False.
+        limit_mem (bool, optional): If True, additional leaves are used and
+            as each process cycles through its subset, leaves are written to/
+            read from a file. Otherwise, all leaves are kept in memory at
+            all times. Defaults to False.
+        suppress_final_output (bool, optional): If True, output of the result
+            to file is suppressed. This is mainly for testing purposes.
+            Defaults to False.
+
+    Raises:
+        ValueError: if `task` is not one of the accepted values listed above.
+
+    """
+    def __init__(self, taskname, pts, left_edge=None, right_edge=None,
+                 periodic=False, unique_str=None, use_double=False,
+                 limit_mem=False, suppress_final_output=False):
+        task_list = ['triangulate', 'volumes']
+        if taskname not in task_list:
+            raise ValueError('{} is not a valid task.'.format(taskname))
+        comm = MPI.COMM_WORLD
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+        ndim = None
+        if rank == 0:
+            ndim = pts.shape[1]
+            if left_edge is None:
+                left_edge = pts.min(axis=0)
+            if right_edge is None:
+                right_edge = pts.max(axis=0)
+        ndim = comm.bcast(ndim, root=0)
+        Delaunay = _get_Delaunay(ndim, parallel=True, bit64=use_double)
+        self.PT = Delaunay(left_edge, right_edge, periodic=periodic,
+                           limit_mem=limit_mem)
+        self.size = size
+        self.rank = rank
+        self.comm = comm
+        self.pts = pts
+        self.taskname = taskname
+        self.unique_str = unique_str
+        self.suppress_final_output = suppress_final_output
+
+    def output_filename(self):
+        if self.taskname == 'triangulate':
+            fname = _tess_filename(unique_str=self.unique_str)
+        elif self.taskname == 'volumes':
+            fname = _vols_filename(unique_str=self.unique_str)
+        return fname
+
+    def run(self):
+        r"""Perform necessary steps to complete the supplied task."""
+        self.PT.insert(self.pts)
+        if self.taskname == 'triangulate':
+            T = self.PT.consolidate_tess()
+            if (self.rank == 0):
+                if not self.suppress_final_output:
+                    ftess = self.output_filename()
+                    with open(ftess, 'wb') as fd:
+                         T.serialize_to_buffer(fd, pts)
+        elif self.taskname == 'volumes':
+            vols = self.PT.consolidate_vols()
+            if (self.rank == 0):
+                if not self.suppress_final_output:
+                    fvols = self.output_filename()
+                    with open(fvols, 'wb') as fd:
+                        fd.write(vols.tobytes())
+
+
+class DelaunayProcessMPI_Python(object):
+    r"""Class for coordinating MPI operations in Python.
+
+    Args:
+        taskname (str): Key for the task that should be parallelized. Options:
+              'triangulate': Perform triangulation and put serialized info in
+                  the output queue.
+              'volumes': Perform triangulation and put volumes in output queue.
+        pts (np.ndarray of float64): Array of coordinates to triangulate.
+        tree (Tree, optional): Decomain decomposition tree. If not provided,
+            :func:`cgal4py.domain_decomp.tree` is used to construct one.
+            Defaults to None.
+        left_edge (np.ndarray of float64, optional): Array of domain mins in
+            each dimension. If not provided, they are determined from the
+            points. Defaults to None. This is not required if `tree` is
+            provided.
+        right_edge (np.ndarray of float64, optional): Array of domain maxes in
+            each dimension. If not provided, they are determined from the
+            points. Defaults to None. This is not required if `tree` is
+            provided.
+        periodic (bool, optional): If True, the domain is assumed to be
+            periodic at its left/right edges in each dimension. Defaults to
+            False. This is not required if `tree` is provided.
         unique_str (str, optional): Unique string identifying the domain
             decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
             file naming. Defaults to None.
@@ -707,32 +774,39 @@ class DelaunayProcessMPI(object):
             the triangulation. Defaults to False.
         use_buffer (bool, optional): If True, communications are done by way of
             buffers rather than pickling python objects. Defaults to False.
-        limit_mem (bool, optional): If False, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. If True, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
+        limit_mem (bool, optional): If True, additional leaves are used and
+            as each process cycles through its subset, leaves are written to/
+            read from a file. Otherwise, all leaves are kept in memory at
+            all times. Defaults to False.
+        suppress_final_output (bool, optional): If True, output of the result
+            to file is suppressed. This is mainly for testing purposes.
             Defaults to False.
 
     Raises:
         ValueError: if `task` is not one of the accepted values listed above.
 
     """
-    def __init__(self, taskname, pts, tree0, unique_str=None,
-                 use_double=False, use_buffer=False, limit_mem=False):
+    def __init__(self, taskname, pts, tree=None,
+                 left_edge=None, right_edge=None,
+                 periodic=False, unique_str=None, use_double=False,
+                 use_buffer=False, limit_mem=False,
+                 suppress_final_output=False):
         task_list = ['triangulate', 'volumes']
         if taskname not in task_list:
             raise ValueError('{} is not a valid task.'.format(taskname))
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
         rank = comm.Get_rank()
-        # Get info for leaves
-        tree = tree0
+        # Domain decomp
         task2leaves = None
         left_edges = None
         right_edges = None
         if rank == 0:
-            if not isinstance(tree0, GenericTree):
-                tree = GenericTree.from_tree(tree0)
+            if tree is None:
+                tree = domain_decomp.tree('kdtree', pts, left_edge, right_edge,
+                                          periodic=periodic, nleaves=size)
+            if not isinstance(tree, GenericTree):
+                tree = GenericTree.from_tree(tree)
             task2leaves = [[] for _ in xrange(size)]
             for leaf in tree.leaves:
                 leaf.pts = pts[tree.idx[leaf.start_idx:leaf.stop_idx]]
@@ -754,6 +828,7 @@ class DelaunayProcessMPI(object):
         self._limit_mem = limit_mem
         self._use_double = use_double
         self._use_buffer = use_buffer
+        self._suppress_final_output = suppress_final_output
         self._comm = comm
         self._num_proc = size
         self._proc_idx = rank
@@ -1094,10 +1169,11 @@ class DelaunayProcessMPI(object):
                                  use_double=self._use_double,
                                  unique_str=self._unique_str)
                                  # limit_mem=limit_mem)
-            ftess = _tess_filename(unique_str=self._unique_str)
-            # T.write_to_file(ftess)
-            with open(ftess, 'wb') as fd:
-                T.serialize_to_buffer(fd, self._pts)
+            if not self._suppress_final_output:
+                ftess = _tess_filename(unique_str=self._unique_str)
+                # T.write_to_file(ftess)
+                with open(ftess, 'wb') as fd:
+                    T.serialize_to_buffer(fd, self._pts)
 
     def enqueue_volumes(self):
         r"""Enqueue resulting voronoi volumes."""
@@ -1133,11 +1209,12 @@ class DelaunayProcessMPI(object):
                         leaf = self._tree.leaves[k]
                         vol[self._tree.idx[leaf.start_idx:leaf.stop_idx]] = x[k]
         if self._proc_idx == 0:
-            # Save volumes
-            fvols = _vols_filename(unique_str=self._unique_str)
-            # np.save(fvols, vol)
-            with open(fvols, 'wb') as fd:
-                fd.write(vol.tobytes())
+            if not self._suppress_final_output:
+                # Save volumes
+                fvols = _vols_filename(unique_str=self._unique_str)
+                # np.save(fvols, vol)
+                with open(fvols, 'wb') as fd:
+                    fd.write(vol.tobytes())
 
     def run(self):
         r"""Performs tessellation and communication for each leaf on this
