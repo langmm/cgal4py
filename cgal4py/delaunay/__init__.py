@@ -29,8 +29,6 @@ else:
     warnings.warn("Could not import the 3D periodic triangulation package. " +
                   "Update CGAL to at least version 3.5 to enable this " +
                   "feature.")
-pyximport.install(setup_args={"include_dirs":np.get_include()},
-                  reload_support=True)
 
 
 _delaunay_dir = os.path.dirname(os.path.realpath(__file__))
@@ -236,7 +234,7 @@ def _delaunay_filename(ftype, dim, periodic=False, bit64=False,
         relpath = True
         fname = "c_{}delaunay{}{}.hpp".format(perstr, ver, bitstr)
     elif ftype == 'import':
-        if ver not in ['2','3']:
+        if ver not in ['2','3','D']:
             fname = '\nfrom cgal4py.delaunay.{}delaunay{} '.format(
                 perstr, ver) + \
                     'cimport {}Delaunay_with_info_{},VALID,D\n'.format(
@@ -413,6 +411,9 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             sources = [
                 _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64,
                                    parallel=parallel)]
+        include_dirs.append(os.path.dirname(sources[0]))
+        sources.append(_delaunay_filename('hpp', dim, periodic=periodic,
+                                          parallel=parallel))
         if parallel:
             if False:  # OpenMPI
                 extra_compile_args += os.popen(
@@ -456,7 +457,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
         
 
 def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
-                  overwrite=False):
+                  overwrite=False, comm=None):
     r"""Dynamically import module for nD Delaunay triangulation and return
     the associated class.
 
@@ -475,19 +476,30 @@ def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
         class: Delaunay triangulation class.
 
     """
+    rank = 0
+    if comm is not None:
+        rank = comm.Get_rank()
     modname = _delaunay_filename('module', ndim, periodic=periodic,
                                  parallel=parallel, bit64=bit64)
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
                                  parallel=parallel, bit64=bit64)
-    # Create extension
-    gen = _make_ext(ndim, periodic=periodic, parallel=parallel,
-                    bit64=bit64, overwrite=overwrite)
-    # Stop obnoxious -Wstrict-prototypes warning with c++
-    cfg_vars = distutils.sysconfig.get_config_vars()
-    for key, value in cfg_vars.items():
-        if type(value) == str:
-            cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
-    return getattr(importlib.import_module(modname),clsname)
+    if rank == 0:
+        importers = pyximport.install(setup_args={"include_dirs":np.get_include()},
+                                      reload_support=True)
+        # Create extension
+        gen = _make_ext(ndim, periodic=periodic, parallel=parallel,
+                        bit64=bit64, overwrite=overwrite)
+        # Stop obnoxious -Wstrict-prototypes warning with c++
+        cfg_vars = distutils.sysconfig.get_config_vars()
+        for key, value in cfg_vars.items():
+            if type(value) == str:
+                cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
+        out = getattr(importlib.import_module(modname),clsname)
+        pyximport.uninstall(*importers)
+    if comm is not None:
+        comm.Barrier()
+        out = getattr(importlib.import_module(modname),clsname)
+    return out
 
 
 

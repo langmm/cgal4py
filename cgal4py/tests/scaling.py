@@ -165,8 +165,8 @@ def strong_scaling(func, npart=1e6, nrep=1, periodic=False, use_mpi=False,
     fname_plot = 'plot_strong_scaling_{}_nproc_{}part{}{}{}{}{}.png'.format(
         func, npart, perstr, mpistr, pycstr, bufstr, outstr)
     nproc_list = [1, 2, 4, 8, 16]
-    ndim_list = [2, 3]
-    clr_list = ['b', 'r']
+    ndim_list = [2, 3, 4]
+    clr_list = ['b', 'r', 'g', 'm']
     times = np.empty((len(nproc_list), len(ndim_list), 2), 'float')
     for j, nproc in enumerate(nproc_list):
         for i, ndim in enumerate(ndim_list):
@@ -241,7 +241,7 @@ def weak_scaling(func, npart=1e4, nrep=1, periodic=False, use_mpi=False,
         func, npart, perstr, mpistr, pycstr, bufstr, outstr)
     nproc_list = [1, 2, 4, 8, 16]
     ndim_list = [2, 3]
-    clr_list = ['b', 'r']
+    clr_list = ['b', 'r', 'g', 'm']
     times = np.empty((len(nproc_list), len(ndim_list), 2), 'float')
     for j, nproc in enumerate(nproc_list):
         for i, ndim in enumerate(ndim_list):

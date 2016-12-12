@@ -363,6 +363,7 @@ public:
   bool tess_exists = false;
   int size;
   int rank;
+  char unique_str[MAXLEN_FILENAME];
   uint32_t id;
   uint32_t nleaves;
   uint32_t ndim;
@@ -385,12 +386,13 @@ public:
   std::vector<std::set<uint32_t>> *rneigh;
   char OutputFile[MAXLEN_FILENAME];
 
-  void begin_init(uint32_t nleaves0, uint32_t ndim0) {
+  void begin_init(uint32_t nleaves0, uint32_t ndim0, const char *ustr) {
     uint32_t k;
     MPI_Comm_size ( MPI_COMM_WORLD, &size);
     MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
     nleaves = nleaves0;
     ndim = ndim0;
+    std::strcpy(unique_str, ustr);
     le = (double*)my_malloc(ndim*sizeof(double));
     re = (double*)my_malloc(ndim*sizeof(double));
     periodic_le = (int*)my_malloc(ndim*sizeof(int));
@@ -409,13 +411,13 @@ public:
   }    
 
   void end_init() {
-    sprintf(OutputFile, "leafoutput%u.dat", id);
+    sprintf(OutputFile, "%s_leafoutput%u.dat", unique_str, id);
     in_memory = true;
   }
 
-  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, int src) {
+  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, const char *ustr, int src) {
     from_node = false;
-    begin_init(nleaves0, ndim0);
+    begin_init(nleaves0, ndim0, ustr);
     // Receive leaf info from root process
     recv(src);
     if (DEBUG > 1)
@@ -423,9 +425,10 @@ public:
     end_init();
   };
 
-  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, KDTree* tree, int index) {
+  CParallelLeaf(uint32_t nleaves0, uint32_t ndim0, const char *ustr,
+		KDTree* tree, int index) {
     from_node = true;
-    begin_init(nleaves0, ndim0);
+    begin_init(nleaves0, ndim0, ustr);
     // Transfer leaf information
     Node* node = tree->leaves[index];
     uint64_t j;
@@ -883,6 +886,7 @@ public:
   uint32_t ndim;
   int tree_exists = 0;
   int limit_mem = 0;
+  char unique_str[MAXLEN_FILENAME];
   // Things only valid for root
   double *le;
   double *re;
@@ -901,7 +905,8 @@ public:
 
   ParallelDelaunay_with_info_D() {}
   ParallelDelaunay_with_info_D(uint32_t ndim0, double *le0, double *re0,
-			       bool *periodic0, int limit_mem0 = 0) {
+			       bool *periodic0, int limit_mem0 = 0,
+			       const char* unique_str0 = "") {
     MPI_Comm_size ( MPI_COMM_WORLD, &size);
     MPI_Comm_rank ( MPI_COMM_WORLD, &rank);
     if (DEBUG)
@@ -911,17 +916,10 @@ public:
     re = re0;
     periodic = periodic0;
     limit_mem = limit_mem0;
-    if (rank == 0) {
-      for (int task = 1; task < size; task ++) {
-	MPI_Send(&ndim, 1, MPI_UNSIGNED, task, 0, MPI_COMM_WORLD);
-	MPI_Send(&limit_mem, 1, MPI_INT, task, 1, MPI_COMM_WORLD);
-      }
-    } else {
-      MPI_Recv(&ndim, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
-      MPI_Recv(&limit_mem, 1, MPI_INT, 0, 1, MPI_COMM_WORLD,
-	       MPI_STATUS_IGNORE);
-    }
+    std::strcpy(unique_str, unique_str0);
+    MPI_Bcast(&ndim, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&limit_mem, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&unique_str, MAXLEN_FILENAME, MPI_CHAR, 0, MPI_COMM_WORLD);
     if (DEBUG)
       printf("%d: Finishing init\n", rank);
   }
@@ -1373,13 +1371,15 @@ public:
 	task = i % size;
 	if (task == rank) {
 	  // leaves used
-	  leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim, tree, i));
+	  leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim,
+						   unique_str,
+						   tree, i));
 	  if (limit_mem > 1)
 	    leaves[iroot]->dump();
 	  map_id2idx[leaves[iroot]->id] = iroot;
 	  iroot++;
 	} else {
-	  CParallelLeaf<Info> ileaf(nleaves_total, ndim, tree, i);
+	  CParallelLeaf<Info> ileaf(nleaves_total, ndim, unique_str, tree, i);
 	  ileaf.send(task);
 	}
       }
@@ -1389,7 +1389,8 @@ public:
     } else {
       for (i = 0; i < nleaves; i++) {
 	// leaves used
-	leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim, 0)); // calls recv
+	leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim,
+						 unique_str, 0)); // calls recv
 	if (limit_mem > 1)
 	  leaves[i]->dump();
 	map_id2idx[leaves[i]->id] = i;

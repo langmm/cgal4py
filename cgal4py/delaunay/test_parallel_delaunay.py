@@ -1,6 +1,7 @@
 from cgal4py.tests.test_cgal4py import make_points
 from cgal4py.delaunay import _get_Delaunay
 from cgal4py import triangulate, voronoi_volumes
+import sys
 
 from mpi4py import MPI
 import numpy as np
@@ -9,17 +10,19 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 
-periodic = False
-npts = int(1e3)
+limit_mem = 32
+use_double = True
+
+periodic = True
+npts = int(1e9)
 ndim = 3
-limit_mem = 1
 test_result = False
-task = 'tess'
+task = 'vols'
 
 # if rank == 0:
-#     ParallelDelaunay = _get_Delaunay(ndim, parallel=True)
+#     ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True)
 # comm.Barrier()
-ParallelDelaunay = _get_Delaunay(ndim, parallel=True)
+ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True, comm=comm)
 
 if rank == 0:
     pts, le, re = make_points(npts, ndim)
@@ -29,7 +32,7 @@ else:
     le = None
     re = None
     pts2 = None
-    
+
 TP = ParallelDelaunay(le, re, periodic=periodic, limit_mem=limit_mem)
 TP.insert(pts)
 # TP.insert(pts2)

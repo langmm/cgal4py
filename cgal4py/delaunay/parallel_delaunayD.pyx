@@ -28,7 +28,7 @@ cdef class ParallelDelaunayD:
     @cython.wraparound(False)
     def __cinit__(self, np.ndarray[np.float64_t, ndim=1] le = None,
                   np.ndarray[np.float64_t, ndim=1] re = None,
-                  object periodic=False, int limit_mem=0):
+                  object periodic=False, str unique_str="", int limit_mem=0):
         cdef np.uint32_t ndim = 0
         cdef cbool* per = NULL
         cdef double* ptr_le = NULL
@@ -36,6 +36,8 @@ cdef class ParallelDelaunayD:
         cdef object comm = MPI.COMM_WORLD
         self.size = comm.Get_size()
         self.rank = comm.Get_rank()
+        cdef bytes py_bytes = unique_str.encode()
+        cdef char* c_unique_str = py_bytes
         if self.rank == 0:
             ndim = le.size
             ptr_le = &le[0]
@@ -52,7 +54,7 @@ cdef class ParallelDelaunayD:
             assert(re == None)
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T = new ParallelDelaunay_with_info_D[info_t](
-                ndim, ptr_le, ptr_re, per, limit_mem)
+                ndim, ptr_le, ptr_re, per, limit_mem, c_unique_str)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

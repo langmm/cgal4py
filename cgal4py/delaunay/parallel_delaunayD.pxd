@@ -12,9 +12,12 @@ cdef extern from "c_parallel_delaunayD.hpp":
     cdef cppclass ParallelDelaunay_with_info_D[Info] nogil:
         ParallelDelaunay_with_info_D()
         ParallelDelaunay_with_info_D(uint32_t ndim0, double *le0, double *re0,
-                                     cbool *periodic0)
+                                     cbool *periodic0, const char *unique_str0)
         ParallelDelaunay_with_info_D(uint32_t ndim0, double *le0, double *re0,
                                      cbool *periodic0, int limit_mem)
+        ParallelDelaunay_with_info_D(uint32_t ndim0, double *le0, double *re0,
+                                     cbool *periodic0, int limit_mem,
+                                     const char *unique_str0)
 
         int rank
         int size
