@@ -2,6 +2,7 @@ from cgal4py.tests.test_cgal4py import make_points
 from cgal4py.delaunay import _get_Delaunay
 from cgal4py import triangulate, voronoi_volumes
 import sys
+from datetime import datetime
 
 from mpi4py import MPI
 import numpy as np
@@ -18,6 +19,7 @@ npts = int(1e9)
 ndim = 3
 test_result = False
 task = 'vols'
+unique_str = datetime.today().strftime("%Y%j%H%M%S")
 
 # if rank == 0:
 #     ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True)
@@ -33,7 +35,8 @@ else:
     re = None
     pts2 = None
 
-TP = ParallelDelaunay(le, re, periodic=periodic, limit_mem=limit_mem)
+TP = ParallelDelaunay(le, re, periodic=periodic, limit_mem=limit_mem,
+                      unique_str=unique_str)
 TP.insert(pts)
 # TP.insert(pts2)
 if rank == 0:

@@ -66,14 +66,10 @@ ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
 ext_options_mpicgal['extra_link_args'] += mpi_link_args
 ext_options_mpicgal['include_dirs'].append(
     os.path.dirname(cykdtree.__file__))
-cykdtree_cpp = os.path.join(
-    os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
-cykdtree_utils_cpp = os.path.join(
-    os.path.dirname(cykdtree.__file__), "c_utils.cpp")
 
 
 def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
-    _delaunay_dir = 'cgal4py/delaunay'
+    _delaunay_dir = os.path.join('cgal4py', 'delaunay')
     ver = str(dim)
     perstr = ''
     relpath = True
@@ -102,12 +98,17 @@ def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
 
 
 # Add Delaunay cython extensions
-def add_delaunay(ext_modules, ver, periodic=False, parallel=False):
+def add_delaunay(ext_modules, src_include, ver, periodic=False, parallel=False,
+                 dont_compile=False):
     ext_name = _delaunay_filename('ext', ver, periodic=periodic,
                                   parallel=parallel)
     pyx_file = _delaunay_filename('pyx', ver, periodic=periodic,
                                   parallel=parallel)
+    pxd_file = _delaunay_filename('pxd', ver, periodic=periodic,
+                                  parallel=parallel)
     cpp_file = _delaunay_filename('cpp', ver, periodic=periodic,
+                                  parallel=parallel)
+    hpp_file = _delaunay_filename('hpp', ver, periodic=periodic,
                                   parallel=parallel)
     if not os.path.isfile(pyx_file):
         print("Extension {} ".format(ext_name) +
@@ -116,76 +117,54 @@ def add_delaunay(ext_modules, ver, periodic=False, parallel=False):
     if not os.path.isfile(cpp_file):
         open(cpp_file,'a').close()
         assert(os.path.isfile(cpp_file))
-    if parallel:
-        ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file,
-                                                        cykdtree_cpp,
-                                                        cykdtree_utils_cpp],
-                                    **ext_options_mpicgal))
-    else:
-        ext_modules.append(Extension(ext_name, sources=[pyx_file, cpp_file],
-                                    **ext_options_cgal))
+    if not dont_compile:
+        if parallel:
+            ext_modules.append(
+                Extension(ext_name, sources=[pyx_file, cpp_file,
+                                             cykdtree_cpp,
+                                             cykdtree_utils_cpp],
+                          **ext_options_mpicgal))
+        else:
+            ext_modules.append(
+                Extension(ext_name, sources=[pyx_file, cpp_file],
+                          **ext_options_cgal))
+    src_include += [pyx_file, pxd_file, hpp_file]
 
 # Add extensions
 cmdclass = { }
 ext_modules = [ ]
+src_include = [ ]
 
 # Add delaunay extensions
 for ver in [2, 3]:
-    add_delaunay(ext_modules, ver)
-    add_delaunay(ext_modules, ver, periodic=True)
-add_delaunay(ext_modules, 2, parallel=True)
+    add_delaunay(ext_modules, src_include, ver)
+    add_delaunay(ext_modules, src_include, ver, periodic=True)
+add_delaunay(ext_modules, src_include, 'D', dont_compile=True)
+add_delaunay(ext_modules, src_include, 'D', parallel=True)
 
 # Add other packages
 ext_modules += [
     Extension("cgal4py.delaunay.tools",
               sources=["cgal4py/delaunay/tools.pyx"],
               **ext_options),
-    Extension("cgal4py.domain_decomp.kdtree",
-              sources=["cgal4py/domain_decomp/kdtree.pyx",
-                       "cgal4py/domain_decomp/c_kdtree.cpp",
-                       "cgal4py/c_utils.cpp"],
-              **ext_options),
+    # Extension("cgal4py.domain_decomp.kdtree",
+    #           sources=["cgal4py/domain_decomp/kdtree.pyx",
+    #                    "cgal4py/domain_decomp/c_kdtree.cpp",
+    #                    "cgal4py/c_utils.cpp"],
+    #           **ext_options),
     Extension("cgal4py.utils",
               sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
               **ext_options)
     ]
-
-#     ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
-#     import cykdtree
-#     cykdtree_cpp = os.path.join(
-#         os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
-#     cykdtree_utils_cpp = os.path.join(
-#         os.path.dirname(cykdtree.__file__), "c_utils.cpp")
-#     # OpenMPI
-#     if False:
-#         mpi_compile_args = os.popen(
-#             "mpic++ --showme:compile").read().strip().split(' ')
-#         mpi_link_args = os.popen(
-#             "mpic++ --showme:link").read().strip().split(' ')
-#     else:
-#         mpi_compile_args = os.popen(
-#             "mpic++ -compile_info").read().strip().split(' ')[1:]
-#         mpi_link_args = os.popen(
-#             "mpic++ -link_info").read().strip().split(' ')[1:]
-#     ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
-#     ext_options_mpicgal['extra_link_args'] += mpi_link_args
-#     ext_options_mpicgal['include_dirs'].append(
-#         os.path.dirname(cykdtree.__file__))
-#     pyx_file = "cgal4py/delaunay/parallel_delaunayD.pyx"
-#     cpp_file = "cgal4py/delaunay/c_parallel_delaunayD.cpp"
-#     if not os.path.isfile(cpp_file):
-#         open(cpp_file,'a').close()
-#     assert(os.path.isfile(cpp_file))
-#     ext_modules.append(
-#         Extension("cgal4py.delaunay.parallel_delaunayD",
-#                   sources=[pyx_file, cpp_file,
-#                            cykdtree_cpp, cykdtree_utils_cpp],
-#                   **ext_options_mpicgal))
+src_include += [
+    "cgal4py/delaunay/tools.pyx",
+    "cgal4py/delaunay/c_tools.hpp"]
 
 
 if use_cython:
     ext_modules = cythonize(ext_modules)
 
+print src_include
 setup(name = 'cgal4py',
       version = '0.1',
       description = 'Python interface for CGAL Triangulations',
@@ -197,6 +176,10 @@ setup(name = 'cgal4py',
                   'cgal4py.tests'],
       zip_safe = False,
       cmdclass = cmdclass,
-      ext_modules = ext_modules)
+      ext_modules = ext_modules,
+      # package_dir = {'cgal4py': 'cgal4py'},
+      # include_package_data=True,
+      data_files = [(os.path.join('cgal4py', 'delaunay'), src_include)],
+      package_data = {'cgal4py.delaunay': src_include})
 
 

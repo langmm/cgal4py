@@ -412,9 +412,10 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
                 _delaunay_filename('cpp', dim, periodic=periodic, bit64=bit64,
                                    parallel=parallel)]
         include_dirs.append(os.path.dirname(sources[0]))
-        sources.append(_delaunay_filename('hpp', dim, periodic=periodic,
-                                          parallel=parallel))
+        # sources.append(_delaunay_filename('hpp', dim, periodic=periodic,
+        #                                   parallel=parallel))
         if parallel:
+            includes.append(_delaunay_filename('hpp', dim))
             if False:  # OpenMPI
                 extra_compile_args += os.popen(
                     "mpic++ --showme:compile").read().strip().split(' ')
@@ -429,6 +430,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             cykdtree_dir = os.path.dirname(cykdtree.__file__)
             include_dirs.append(cykdtree_dir)
             sources += [
+                _delaunay_filename('cpp', dim),
                 os.path.join(cykdtree_dir, "c_kdtree.cpp"),
                 os.path.join(cykdtree_dir, "c_utils.cpp")]
         for cpp_file in sources:
@@ -453,7 +455,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
                       "It will be automatically generated and compiled " +
                       "at import using pyximport. Please ignore any " +
                       "compilation warnings from numpy.")
-    return is_new
+    return generated
         
 
 def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
@@ -471,6 +473,11 @@ def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
             returned. Defaults to False.
         overwrite (bool, optional): If True, generated extension files are
             re-generated. Defaults to False.
+        comm (`mpi4py.Comm`, optional): MPI communicator. If provided,
+            import of the requested module will be attempted first on the root
+            process, then imported on all processes. This prevents pyximport
+            compilation being called multiple times and causing a race
+            condition. If not provided, import is done on all processes.
 
     Returns:
         class: Delaunay triangulation class.
@@ -483,22 +490,32 @@ def _get_Delaunay(ndim, periodic=False, parallel=False, bit64=False,
                                  parallel=parallel, bit64=bit64)
     clsname = _delaunay_filename('pyclass', ndim, periodic=periodic,
                                  parallel=parallel, bit64=bit64)
-    if rank == 0:
+    # Barrier for non-root processes
+    if comm is not None:
+        if rank > 0:
+            comm.Barrier()
+    # Create extension
+    gen = _make_ext(ndim, periodic=periodic, parallel=parallel,
+                    bit64=bit64, overwrite=overwrite)
+    # If generated extension, install pyximport
+    if gen:
         importers = pyximport.install(setup_args={"include_dirs":np.get_include()},
                                       reload_support=True)
-        # Create extension
-        gen = _make_ext(ndim, periodic=periodic, parallel=parallel,
-                        bit64=bit64, overwrite=overwrite)
         # Stop obnoxious -Wstrict-prototypes warning with c++
         cfg_vars = distutils.sysconfig.get_config_vars()
         for key, value in cfg_vars.items():
             if type(value) == str:
                 cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
-        out = getattr(importlib.import_module(modname),clsname)
+    # Import
+    out = getattr(importlib.import_module(modname),clsname)
+    # If generated extension, uninstall pyximport
+    if gen:
         pyximport.uninstall(*importers)
+    # Import on all processes once root is successful
     if comm is not None:
-        comm.Barrier()
-        out = getattr(importlib.import_module(modname),clsname)
+        if rank == 0:
+            comm.Barrier()
+        # out = getattr(importlib.import_module(modname),clsname)
     return out
 
 
