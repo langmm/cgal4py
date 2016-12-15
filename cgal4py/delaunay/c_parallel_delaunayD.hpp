@@ -26,7 +26,7 @@
 #endif
 #define VALID 1
 #define MAXLEN_FILENAME  1000
-#define DEBUG 0
+#define DEBUG 1
 
 void *my_malloc(size_t size) {
   void *out = malloc(size);
@@ -442,17 +442,13 @@ public:
     memcpy(re, node->right_edge, ndim*sizeof(double));
     memcpy(domain_width, tree->domain_width, ndim*sizeof(double));
     for (j = 0; j < npts; j++) {
-      idx[j] = (Info)(node->left_idx + j);
+      idx[j] = (Info)(tree->left_idx + node->left_idx + j);
       for (k = 0; k < ndim; k++) {
     	pts[ndim*j+k] = tree->all_pts[ndim*tree->all_idx[node->left_idx+j]+k];
       }
     }
-    for (k = 0; k < nleaves; k++) {
-      memcpy(leaves_le+ndim*k, tree->leaves[k]->left_edge,
-    	     ndim*sizeof(double));
-      memcpy(leaves_re+ndim*k, tree->leaves[k]->right_edge,
-    	     ndim*sizeof(double));
-    }
+    memcpy(leaves_le, tree->leaves_le, nleaves*ndim*sizeof(double));
+    memcpy(leaves_re, tree->leaves_re, nleaves*ndim*sizeof(double));
     neigh->insert(node->all_neighbors.begin(), node->all_neighbors.end());
     for (k = 0; k < ndim; k++) {
       periodic_le[k] = node->periodic_left[k];
@@ -896,8 +892,9 @@ public:
   int nleaves_total;
   double *pts_total = NULL;
   uint64_t *idx_total = NULL;
-  Info *info_total;
+  Info *info_total = NULL;
   KDTree *tree = NULL;
+  ParallelKDTree *ptree = NULL;
   // Things for each process
   int nleaves;
   std::vector<CParallelLeaf<Info>*> leaves;
@@ -935,7 +932,10 @@ public:
     for (i = 0; i < nleaves; i++) {
       delete(leaves.pop()); // leaves used
     }
-    delete(tree);
+    if (tree != NULL)
+      delete(tree);
+    if (ptree != NULL)
+      delete(ptree);
     if (DEBUG)
       printf("%d: Finishing dealloc\n", rank);
   }
@@ -1329,9 +1329,10 @@ public:
 	idx_total[j] = j;
       tree = new KDTree(pts_total, idx_total, npts_total, ndim,
 		        leafsize, le, re, periodic, false);
-      info_total = (Info*)my_malloc(npts_total*sizeof(Info));
-      for (j = 0; j < npts_total; j++)
-	info_total[j] = idx_total[j];
+      tree->consolidate_edges();
+      // info_total = (Info*)my_malloc(npts_total*sizeof(Info));
+      // for (j = 0; j < npts_total; j++)
+      // 	info_total[j] = idx_total[j];
       nleaves_total = tree->num_leaves;
     }
     MPI_Bcast(&nleaves_total, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -1402,6 +1403,66 @@ public:
       free(nleaves_per_proc);
     if (DEBUG)
       printf("%d: Finished domain decomposition\n", rank);
+  }
+
+  void parallel_domain_decomp() {
+    int i;
+    uint64_t j;
+    uint32_t k;
+    int leafsize_limit = 0, tot_leafsize_limit = 0;
+    if (DEBUG)
+      printf("%d: Beginning parallel domain decomposition\n", rank);
+    // Determine leafsize
+    uint32_t leafsize = 0;
+    if (rank == 0) {
+      // Create KDtree
+      nleaves_total = size;
+      nleaves_total = (int)(pow(2,ceil(log2((float)(nleaves_total)))));
+      if (limit_mem > 1)
+	nleaves_total *= limit_mem;
+      leafsize = std::max((uint32_t)(npts_total/nleaves_total + 1), (ndim+1));
+      idx_total = (uint64_t*)my_malloc(npts_total*sizeof(uint64_t));
+      for (j = 0; j < npts_total; j++)
+	idx_total[j] = j;
+    }
+    // Create tree
+    ptree = new ParallelKDTree(pts_total, idx_total, npts_total, ndim,
+			       leafsize, le, re, periodic, false);
+    nleaves_total = ptree->tot_num_leaves;
+    nleaves = ptree->tree->num_leaves;
+    if (nleaves == 1)
+      limit_mem = 1;
+    // Create version of indices in correct format
+    // if (rank == 0) {
+    //   info_total = (Info*)my_malloc(npts_total*sizeof(Info));
+    //   for (j = 0; j < npts_total; j++)
+    //   	info_total[j] = idx_total[j];
+    // }
+    // Make sure leaves meet minimum criteria
+    for (i = 0; i < nleaves; i++) {
+      if (ptree->leaves[i]->children < (ndim+1)) {
+	leafsize_limit = ptree->leaves[i]->children;
+	break;
+      }
+    }
+    MPI_Allreduce(&leafsize_limit, &tot_leafsize_limit, 1, MPI_INT, MPI_MAX,
+		  MPI_COMM_WORLD);
+    if (leafsize_limit)
+      printf("Leafsize is too small (%d in %dD).", leafsize_limit, ndim);
+      // throw std::runtime_error("Leafsize is too small (%d in %dD).",
+      // 			       leafsize_limit, );
+    // Create leaves from tree nodes
+    for (i = 0; i < nleaves; i++) {
+      leaves.push_back(new CParallelLeaf<Info>(nleaves_total, ndim,
+					       unique_str, ptree, i));
+      if (limit_mem > 1)
+	leaves[i]->dump();
+      map_id2idx[leaves[i]->id] = i;
+      
+    }
+    tree_exists = 1;
+    if (DEBUG)
+      printf("%d: Finished parallel domain decomposition\n", rank);
   }
 
   uint32_t num_cells() {

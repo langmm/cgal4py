@@ -46,26 +46,30 @@ else:
     ext_options_cgal['extra_link_args'] += ["-lgmp"]
 
 
-ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
-import cykdtree
-cykdtree_cpp = os.path.join(
-    os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
-cykdtree_utils_cpp = os.path.join(
-    os.path.dirname(cykdtree.__file__), "c_utils.cpp")
-if False:  # OpenMPI
-    mpi_compile_args = os.popen(
-        "mpic++ --showme:compile").read().strip().split(' ')
-    mpi_link_args = os.popen(
-        "mpic++ --showme:link").read().strip().split(' ')
-else:  # MPICH
-    mpi_compile_args = os.popen(
-        "mpic++ -compile_info").read().strip().split(' ')[1:]
-    mpi_link_args = os.popen(
-        "mpic++ -link_info").read().strip().split(' ')[1:]
-ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
-ext_options_mpicgal['extra_link_args'] += mpi_link_args
-ext_options_mpicgal['include_dirs'].append(
-    os.path.dirname(cykdtree.__file__))
+compile_parallel = True
+try:
+    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
+    import cykdtree
+    cykdtree_cpp = os.path.join(
+        os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+    cykdtree_utils_cpp = os.path.join(
+        os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+    if False:  # OpenMPI
+        mpi_compile_args = os.popen(
+            "mpic++ --showme:compile").read().strip().split(' ')
+        mpi_link_args = os.popen(
+            "mpic++ --showme:link").read().strip().split(' ')
+    else:  # MPICH
+        mpi_compile_args = os.popen(
+            "mpic++ -compile_info").read().strip().split(' ')[1:]
+        mpi_link_args = os.popen(
+            "mpic++ -link_info").read().strip().split(' ')[1:]
+    ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
+    ext_options_mpicgal['extra_link_args'] += mpi_link_args
+    ext_options_mpicgal['include_dirs'].append(
+        os.path.dirname(cykdtree.__file__))
+except:
+    compile_parallel = False
 
 
 def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
@@ -140,18 +144,14 @@ for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
 add_delaunay(ext_modules, src_include, 'D', dont_compile=True)
-add_delaunay(ext_modules, src_include, 'D', parallel=True)
+add_delaunay(ext_modules, src_include, 'D', parallel=True,
+             dont_compile=compile_parallel)
 
 # Add other packages
 ext_modules += [
     Extension("cgal4py.delaunay.tools",
               sources=["cgal4py/delaunay/tools.pyx"],
               **ext_options),
-    # Extension("cgal4py.domain_decomp.kdtree",
-    #           sources=["cgal4py/domain_decomp/kdtree.pyx",
-    #                    "cgal4py/domain_decomp/c_kdtree.cpp",
-    #                    "cgal4py/c_utils.cpp"],
-    #           **ext_options),
     Extension("cgal4py.utils",
               sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
               **ext_options)

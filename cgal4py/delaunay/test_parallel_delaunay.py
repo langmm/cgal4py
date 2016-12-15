@@ -21,10 +21,8 @@ test_result = False
 task = 'vols'
 unique_str = datetime.today().strftime("%Y%j%H%M%S")
 
-# if rank == 0:
-#     ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True)
-# comm.Barrier()
-ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True, comm=comm)
+ParallelDelaunay = _get_Delaunay(ndim, bit64=use_double, parallel=True,
+                                 comm=comm)
 
 if rank == 0:
     pts, le, re = make_points(npts, ndim)
