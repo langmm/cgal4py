@@ -166,22 +166,39 @@ src_include += [
 if use_cython:
     ext_modules = cythonize(ext_modules)
 
+with open('README.rst') as file:
+    long_description = file.read()
+
 # print src_include
 setup(name = 'cgal4py',
-      version = '0.1',
-      description = 'Python interface for CGAL Triangulations',
-      url = 'https://langmm@bitbucket.org/langmm/cgal4py',
-      author = 'Meagan Lang',
-      author_email = 'langmm.astro@gmail.com',
-      license = 'BSD',
       packages = ['cgal4py', 'cgal4py.delaunay', 'cgal4py.domain_decomp',
                   'cgal4py.tests'],
+      package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
+      package_data = {'cgal4py': ['README.md', 'README.rst'],
+                      'cgal4py.delaunay': src_include},
+      version = '0.1',
+      description = 'Python interface for CGAL Triangulations',
+      long_description = long_description,
+      author = 'Meagan Lang',
+      author_email = 'langmm.astro@gmail.com',
+      url = 'https://langmm@bitbucket.org/langmm/cgal4py',
+      keywords = ['delaunay', 'voronoi', 'cgal',
+                  'triangulation', 'tessellation'],
+      classifiers = ["Programming Language :: Python",
+                     "Programming Language :: C++",
+                     "Operating System :: OS Independent",
+                     "Intended Audience :: Science/Research",
+                     "License :: OSI Approved :: BSD License",
+                     "Natural Language :: English",
+                     "Topic :: Scientific/Engineering",
+                     "Topic :: Scientific/Engineering :: Astronomy",
+                     "Topic :: Scientific/Engineering :: Mathematics",
+                     "Topic :: Scientific/Engineering :: Physics",
+                     "Development Status :: 3 - Alpha"],
+      license = 'BSD',
       zip_safe = False,
       cmdclass = cmdclass,
       ext_modules = ext_modules,
-      # package_dir = {'cgal4py': 'cgal4py'},
-      # include_package_data=True,
-      data_files = [(os.path.join('cgal4py', 'delaunay'), src_include)],
-      package_data = {'cgal4py.delaunay': src_include})
+      data_files = [(os.path.join('cgal4py', 'delaunay'), src_include)])
 
 
