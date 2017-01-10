@@ -48,6 +48,8 @@ if not release:
     ext_options['define_macros'].append(
         ('CYTHON_TRACE', '1'))
 
+cykdtree_cpp = None
+cykdtree_utils_cpp = None
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
@@ -86,8 +88,6 @@ else:
             os.path.dirname(cykdtree.__file__))
     except:
         compile_parallel = False
-        cykdtree_cpp = None
-        cykdtree_utils_cpp = None
 
 
 def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
