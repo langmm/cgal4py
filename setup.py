@@ -195,7 +195,7 @@ setup(name = 'cgal4py',
       # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},
-      version = '0.1',
+      version = '0.1.1',
       description = 'Python interface for CGAL Triangulations',
       long_description = long_description,
       author = 'Meagan Lang',
