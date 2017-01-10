@@ -12,7 +12,7 @@ except ImportError:
 else:
     use_cython = True
 
-release = False
+release = True
 
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
