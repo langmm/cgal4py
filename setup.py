@@ -140,6 +140,7 @@ def add_delaunay(ext_modules, src_include, ver, periodic=False, parallel=False,
     if not os.path.isfile(cpp_file):
         open(cpp_file,'a').close()
         assert(os.path.isfile(cpp_file))
+    print ver, periodic, parallel, dont_compile
     if not dont_compile:
         if parallel:
             ext_modules.append(
@@ -162,8 +163,9 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
+print compile_parallel
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
-             dont_compile=compile_parallel)
+             dont_compile=(not compile_parallel))
 
 # Add other packages
 ext_modules += [
