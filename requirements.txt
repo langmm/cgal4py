@@ -1,5 +1,4 @@
 numpy
 matplotlib
 cykdtree
-mpi4py
 multiprocessing

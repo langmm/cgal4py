@@ -14,9 +14,15 @@ import copy
 import struct
 import pstats
 import cPickle
+import warnings
 from datetime import datetime
 import multiprocessing as mp
-from mpi4py import MPI
+try:
+    from mpi4py import MPI
+    mpi_loaded = True
+except:
+    mpi_loaded = False
+    warnings.warn("mpi4py could not be imported.")
 import ctypes
 
 
@@ -34,6 +40,8 @@ def _get_mpi_type(np_type):
         ValueError: If `np_type` is not supported.
 
     """
+    if not mpi_loaded:
+        raise Exception("mpi4py could not be imported.")
     if np_type in ('i', 'int32', np.int32):
         mpi_type = MPI.INT
     elif np_type in ('l', 'int64', np.int64):
@@ -123,6 +131,8 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             Defaults to False.
 
     """
+    if not mpi_loaded:
+        raise Exception("mpi4py could not be imported.")
     if os.path.isfile(fname):
         if overwrite:
             os.remove(fname)
@@ -692,6 +702,8 @@ class DelaunayProcessMPI_C(object):
     def __init__(self, taskname, pts, left_edge=None, right_edge=None,
                  periodic=False, unique_str=None, use_double=False,
                  limit_mem=False, suppress_final_output=False):
+        if not mpi_loaded:
+            raise Exception("mpi4py could not be imported.")
         task_list = ['triangulate', 'volumes']
         if taskname not in task_list:
             raise ValueError('{} is not a valid task.'.format(taskname))
@@ -790,6 +802,8 @@ class DelaunayProcessMPI_Python(object):
                  periodic=False, unique_str=None, use_double=False,
                  use_buffer=False, limit_mem=False,
                  suppress_final_output=False):
+        if not mpi_loaded:
+            raise Exception("mpi4py could not be imported.")
         task_list = ['triangulate', 'volumes']
         if taskname not in task_list:
             raise ValueError('{} is not a valid task.'.format(taskname))

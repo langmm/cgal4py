@@ -5,7 +5,7 @@ Installation
 Installing Dependencies
 =======================
 
-|cgal4py| requires the `CGAL`_ |cgalver| c++ library and the `cykdtree`_
+|cgal4py| requires the `CGAL`_ |cgalver| c++ library and the `cykdtree`_. You should also have a C++14 compiler.
 
 Installing `CGAL`_
 ------------------
@@ -22,9 +22,7 @@ Use of older versions of `CGAL`_ will disable some features of |cgal4py| (e.g. p
 Installing `cykdtree`_
 ----------------------
 
-..todo:: Links to PyPI release
-
-`cykdtree`_ can be installed from either PyPI using ``pip``::
+`cykdtree`_ can be installed from either `PyPI <https://pypi.python.org/pypi/cykdtree>`__ using ``pip``::
 
    $ pip install cykdtree
 
@@ -42,9 +40,7 @@ If you do not have admin privileges on the target machine, ``--user`` can be add
 Installing |cgal4py|
 ====================
 
-..todo:: Links to PyPI release
-
-|cgal4py| can be installed from either PyPI using ``pip``::
+|cgal4py| can be installed from either `PyPI <https://pypi.python.org/pypi/cgal4py>`__ using ``pip``::
 
    $ pip install cgal4py
 

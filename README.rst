@@ -15,7 +15,7 @@ Requirements
 For running in serial:
 
  * `Python 2.7 <https://www.python.org/download/releases/2.7/>`_
- * C++11 compiler
+ * C++14 compiler
  * `Cython <http://cython.org/>`_
  * `CGAL <http://www.cgal.org/download.html>`__ Version 3.5 or higher is required for periodic triangulations in 3D and version 4.9 or higher is required for periodic triangulations in 2D.
 

@@ -40,8 +40,8 @@ ext_options = dict(language="c++",
                    include_dirs=[numpy.get_include()],
                    libraries=[],
                    extra_link_args=[],
-                   extra_compile_args=["-std=gnu++11"],
-                   # extra_compile_args=["-std=c++14"],
+                   # extra_compile_args=["-std=gnu++11"],
+                   extra_compile_args=["-std=c++14"],
                    define_macros=[("NPY_NO_DEPRECATED_API", None)])
 # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
 if not release:
@@ -65,16 +65,17 @@ try:
         os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
     cykdtree_utils_cpp = os.path.join(
         os.path.dirname(cykdtree.__file__), "c_utils.cpp")
-    if False:  # OpenMPI
-        mpi_compile_args = os.popen(
-            "mpic++ --showme:compile").read().strip().split(' ')
-        mpi_link_args = os.popen(
-            "mpic++ --showme:link").read().strip().split(' ')
-    else:  # MPICH
+    # Attempt to call MPICH first, then OpenMPI
+    try: 
         mpi_compile_args = os.popen(
             "mpic++ -compile_info").read().strip().split(' ')[1:]
         mpi_link_args = os.popen(
             "mpic++ -link_info").read().strip().split(' ')[1:]
+    except:
+        mpi_compile_args = os.popen(
+            "mpic++ --showme:compile").read().strip().split(' ')
+        mpi_link_args = os.popen(
+            "mpic++ --showme:link").read().strip().split(' ')
     ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
     ext_options_mpicgal['extra_link_args'] += mpi_link_args
     ext_options_mpicgal['include_dirs'].append(
@@ -177,7 +178,6 @@ if use_cython:
 with open('README.rst') as file:
     long_description = file.read()
 
-# print src_include
 setup(name = 'cgal4py',
       packages = ['cgal4py', 'cgal4py.delaunay', 'cgal4py.domain_decomp',
                   'cgal4py.tests'],
