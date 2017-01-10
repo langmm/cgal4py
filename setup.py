@@ -86,6 +86,8 @@ else:
             os.path.dirname(cykdtree.__file__))
     except:
         compile_parallel = False
+        cykdtree_cpp = None
+        cykdtree_utils_cpp = None
 
 
 def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
@@ -159,7 +161,6 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
-print compile_parallel
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
              dont_compile=compile_parallel)
 
