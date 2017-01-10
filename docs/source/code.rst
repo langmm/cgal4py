@@ -8,10 +8,10 @@ Code
 .. automodule:: cgal4py.delaunay
    :members:
 
-.. automodule:: cgal4py.delaunay2
+.. automodule:: cgal4py.delaunay.delaunay2
    :members:
 
-.. automodule:: cgal4py.delaunay3
+.. automodule:: cgal4py.delaunay.delaunay3
    :members:
 
 .. automodule:: cgal4py.plot

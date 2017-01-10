@@ -3122,8 +3122,8 @@ cdef class PeriodicDelaunay3:
             start (PeriodicDelaunay3_cell): Cell to start list of facets at. 
 
         Returns: 
-            tuple: :obj:`list` of `PeriodicDelaunay3_cell`s in conflict with pos 
-                and :obj:`list` of `PeriodicDelaunay3_facet`s bounding the zone 
+            tuple: :obj:`list` of PeriodicDelaunay3_cells in conflict with pos 
+                and :obj:`list` of PeriodicDelaunay3_facets bounding the zone 
                 in conflict.
 
         """

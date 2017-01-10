@@ -3,6 +3,7 @@ wrapped CGAL C++ libraries."""
 import plot
 import utils
 import domain_decomp
+import delaunay
 from delaunay import Delaunay
 import numpy as np
 import warnings

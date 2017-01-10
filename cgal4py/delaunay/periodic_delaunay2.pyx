@@ -2493,8 +2493,8 @@ cdef class PeriodicDelaunay2:
             start (PeriodicDelaunay2_cell): Cell to start list of conflicts at.  
         
         Returns:
-            tuple: :obj:`list` of :obj:`PeriodicDelaunay2_cell`s in conflict 
-                with pos and :obj:`list` of :obj:`PeriodicDelaunay2_edge`s 
+            tuple: :obj:`list` of PeriodicDelaunay2_cells in conflict 
+                with pos and :obj:`list` of PeriodicDelaunay2_edges 
                 bounding the conflicting cells.
 
         """

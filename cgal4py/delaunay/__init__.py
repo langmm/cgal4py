@@ -12,18 +12,22 @@ import tools
 import os
 import pyximport
 import distutils
+import delaunay2
+import delaunay3
 from delaunay2 import Delaunay2
 from delaunay3 import Delaunay3
 from periodic_delaunay2 import is_valid as is_valid_P2
 from periodic_delaunay3 import is_valid as is_valid_P3
 import parallel_delaunayD
 if is_valid_P2():
+    import periodic_delaunay2
     from periodic_delaunay2 import PeriodicDelaunay2
 else:
     warnings.warn("Could not import the 2D periodic triangulation package. " +
                   "Update CGAL to at least version 4.9 to enable this " +
                   "feature.")
 if is_valid_P3():
+    import periodic_delaunay3
     from periodic_delaunay3 import PeriodicDelaunay3
 else:
     warnings.warn("Could not import the 3D periodic triangulation package. " +
@@ -611,8 +615,8 @@ def VoronoiVolumes(pts, *args, **kwargs):
 
 
 __all__ = ["tools", "Delaunay", "VoronoiVolumes",
-           "Delaunay2", "Delaunay3"]
+           "delaunay2", "delaunay3", "Delaunay2", "Delaunay3"]
 if is_valid_P2():
-    __all__.append("PeriodicDelaunay2")
+    __all__ += ["periodic_delaunay2", "PeriodicDelaunay2"]
 if is_valid_P3():
-    __all__.append("PeriodicDelaunay3")
+    __all__ += ["periodic_delaunay3", "PeriodicDelaunay3"]

@@ -190,8 +190,8 @@ with open('README.rst') as file:
     long_description = file.read()
 
 setup(name = 'cgal4py',
-      packages = ['cgal4py', 'cgal4py.delaunay', 'cgal4py.domain_decomp',
-                  'cgal4py.tests'],
+      packages = ['cgal4py', 'cgal4py.delaunay',
+                  'cgal4py.domain_decomp', 'cgal4py.tests'],
       # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},

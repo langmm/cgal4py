@@ -200,8 +200,8 @@ cdef class Delaunay3_vertex_iter:
         T (Delaunay3): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include: 
-                'all_begin': The first vertex in an iteration over all vertices.  
-                'all_end': The last vertex in an iteration over all vertices. 
+            * 'all_begin': The first vertex in an iteration over all vertices.  
+            * 'all_end': The last vertex in an iteration over all vertices. 
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -610,8 +610,8 @@ cdef class Delaunay3_edge_iter:
         T (Delaunay3): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include: 
-                'all_begin': The first edge in an iteration over all edges.
-                'all_end': The last edge in an iteration over all edges.
+            * 'all_begin': The first edge in an iteration over all edges.
+            * 'all_end': The last edge in an iteration over all edges.
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -1039,8 +1039,8 @@ cdef class Delaunay3_facet_iter:
         T (Delaunay3): Triangulation that this facet belongs to.
         facet (:obj:`str`, optional): String specifying the facet that 
             should be referenced. Valid options include: 
-                'all_begin': The first facet in an iteration over all facets.
-                'all_end': The last facet in an iteration over all facets.
+            * 'all_begin': The first facet in an iteration over all facets.
+            * 'all_end': The last facet in an iteration over all facets.
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -1565,8 +1565,8 @@ cdef class Delaunay3_cell_iter:
         T (Delaunay3): Triangulation that this cell belongs to. 
         cell (:obj:`str`, optional): String specifying the cell that
             should be referenced. Valid options include: 
-                'all_begin': The first cell in an iteration over all cells. 
-                'all_end': The last cell in an iteration over all cells.
+            * 'all_begin': The first cell in an iteration over all cells. 
+            * 'all_end': The last cell in an iteration over all cells.
     
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -2799,8 +2799,8 @@ cdef class Delaunay3:
             start (Delaunay3_cell): Cell to start list of facets at. 
 
         Returns: 
-            tuple: :obj:`list` of `Delaunay3_cell`s in conflict with pos and 
-                :obj:`list` of `Delaunay3_facet`s bounding the zone in conflict.
+            tuple: :obj:`list` of Delaunay3_cells in conflict with pos and 
+                :obj:`list` of Delaunay3_facets bounding the zone in conflict.
 
         """
         assert(len(pos) == 3)

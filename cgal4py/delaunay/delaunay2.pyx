@@ -189,8 +189,8 @@ cdef class Delaunay2_vertex_iter:
         T (Delaunay2): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include:
-                'all_begin': The first vertex in an iteration over all vertices.
-                'all_end': The last vertex in an iteration over all vertices.
+            * 'all_begin': The first vertex in an iteration over all vertices.
+            * 'all_end': The last vertex in an iteration over all vertices.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -529,8 +529,8 @@ cdef class Delaunay2_edge_iter:
         T (Delaunay2): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include:
-                'all_begin': The first edge in an iteration over all edges.
-                'all_end': The last edge in an iteration over all edges.
+            * 'all_begin': The first edge in an iteration over all edges.
+            * 'all_end': The last edge in an iteration over all edges.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -1042,8 +1042,8 @@ cdef class Delaunay2_cell_iter:
         T (Delaunay2): Triangulation that this cell belongs to.
         cell (:obj:`str`, optional): String specifying the cell that 
             should be referenced. Valid options include:
-                'all_begin': The first cell in an iteration over all cells.
-                'all_end': The last cell in an iteration over all cells.
+            * 'all_begin': The first cell in an iteration over all cells.
+            * 'all_end': The last cell in an iteration over all cells.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -2219,15 +2219,15 @@ cdef class Delaunay2:
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
                                    Delaunay2_cell start):
         r"""Get the cells and edges of cells that are in conflict with a given 
-            point.
+        point.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
             start (Delaunay2_cell): Cell to start list of conflicts at.  
         
         Returns:
-            tuple: :obj:`list` of :obj:`Delaunay2_cell`s in conflict with pos 
-                and :obj:`list` of :obj:`Delaunay2_edge`s bounding the 
+            tuple: :obj:`list` of Delaunay2_cell in conflict with pos
+                and :obj:`list` of Delaunay2_edge bounding the
                 conflicting cells.
 
         """

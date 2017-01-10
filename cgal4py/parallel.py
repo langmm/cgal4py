@@ -96,9 +96,11 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
             return a dictionary with 'pts' key at a minimum corresponding to
             the 2D array of points that should be triangulated. Additional
             optional keys include:
-                periodic (bool): True if the domain is periodic.
-                left_edge (np.ndarray of float64): Left edges of the domain.
-                right_edge (np.ndarray of float64): Right edges of the domain.
+
+            * periodic (bool): True if the domain is periodic.
+            * left_edge (np.ndarray of float64): Left edges of the domain.
+            * right_edge (np.ndarray of float64): Right edges of the domain.
+
             A list of lines resulting in the above mentioned dictionary is also
             accepted.
         taskname (str): Name of task to be passed to 
@@ -325,17 +327,22 @@ def ParallelMPI(task, read_func, ndim, nproc, use_double=False,
     using MPI.
 
     Args:
-        task (str): Task for which results should be returned. Values include:
-            'triangulate': Return the Delaunay triangulation class.
-            'volumes': Return the volumes of the Voronoi cells associated with
-                each point.
+        task (str): Task for which results should be returned. 
+            Values include:
+
+            * 'triangulate': Return the Delaunay triangulation class.
+            * 'volumes': Return the volumes of the Voronoi cells associated with
+              each point.
+
         read_func (func): Function for reading in points. The function should
             return a dictionary with 'pts' key at a minimum corresponding to
             the 2D array of points that should be triangulated. Additional
             optional keys include:
-                periodic (bool): True if the domain is periodic.
-                left_edge (np.ndarray of float64): Left edges of the domain.
-                right_edge (np.ndarray of float64): Right edges of the domain.
+
+            * periodic (bool): True if the domain is periodic.
+            * left_edge (np.ndarray of float64): Left edges of the domain.
+            * right_edge (np.ndarray of float64): Right edges of the domain.
+
             A list of lines resulting in the above mentioned dictionary is also
             accepted.
         ndim (int): Number of dimension in the domain.
@@ -438,10 +445,13 @@ def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
     using the `multiprocessing` package.
 
     Args:
-        task (str): Task for which results should be returned. Values include:
-            'triangulate': Return the Delaunay triangulation class.
-            'volumes': Return the volumes of the Voronoi cells associated with
-                each point.
+        task (str): Task for which results should be returned. Values
+            include:
+
+            * 'triangulate': Return the Delaunay triangulation class.
+            * 'volumes': Return the volumes of the Voronoi cells associated with
+              each point.
+
         pts (np.ndarray of float64): (n,m) array of n m-dimensional
             coordinates.
         tree (object): Domain decomposition tree for splitting points among the
@@ -668,10 +678,13 @@ class DelaunayProcessMPI_C(object):
     :class:`cgal4py.parallel.DelaunayProcessMPI_Python`.
 
     Args:
-        taskname (str): Key for the task that should be parallelized. Options:
-              'triangulate': Perform triangulation and put serialized info in
-                  the output queue.
-              'volumes': Perform triangulation and put volumes in output queue.
+        taskname (str): Key for the task that should be parallelized. 
+            Options:
+
+            * 'triangulate': Perform triangulation and put serialized info in
+              the output queue.
+            * 'volumes': Perform triangulation and put volumes in output queue.
+
         pts (np.ndarray of float64): Array of coordinates to triangulate.
         left_edge (np.ndarray of float64, optional): Array of domain mins in
             each dimension. If not provided, they are determined from the
@@ -759,10 +772,13 @@ class DelaunayProcessMPI_Python(object):
     r"""Class for coordinating MPI operations in Python.
 
     Args:
-        taskname (str): Key for the task that should be parallelized. Options:
-              'triangulate': Perform triangulation and put serialized info in
-                  the output queue.
-              'volumes': Perform triangulation and put volumes in output queue.
+        taskname (str): Key for the task that should be parallelized.
+            Options:
+
+            * 'triangulate': Perform triangulation and put serialized info in
+              the output queue.
+            * 'volumes': Perform triangulation and put volumes in output queue.
+
         pts (np.ndarray of float64): Array of coordinates to triangulate.
         tree (Tree, optional): Decomain decomposition tree. If not provided,
             :func:`cgal4py.domain_decomp.tree` is used to construct one.
@@ -1277,10 +1293,13 @@ class DelaunayProcessMulti(mp.Process):
     single process during a parallel Delaunay triangulation.
 
     Args:
-        task (str): Key for the task that should be parallelized. Options are:
-              'triangulate': Perform triangulation and put serialized info in
-                  the output queue.
-              'volumes': Perform triangulation and put volumes in output queue.
+        task (str): Key for the task that should be parallelized. Options
+            are:
+
+            * 'triangulate': Perform triangulation and put serialized info in
+              the output queue.
+            * 'volumes': Perform triangulation and put volumes in output queue.
+
         proc_idx (int): Index of this process.
         leaves (list of leaf objects): Leaves that should be triangulated on
             this process. The leaves are created by
@@ -1746,13 +1765,14 @@ class ParallelLeaf(object):
         
         Returns:
             tuple: Containing
-                hvall (list): List of tree indices that should be sent to each
-                    process.
-                n (list): Indices of neighbor leaves.
-                left_edges (np.ndarray of float64): Left edges of neighbor
-                    leaves.
-                right_edges (np.ndarray of float64): Right edges of neighbor
-                    leaves.
+
+                * hvall (list): List of tree indices that should be sent to each
+                  process.
+                * n (list): Indices of neighbor leaves.
+                * left_edges (np.ndarray of float64): Left edges of neighbor
+                  leaves.
+                * right_edges (np.ndarray of float64): Right edges of neighbor
+                  leaves.
 
         """
         if self.limit_mem:
@@ -2039,7 +2059,7 @@ class ParallelLeaf(object):
         Args:
             fname (str, optional): Full path to file where tessellation info
                 should be written. Defaults to None. If None, it is set to
-                :method:`cgal4py.parallel.ParallelLeaf.tess_output_filename`.
+                :py:meth:`cgal4py.parallel.ParallelLeaf.tess_output_filename`.
 
         Returns:
             int: The maximum number of cells that will be contributed by this
