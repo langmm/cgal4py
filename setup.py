@@ -50,16 +50,17 @@ if not release:
 
 cykdtree_cpp = None
 cykdtree_utils_cpp = None
-ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
+    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
     compile_parallel = False
 else:
     ext_options_cgal = copy.deepcopy(ext_options)
     ext_options_cgal['libraries'] += ['gmp','CGAL']
     ext_options_cgal['extra_link_args'] += ["-lgmp"]
     # Check that there is a version of MPI available
+    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
     compile_parallel = True
     try:
         import cykdtree
