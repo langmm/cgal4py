@@ -16,7 +16,7 @@ release = True
 
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
-# RTDFLAG = True
+RTDFLAG = True
 
 # Stop obnoxious -Wstrict-prototypes warning with c++
 cfg_vars = distutils.sysconfig.get_config_vars()
