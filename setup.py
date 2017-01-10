@@ -51,37 +51,41 @@ if not release:
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
+    compile_parallel = False
 else:
     ext_options_cgal = copy.deepcopy(ext_options)
     ext_options_cgal['libraries'] += ['gmp','CGAL']
     ext_options_cgal['extra_link_args'] += ["-lgmp"]
-
-
-compile_parallel = True
-try:
-    ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
-    import cykdtree
-    cykdtree_cpp = os.path.join(
-        os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
-    cykdtree_utils_cpp = os.path.join(
-        os.path.dirname(cykdtree.__file__), "c_utils.cpp")
-    # Attempt to call MPICH first, then OpenMPI
-    try: 
-        mpi_compile_args = os.popen(
-            "mpic++ -compile_info").read().strip().split(' ')[1:]
-        mpi_link_args = os.popen(
-            "mpic++ -link_info").read().strip().split(' ')[1:]
+    # Check that there is a version of MPI available
+    compile_parallel = True
+    try:
+        ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
+        import cykdtree
+        cykdtree_cpp = os.path.join(
+            os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+        cykdtree_utils_cpp = os.path.join(
+            os.path.dirname(cykdtree.__file__), "c_utils.cpp")
+        # Attempt to call MPICH first, then OpenMPI
+        try: 
+            mpi_compile_args = os.popen(
+                "mpic++ -compile_info").read().strip().split(' ')[1:]
+            mpi_link_args = os.popen(
+                "mpic++ -link_info").read().strip().split(' ')[1:]
+            if len(mpi_compile_args[0]) == 0:
+                raise Exception
+        except:
+            mpi_compile_args = os.popen(
+                "mpic++ --showme:compile").read().strip().split(' ')
+            mpi_link_args = os.popen(
+                "mpic++ --showme:link").read().strip().split(' ')
+            if len(mpi_compile_args[0]) == 0:
+                raise Exception
+        ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
+        ext_options_mpicgal['extra_link_args'] += mpi_link_args
+        ext_options_mpicgal['include_dirs'].append(
+            os.path.dirname(cykdtree.__file__))
     except:
-        mpi_compile_args = os.popen(
-            "mpic++ --showme:compile").read().strip().split(' ')
-        mpi_link_args = os.popen(
-            "mpic++ --showme:link").read().strip().split(' ')
-    ext_options_mpicgal['extra_compile_args'] += mpi_compile_args
-    ext_options_mpicgal['extra_link_args'] += mpi_link_args
-    ext_options_mpicgal['include_dirs'].append(
-        os.path.dirname(cykdtree.__file__))
-except:
-    compile_parallel = False
+        compile_parallel = False
 
 
 def _delaunay_filename(ftype, dim, periodic=False, parallel=False):
