@@ -159,6 +159,7 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
+print compile_parallel
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
              dont_compile=compile_parallel)
 
