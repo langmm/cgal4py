@@ -33,7 +33,8 @@ ext_options = dict(language="c++",
                    include_dirs=[numpy.get_include()],
                    libraries=[],
                    extra_link_args=[],
-                   extra_compile_args=["-std=c++14"],# "-std=gnu++11",
+                   extra_compile_args=["-std=gnu++11"],
+                   # extra_compile_args=["-std=c++14"],# "-std=gnu++11",
                    # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
                    define_macros=[('CYTHON_TRACE', '1'),
                                   ("NPY_NO_DEPRECATED_API", None)])
@@ -143,7 +144,8 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
-add_delaunay(ext_modules, src_include, 'D', dont_compile=True)
+add_delaunay(ext_modules, src_include, 'D', dont_compile=True,
+             periodic=True)
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
              dont_compile=compile_parallel)
 
@@ -164,14 +166,14 @@ src_include += [
 if use_cython:
     ext_modules = cythonize(ext_modules)
 
-print src_include
+# print src_include
 setup(name = 'cgal4py',
       version = '0.1',
       description = 'Python interface for CGAL Triangulations',
       url = 'https://langmm@bitbucket.org/langmm/cgal4py',
       author = 'Meagan Lang',
       author_email = 'langmm.astro@gmail.com',
-      license = 'GPL',
+      license = 'BSD',
       packages = ['cgal4py', 'cgal4py.delaunay', 'cgal4py.domain_decomp',
                   'cgal4py.tests'],
       zip_safe = False,

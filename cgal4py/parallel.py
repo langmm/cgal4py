@@ -2,7 +2,6 @@ r"""Routines for running triangulations in paralle.
 
 .. todo::
    * parallelism through treading
-   * parallelism using MPI
 
 """
 from cgal4py.delaunay import Delaunay, tools, _get_Delaunay
