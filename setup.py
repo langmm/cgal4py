@@ -12,6 +12,8 @@ except ImportError:
 else:
     use_cython = True
 
+release = False
+
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
 # RTDFLAG = True
@@ -23,7 +25,7 @@ for key, value in cfg_vars.items():
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 # Needed for line_profiler - disable for production code
-# if not RTDFLAG:
+# if not RTDFLAG and not release:
 #     from Cython.Compiler.Options import directive_defaults
 #     directive_defaults['linetrace'] = True
 #     directive_defaults['binding'] = True
@@ -34,10 +36,13 @@ ext_options = dict(language="c++",
                    libraries=[],
                    extra_link_args=[],
                    extra_compile_args=["-std=gnu++11"],
-                   # extra_compile_args=["-std=c++14"],# "-std=gnu++11",
-                   # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
-                   define_macros=[('CYTHON_TRACE', '1'),
-                                  ("NPY_NO_DEPRECATED_API", None)])
+                   # extra_compile_args=["-std=c++14"],
+                   define_macros=[("NPY_NO_DEPRECATED_API", None)])
+# CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
+if not release:
+    ext_options['define_macros'].append(
+        ('CYTHON_TRACE', '1'))
+
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
