@@ -149,8 +149,6 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
-add_delaunay(ext_modules, src_include, 'D', dont_compile=True,
-             periodic=True)
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
              dont_compile=compile_parallel)
 
@@ -178,7 +176,7 @@ with open('README.rst') as file:
 setup(name = 'cgal4py',
       packages = ['cgal4py', 'cgal4py.delaunay', 'cgal4py.domain_decomp',
                   'cgal4py.tests'],
-      package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
+      # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},
       version = '0.1',
