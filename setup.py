@@ -40,8 +40,8 @@ ext_options = dict(language="c++",
                    include_dirs=[numpy.get_include()],
                    libraries=[],
                    extra_link_args=[],
-                   # extra_compile_args=["-std=gnu++11"],
-                   extra_compile_args=["-std=gnu++14"],
+                   extra_compile_args=["-std=gnu++11"],
+                   # extra_compile_args=["-std=gnu++14"],
                    define_macros=[("NPY_NO_DEPRECATED_API", None)])
 # CYTHON_TRACE required for coverage and line_profiler.  Remove for release.
 if not release:
@@ -49,6 +49,7 @@ if not release:
         ('CYTHON_TRACE', '1'))
 
 cykdtree_cpp = None
+cykdtree_parallel_cpp = None
 cykdtree_utils_cpp = None
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
@@ -66,6 +67,8 @@ else:
         import cykdtree
         cykdtree_cpp = os.path.join(
             os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
+        cykdtree_parallel_cpp = os.path.join(
+            os.path.dirname(cykdtree.__file__), "c_parallel_kdtree.cpp")
         cykdtree_utils_cpp = os.path.join(
             os.path.dirname(cykdtree.__file__), "c_utils.cpp")
         # Attempt to call MPICH first, then OpenMPI
@@ -145,6 +148,7 @@ def add_delaunay(ext_modules, src_include, ver, periodic=False, parallel=False,
             ext_modules.append(
                 Extension(ext_name, sources=[pyx_file, cpp_file,
                                              cykdtree_cpp,
+                                             cykdtree_parallel_cpp,
                                              cykdtree_utils_cpp],
                           **ext_options_mpicgal))
         else:

@@ -7,7 +7,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
-#include "c_kdtree.hpp"
+// #include "c_kdtree.hpp"
+#include "c_parallel_kdtree.hpp"
 #include "c_tools.hpp"
 #include "c_delaunay2.hpp"
 #include "c_delaunay3.hpp"
