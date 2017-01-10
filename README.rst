@@ -2,7 +2,7 @@
 README
 ======
 
-cgal4py is a Python interface for using the `CGAL <http://www.cgal.org>`_ Delaunay triangulation classes in any number of dimensions. Triangulation in parallel is also supported using the algorithm described in `Peterka, Morozov, & Phillips (2014) <http://mrzv.org/publications/distributed-delaunay/>`_. Documentation for cgal4py can be found `here <http://cgal4py.readthedocs.io/en/latest/>`_.
+cgal4py is a Python interface for using the `CGAL <http://www.cgal.org>`__ Delaunay triangulation classes in any number of dimensions. Triangulation in parallel is also supported using the algorithm described in `Peterka, Morozov, & Phillips (2014) <http://mrzv.org/publications/distributed-delaunay/>`_. Documentation for cgal4py can be found `here <http://cgal4py.readthedocs.io/en/latest/>`_.
 
 ---------
 Licensing
@@ -17,7 +17,7 @@ For running in serial:
  * `Python 2.7 <https://www.python.org/download/releases/2.7/>`_
  * C++11 compiler
  * `Cython <http://cython.org/>`_
- * `CGAL <http://www.cgal.org/download.html>`_ Version 3.5 or higher is required for periodic triangulations in 3D and version 4.9 or higher is required for periodic triangulations in 2D.
+ * `CGAL <http://www.cgal.org/download.html>`__ Version 3.5 or higher is required for periodic triangulations in 3D and version 4.9 or higher is required for periodic triangulations in 2D.
 
 For running in parallel you will need the above plus:
 
