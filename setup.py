@@ -50,6 +50,7 @@ if not release:
 
 cykdtree_cpp = None
 cykdtree_utils_cpp = None
+ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
 if RTDFLAG:
     ext_options['extra_compile_args'].append('-DREADTHEDOCS')
     ext_options_cgal = copy.deepcopy(ext_options)
@@ -61,7 +62,6 @@ else:
     # Check that there is a version of MPI available
     compile_parallel = True
     try:
-        ext_options_mpicgal = copy.deepcopy(ext_options_cgal)
         import cykdtree
         cykdtree_cpp = os.path.join(
             os.path.dirname(cykdtree.__file__), "c_kdtree.cpp")
