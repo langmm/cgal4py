@@ -2,10 +2,10 @@ from setuptools import setup
 from distutils.core import setup
 from distutils.extension import Extension
 import distutils.sysconfig
-from Cython.Build import cythonize
 import numpy
 import os, copy
 try:
+    from Cython.Build import cythonize
     from Cython.Distutils import build_ext
 except ImportError:
     use_cython = False
@@ -16,7 +16,7 @@ release = True
 
 # Check if ReadTheDocs is building extensions
 RTDFLAG = bool(os.environ.get('READTHEDOCS', None) == 'True')
-RTDFLAG = True
+# RTDFLAG = True
 
 # Stop obnoxious -Wstrict-prototypes warning with c++
 cfg_vars = distutils.sysconfig.get_config_vars()
@@ -25,7 +25,7 @@ for key, value in cfg_vars.items():
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 # Needed for line_profiler - disable for production code
-if not RTDFLAG and not release:
+if not RTDFLAG and not release and use_cython:
     try:
         from Cython.Compiler.Options import directive_defaults
     except ImportError:
