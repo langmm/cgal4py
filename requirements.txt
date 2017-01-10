@@ -2,3 +2,5 @@ numpy
 matplotlib
 cython
 cykdtree
+mpi4py
+multiprocessing

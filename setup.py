@@ -25,10 +25,15 @@ for key, value in cfg_vars.items():
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
 # Needed for line_profiler - disable for production code
-# if not RTDFLAG and not release:
-#     from Cython.Compiler.Options import directive_defaults
-#     directive_defaults['linetrace'] = True
-#     directive_defaults['binding'] = True
+if not RTDFLAG and not release:
+    try:
+        from Cython.Compiler.Options import directive_defaults
+    except ImportError:
+        # Update to cython  
+        from Cython.Compiler.Options import get_directive_defaults
+        directive_defaults = get_directive_defaults()
+    directive_defaults['linetrace'] = True
+    directive_defaults['binding'] = True
 
 # Set generic extension options
 ext_options = dict(language="c++",
