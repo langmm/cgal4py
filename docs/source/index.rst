@@ -24,20 +24,5 @@ Indices and tables
 
 .. todo::
    * separate out dummyCGAL into separate cases to make it more managable
-   * design logo
-   * upload to PyPI
    * documentation for simple examples
-   * run flake8
-   * General structure:
-      * MPI parallelism:
-	 1. Do domain decomp on process 0
-	 2. Communicate leaves to each process (one class per process)
-	 3. Perform triangulation on each process
-	 4. Do communication of points at edges
-	 5. Provide interface to total process
-      * Thread prallelism:
-	 1. Do domain decomp
-	 2. Split leaves between threads
-	 3. Perform triangulation on each thread
-	 4. Do communication between triangulations/combine triangulations
-	 5. Provide interface to total triangulation
+   * flake8
