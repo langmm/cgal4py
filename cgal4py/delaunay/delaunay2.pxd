@@ -142,6 +142,8 @@ cdef extern from "c_delaunay2.hpp":
 
             int dimension() except + 
 
+            double min_angle()
+
         bool is_infinite(Vertex x)
         bool is_infinite(Edge x)
         bool is_infinite(Cell x)
@@ -177,6 +179,8 @@ cdef extern from "c_delaunay2.hpp":
         double dual_area(const Vertex v)
         void dual_areas(double* vols) const
         double length(const Edge e)
+        double minimum_angle(const Cell c) const
+        void minimum_angles(double* angles) const 
 
         bool flip(Cell x, int i)
         bool flip(Edge x)

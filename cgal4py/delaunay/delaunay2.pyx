@@ -967,6 +967,11 @@ cdef class Delaunay2_cell:
         def __get__(self):
             return self.x.dimension()
 
+    property min_angle:
+        r"double: The smalles angle in this face in radians."
+        def __get__(self):
+            return self.x.min_angle()
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this cell.
 
@@ -1806,6 +1811,19 @@ cdef class Delaunay2:
             return out
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.dual_areas(&out[0])
+        return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def minimum_angles(self):
+        r"""np.ndarray of float64: Array of minimum angles for finite cells in
+        the triangulation. The angles are in the order of the cell traversal."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_cells, 'float64')
+        if self.n == 0:
+            return out
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            self.T.minimum_angles(&out[0])
         return out
         
     @_update_to_tess

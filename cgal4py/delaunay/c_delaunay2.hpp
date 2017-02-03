@@ -371,6 +371,31 @@ public:
     void cw_permute() { _x->cw_permute(); }
 
     int dimension() const { return _x->dimension(); }
+
+    double min_angle() const {
+      Point p0, p1, p2;
+      CGAL::Vector_2<K2> v0, v1, v2;
+      double cosine0, cosine1, cosine2;
+      double angle0, angle1, angle2, min_angle;
+      p0 = _x->vertex(0)->point();
+      p1 = _x->vertex(1)->point();
+      p2 = _x->vertex(2)->point();
+      v0 = p1 - p0;
+      v1 = p2 - p1;
+      v2 = p0 - p2;
+      cosine0 = (static_cast<double>(-v0 * v2)) / std::sqrt(v0*v0) / std::sqrt(v2*v2);
+      cosine1 = (static_cast<double>(-v1 * v0)) / std::sqrt(v1*v1) / std::sqrt(v0*v0);
+      cosine2 = (static_cast<double>(-v2 * v1)) / std::sqrt(v2*v2) / std::sqrt(v1*v1);
+      angle0 = std::acos(cosine0);
+      angle1 = std::acos(cosine1);
+      angle2 = std::acos(cosine2);
+      min_angle = angle0;
+      if (angle1 < min_angle)
+	min_angle = angle1;
+      if (angle2 < min_angle)
+	min_angle = angle2;
+      return min_angle;
+    }
   };
 
 
@@ -528,6 +553,20 @@ public:
     Finite_vertices_iterator it = T.finite_vertices_begin();
     for ( ; it != T.finite_vertices_end(); it++) {
       vols[it->info()] = dual_area(Vertex(it));
+    }
+  }
+
+  double minimum_angle(const Cell c) const {
+    return c.min_angle();
+  }
+
+  void minimum_angles(double* angles) const {
+    int i = 0;
+    for (All_faces_iterator it = T.all_faces_begin(); it != T.all_faces_end(); it++) {
+      if (T.is_infinite(it) == false) {
+	angles[i] = minimum_angle(Cell(it));
+	i++;
+      }
     }
   }
 
