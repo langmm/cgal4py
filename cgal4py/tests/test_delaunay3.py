@@ -399,7 +399,7 @@ def test_cell():
     T.insert(pts)
     cold = None
     for c in T.all_cells:
-        print(c, c.circumcenter, c.center)
+        print(c, c.circumcenter, c.center, c.min_angle)
         assert(c == c)
         if cold is not None:
             assert(c != cold)
@@ -822,3 +822,15 @@ def test_edges():
     e = T.edges
     assert(e.shape[0] == T.num_finite_edges)
     assert(e.shape[1] == 2)
+
+def test_voronoi_volumes():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.voronoi_volumes()
+    assert(v.shape[0] == T.num_finite_verts)
+
+def test_minimum_angles():
+    T = Delaunay3()
+    T.insert(pts)
+    v = T.minimum_angles()
+    assert(v.shape[0] < T.num_finite_cells)
