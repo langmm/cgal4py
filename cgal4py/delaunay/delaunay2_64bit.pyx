@@ -192,8 +192,8 @@ cdef class Delaunay2_64bit_vertex_iter:
         T (Delaunay2_64bit): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include:
-                'all_begin': The first vertex in an iteration over all vertices.
-                'all_end': The last vertex in an iteration over all vertices.
+            * 'all_begin': The first vertex in an iteration over all vertices.
+            * 'all_end': The last vertex in an iteration over all vertices.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -532,8 +532,8 @@ cdef class Delaunay2_64bit_edge_iter:
         T (Delaunay2_64bit): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include:
-                'all_begin': The first edge in an iteration over all edges.
-                'all_end': The last edge in an iteration over all edges.
+            * 'all_begin': The first edge in an iteration over all edges.
+            * 'all_end': The last edge in an iteration over all edges.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -970,6 +970,11 @@ cdef class Delaunay2_64bit_cell:
         def __get__(self):
             return self.x.dimension()
 
+    property min_angle:
+        r"double: The smalles angle in this face in radians."
+        def __get__(self):
+            return self.x.min_angle()
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this cell.
 
@@ -1045,8 +1050,8 @@ cdef class Delaunay2_64bit_cell_iter:
         T (Delaunay2_64bit): Triangulation that this cell belongs to.
         cell (:obj:`str`, optional): String specifying the cell that 
             should be referenced. Valid options include:
-                'all_begin': The first cell in an iteration over all cells.
-                'all_end': The last cell in an iteration over all cells.
+            * 'all_begin': The first cell in an iteration over all cells.
+            * 'all_end': The last cell in an iteration over all cells.
 
     Attributes:
         T (:obj:`Delaunay_with_info_2[info_t]`): C++ Triangulation object 
@@ -1810,6 +1815,20 @@ cdef class Delaunay2_64bit:
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.dual_areas(&out[0])
         return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def minimum_angles(self):
+        r"""np.ndarray of float64: Array of minimum angles for finite cells in
+        the triangulation. The angles are in the order of the cell traversal."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_cells, 'float64')
+        cdef int nout
+        if self.n == 0:
+            return out
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            nout = self.T.minimum_angles(&out[0])
+        return out[:nout]
         
     @_update_to_tess
     def remove(self, Delaunay2_64bit_vertex x):
@@ -2222,15 +2241,15 @@ cdef class Delaunay2_64bit:
     def get_conflicts_and_boundary(self, np.ndarray[np.float64_t, ndim=1] pos,
                                    Delaunay2_64bit_cell start):
         r"""Get the cells and edges of cells that are in conflict with a given 
-            point.
+        point.
 
         Args:
             pos (:obj:`ndarray` of float64): x,y coordinates.
             start (Delaunay2_64bit_cell): Cell to start list of conflicts at.  
         
         Returns:
-            tuple: :obj:`list` of :obj:`Delaunay2_64bit_cell`s in conflict with pos 
-                and :obj:`list` of :obj:`Delaunay2_64bit_edge`s bounding the 
+            tuple: :obj:`list` of Delaunay2_64bit_cell in conflict with pos
+                and :obj:`list` of Delaunay2_64bit_edge bounding the
                 conflicting cells.
 
         """

@@ -147,8 +147,8 @@ def add_delaunay(ext_modules, src_include, ver, periodic=False, parallel=False,
         if parallel:
             ext_modules.append(
                 Extension(ext_name, sources=[pyx_file, cpp_file,
-                                             cykdtree_cpp,
-                                             cykdtree_parallel_cpp,
+                                             # cykdtree_cpp,
+                                             # cykdtree_parallel_cpp,
                                              cykdtree_utils_cpp],
                           **ext_options_mpicgal))
         else:
@@ -174,9 +174,6 @@ ext_modules += [
     Extension("cgal4py.delaunay.tools",
               sources=["cgal4py/delaunay/tools.pyx"],
               **ext_options),
-    Extension("cgal4py.utils",
-              sources=["cgal4py/utils.pyx","cgal4py/c_utils.cpp"],
-              **ext_options)
     ]
 src_include += [
     "cgal4py/delaunay/tools.pyx",

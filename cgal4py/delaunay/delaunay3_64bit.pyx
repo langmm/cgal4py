@@ -203,8 +203,8 @@ cdef class Delaunay3_64bit_vertex_iter:
         T (Delaunay3_64bit): Triangulation that this vertex belongs to.
         vert (:obj:`str`, optional): String specifying the vertex that 
             should be referenced. Valid options include: 
-                'all_begin': The first vertex in an iteration over all vertices.  
-                'all_end': The last vertex in an iteration over all vertices. 
+            * 'all_begin': The first vertex in an iteration over all vertices.  
+            * 'all_end': The last vertex in an iteration over all vertices. 
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -613,8 +613,8 @@ cdef class Delaunay3_64bit_edge_iter:
         T (Delaunay3_64bit): Triangulation that this edge belongs to.
         edge (:obj:`str`, optional): String specifying the edge that 
             should be referenced. Valid options include: 
-                'all_begin': The first edge in an iteration over all edges.
-                'all_end': The last edge in an iteration over all edges.
+            * 'all_begin': The first edge in an iteration over all edges.
+            * 'all_end': The last edge in an iteration over all edges.
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -1042,8 +1042,8 @@ cdef class Delaunay3_64bit_facet_iter:
         T (Delaunay3_64bit): Triangulation that this facet belongs to.
         facet (:obj:`str`, optional): String specifying the facet that 
             should be referenced. Valid options include: 
-                'all_begin': The first facet in an iteration over all facets.
-                'all_end': The last facet in an iteration over all facets.
+            * 'all_begin': The first facet in an iteration over all facets.
+            * 'all_end': The last facet in an iteration over all facets.
  
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -1478,6 +1478,11 @@ cdef class Delaunay3_64bit_cell:
             self.T.circumcenter(self.x, &out[0])
             return out
 
+    property min_angle:
+        r"double: The smallest solid angle in this cell in steradians."
+        def __get__(self):
+            return self.x.min_angle()
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this cell.
 
@@ -1568,8 +1573,8 @@ cdef class Delaunay3_64bit_cell_iter:
         T (Delaunay3_64bit): Triangulation that this cell belongs to. 
         cell (:obj:`str`, optional): String specifying the cell that
             should be referenced. Valid options include: 
-                'all_begin': The first cell in an iteration over all cells. 
-                'all_end': The last cell in an iteration over all cells.
+            * 'all_begin': The first cell in an iteration over all cells. 
+            * 'all_end': The last cell in an iteration over all cells.
     
     Attributes:
         T (:obj:`Delaunay_with_info_3[info_t]`): C++ Triangulation object 
@@ -2347,6 +2352,20 @@ cdef class Delaunay3_64bit:
             self.T.dual_volumes(&out[0])
         return out
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def minimum_angles(self):
+        r"""np.ndarray of float64: Array of minimum angles for finite cells in
+        the triangulation. The angles are in the order of the cell traversal."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_cells, 'float64')
+        cdef int nout
+        if self.n == 0:
+            return out
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            nout = self.T.minimum_angles(&out[0])
+        return out[:nout]
+
     @_update_to_tess
     def remove(self, Delaunay3_64bit_vertex x):
         r"""Remove a vertex from the triangulation. 
@@ -2802,8 +2821,8 @@ cdef class Delaunay3_64bit:
             start (Delaunay3_64bit_cell): Cell to start list of facets at. 
 
         Returns: 
-            tuple: :obj:`list` of `Delaunay3_64bit_cell`s in conflict with pos and 
-                :obj:`list` of `Delaunay3_64bit_facet`s bounding the zone in conflict.
+            tuple: :obj:`list` of Delaunay3_64bit_cells in conflict with pos and 
+                :obj:`list` of Delaunay3_64bit_facets bounding the zone in conflict.
 
         """
         assert(len(pos) == 3)

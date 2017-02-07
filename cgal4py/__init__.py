@@ -1,7 +1,6 @@
 r"""Package for performing Delaunay triangulations in Python using Cython
 wrapped CGAL C++ libraries."""
 import plot
-from cgal4py import utils
 import domain_decomp
 import delaunay
 from delaunay import Delaunay
@@ -177,7 +176,7 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
 # Must go here to support tests of triangulate & voronoi_volumes
 import tests  # noqa: E402
 
-__all__ = ["triangulate", "voronoi_volumes", "delaunay", "plot", "utils",
+__all__ = ["triangulate", "voronoi_volumes", "delaunay", "plot",
            "domain_decomp", "tests"]
 if FLAG_MULTIPROC:
     __all__.append("parallel")
