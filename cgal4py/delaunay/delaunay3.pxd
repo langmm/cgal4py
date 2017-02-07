@@ -166,6 +166,8 @@ cdef extern from "c_delaunay3.hpp":
             void set_neighbors()
             void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4)
 
+            double min_angle()
+
         bool are_equal(const Edge e1, const Edge e2) 
         bool are_equal(const Facet f1, const Facet f2) 
 
@@ -213,6 +215,10 @@ cdef extern from "c_delaunay3.hpp":
         double dual_volume(const Vertex v) const
         void dual_volumes(double* vols) const
         double length(const Edge e) const
+
+        bool is_boundary_cell(const Cell c) const
+        double minimum_angle(const Cell c) const
+        int minimum_angles(double* angles) const
 
         bool flip(Cell x, int i, int j)
         bool flip(Edge x)

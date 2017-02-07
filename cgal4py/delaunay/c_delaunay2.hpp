@@ -556,18 +556,30 @@ public:
     }
   }
 
+  bool is_boundary_cell(const Cell c) const {
+    if (T.is_infinite(c._x)) 
+      return true;
+    for (int i = 0; i < 3; i++) {
+      if (T.is_infinite(c.neighbor(i)._x))
+	return true;
+    }
+    return false;
+  }
+
   double minimum_angle(const Cell c) const {
     return c.min_angle();
   }
 
-  void minimum_angles(double* angles) const {
+  int minimum_angles(double* angles) const {
     int i = 0;
     for (All_faces_iterator it = T.all_faces_begin(); it != T.all_faces_end(); it++) {
-      if (T.is_infinite(it) == false) {
+      if (!(is_boundary_cell(Cell(it)))) {
+      // if (T.is_infinite(it) == false) {
 	angles[i] = minimum_angle(Cell(it));
 	i++;
       }
     }
+    return i;
   }
 
   double length(const Edge e) const {

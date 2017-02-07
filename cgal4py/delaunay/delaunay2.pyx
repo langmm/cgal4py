@@ -1820,11 +1820,12 @@ cdef class Delaunay2:
         the triangulation. The angles are in the order of the cell traversal."""
         cdef np.ndarray[np.float64_t, ndim=1] out
         out = np.empty(self.num_finite_cells, 'float64')
+        cdef int nout
         if self.n == 0:
             return out
         with nogil, cython.boundscheck(False), cython.wraparound(False):
-            self.T.minimum_angles(&out[0])
-        return out
+            nout = self.T.minimum_angles(&out[0])
+        return out[:nout]
         
     @_update_to_tess
     def remove(self, Delaunay2_vertex x):

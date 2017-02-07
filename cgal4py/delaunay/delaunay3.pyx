@@ -1475,6 +1475,11 @@ cdef class Delaunay3_cell:
             self.T.circumcenter(self.x, &out[0])
             return out
 
+    property min_angle:
+        r"double: The smallest solid angle in this cell in steradians."
+        def __get__(self):
+            return self.x.min_angle()
+
     def incident_vertices(self):
         r"""Find vertices that are incident to this cell.
 
@@ -2343,6 +2348,20 @@ cdef class Delaunay3:
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.dual_volumes(&out[0])
         return out
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def minimum_angles(self):
+        r"""np.ndarray of float64: Array of minimum angles for finite cells in
+        the triangulation. The angles are in the order of the cell traversal."""
+        cdef np.ndarray[np.float64_t, ndim=1] out
+        out = np.empty(self.num_finite_cells, 'float64')
+        cdef int nout
+        if self.n == 0:
+            return out
+        with nogil, cython.boundscheck(False), cython.wraparound(False):
+            nout = self.T.minimum_angles(&out[0])
+        return out[:nout]
 
     @_update_to_tess
     def remove(self, Delaunay3_vertex x):

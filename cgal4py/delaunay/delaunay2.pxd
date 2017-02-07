@@ -179,8 +179,10 @@ cdef extern from "c_delaunay2.hpp":
         double dual_area(const Vertex v)
         void dual_areas(double* vols) const
         double length(const Edge e)
+
+        bool is_boundary_cell(const Cell c) const 
         double minimum_angle(const Cell c) const
-        void minimum_angles(double* angles) const 
+        int minimum_angles(double* angles) const 
 
         bool flip(Cell x, int i)
         bool flip(Edge x)

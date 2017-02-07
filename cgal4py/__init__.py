@@ -1,7 +1,7 @@
 r"""Package for performing Delaunay triangulations in Python using Cython
 wrapped CGAL C++ libraries."""
 import plot
-import utils
+from cgal4py import utils
 import domain_decomp
 import delaunay
 from delaunay import Delaunay

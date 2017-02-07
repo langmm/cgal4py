@@ -387,6 +387,36 @@ class Delaunay_with_info_3
     void set_neighbors(Cell c1, Cell c2, Cell c3, Cell c4) {
       _x->set_neighbors(c1._x, c2._x, c3._x, c4._x); 
     }
+
+    double min_angle() const {
+      Point p0, p1, p2, p3;
+      CGAL::Vector_3<K3> v1, v2, v3;
+      double min_angle = 99999999999999;
+      double theta1, theta2, theta3, theta0;
+      double tangent, angle;
+      for (int i = 0; i < 4; i++) {
+	p0 = _x->vertex(i)->point();
+	p1 = _x->vertex((i+1)%4)->point();
+	p2 = _x->vertex((i+2)%4)->point();
+	p3 = _x->vertex((i+3)%4)->point();
+	v1 = p1 - p0;
+	v2 = p2 - p0;
+	v3 = p3 - p0;
+	theta1 = std::abs(v2 * v3 / CGAL::sqrt(v2*v2) / CGAL::sqrt(v3*v3));
+	theta2 = std::abs(v3 * v1 / CGAL::sqrt(v3*v3) / CGAL::sqrt(v1*v1));
+	theta3 = std::abs(v1 * v2 / CGAL::sqrt(v1*v1) / CGAL::sqrt(v2*v2));
+	theta0 = (theta1 + theta2 + theta3)/2.0;
+	tangent = std::sqrt(std::tan(theta0/2.0)*
+			    std::tan((theta0 - theta1)/2.0)*
+			    std::tan((theta0 - theta2)/2.0)*
+			    std::tan((theta0 - theta3)/2.0));
+	angle = 4.0*std::atan(tangent);
+	if (angle < min_angle)
+	  min_angle = angle;
+      }
+      return min_angle;
+    }
+      
   };
 
   bool are_equal(const Facet f1, const Facet f2) const {
@@ -637,6 +667,31 @@ class Delaunay_with_info_3
     for (Finite_vertices_iterator it = T.finite_vertices_begin(); it != T.finite_vertices_end(); it++) {
       vols[it->info()] = dual_volume(Vertex(it));
     }    
+  }
+
+  bool is_boundary_cell(const Cell c) const {
+    if (T.is_infinite(c._x))
+      return true;
+    for (int i = 0; i < 4; i++) {
+      if (T.is_infinite(c.neighbor(i)._x))
+        return true;
+    }
+    return false;
+  }
+  
+  double minimum_angle(const Cell c) const {
+    return c.min_angle();
+  }
+  
+  int minimum_angles(double* angles) const {
+    int i = 0;
+    for (All_cells_iterator it = T.all_cells_begin(); it != T.all_cells_end(); it++) {
+      if (!(is_boundary_cell(Cell(it)))) {
+        angles[i] = minimum_angle(Cell(it));
+        i++;
+      }
+    }
+    return i;
   }
 
   double length(const Edge e) const {
