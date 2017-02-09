@@ -8,27 +8,27 @@ r"""Access to generic triangulation extensions.
 import numpy as np
 import warnings
 import importlib
-import tools
+from cgal4py.delaunay import tools
 import os
 import pyximport
 import distutils
-import delaunay2
-import delaunay3
-from delaunay2 import Delaunay2
-from delaunay3 import Delaunay3
-from periodic_delaunay2 import is_valid as is_valid_P2
-from periodic_delaunay3 import is_valid as is_valid_P3
-import parallel_delaunayD
+from cgal4py.delaunay import delaunay2
+from cgal4py.delaunay import delaunay3
+from cgal4py.delaunay.delaunay2 import Delaunay2
+from cgal4py.delaunay.delaunay3 import Delaunay3
+from cgal4py.delaunay.periodic_delaunay2 import is_valid as is_valid_P2
+from cgal4py.delaunay.periodic_delaunay3 import is_valid as is_valid_P3
+from cgal4py.delaunay import parallel_delaunayD
 if is_valid_P2():
-    import periodic_delaunay2
-    from periodic_delaunay2 import PeriodicDelaunay2
+    from cgal4py.delaunay import periodic_delaunay2
+    from cgal4py.delaunay.periodic_delaunay2 import PeriodicDelaunay2
 else:
     warnings.warn("Could not import the 2D periodic triangulation package. " +
                   "Update CGAL to at least version 4.9 to enable this " +
                   "feature.")
 if is_valid_P3():
-    import periodic_delaunay3
-    from periodic_delaunay3 import PeriodicDelaunay3
+    from cgal4py.delaunay import periodic_delaunay3
+    from cgal4py.delaunay.periodic_delaunay3 import PeriodicDelaunay3
 else:
     warnings.warn("Could not import the 3D periodic triangulation package. " +
                   "Update CGAL to at least version 3.5 to enable this " +
@@ -97,7 +97,7 @@ def _create_pyxbld_file(fname, overwrite=False, **kwargs):
         "                     libraries=['gmp','CGAL'] + " + \
             "{},".format(kwargs.get('libraries', [])),
         "                     language='c++',",
-        "                     extra_compile_args=['-std=c++14'] + " + \
+        "                     extra_compile_args=['-std=gnu++11'] + " + \
             "{},".format(kwargs.get('extra_compile_args', [])),
         "                     extra_link_args=['-lgmp'] + " + \
             "{},".format(kwargs.get('extra_link_args', [])),
@@ -435,7 +435,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
             include_dirs.append(cykdtree_dir)
             sources += [
                 _delaunay_filename('cpp', dim),
-                os.path.join(cykdtree_dir, "c_kdtree.cpp"),
+                os.path.join(cykdtree_dir, "c_parallel_kdtree.cpp"),
                 os.path.join(cykdtree_dir, "c_utils.cpp")]
         for cpp_file in sources:
             if not os.path.isfile(cpp_file):

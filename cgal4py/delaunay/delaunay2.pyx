@@ -10,6 +10,7 @@ import numpy as np
 cimport numpy as np
 import struct
 
+from cgal4py import PY_MAJOR_VERSION
 from cgal4py import plot
 from cgal4py.delaunay.tools cimport sortSerializedTess
 
@@ -1326,7 +1327,11 @@ cdef class Delaunay2:
         ffmt = 'd'
         if pos is not None:
             ffmt = pos.dtype.char
-        buf.write(struct.pack('cc', ffmt, ifmt))
+        if PY_MAJOR_VERSION == 2:
+            buf.write(struct.pack('cc', ffmt, ifmt))
+        else:
+            buf.write(struct.pack('cc', ffmt.encode('ascii'),
+                                  ifmt.encode('ascii')))
         buf.write(struct.pack(ifmt, idx_inf))
         if pos is not None:
             buf.write(struct.pack(2*ifmt, pos.shape[0], pos.shape[1]))
@@ -1353,7 +1358,13 @@ cdef class Delaunay2:
         cdef str ifmt, ffmt
         cdef int isiz, fsiz
         cdef int nx, ny
-        (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        cdef bytes ibfmt, fbfmt
+        if PY_MAJOR_VERSION == 2:
+            (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        else:
+            (fbfmt, ibfmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+            ffmt = fbfmt.decode()
+            ifmt = ibfmt.decode()
         fsiz = struct.calcsize(ffmt)
         isiz = struct.calcsize(ifmt)
         (idx_inf,) = struct.unpack(ifmt, buf.read(isiz))
@@ -1410,7 +1421,12 @@ cdef class Delaunay2:
                 be written to.
 
         """
-        cdef char* cfname = fname
+        cdef char* cfname
+        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        if PY_MAJOR_VERSION < 3:
+            cfname = fname
+        else:
+            cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.write_to_file(cfname)
 
@@ -1423,7 +1439,12 @@ cdef class Delaunay2:
                 be read from.
 
         """
-        cdef char* cfname = fname
+        cdef char* cfname
+        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        if PY_MAJOR_VERSION < 3:
+            cfname = fname
+        else:
+            cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.read_from_file(cfname)
         self.n = self.T.num_finite_verts()
@@ -2328,10 +2349,10 @@ cdef class Delaunay2:
         assert(vout.size() == nbox)
         # Transfer values to array
         cdef uint64_t i, j
-        cdef object out = [None for i in xrange(vout.size())]
-        for i in xrange(vout.size()):
+        cdef object out = [None for i in range(vout.size())]
+        for i in range(vout.size()):
             out[i] = np.empty(vout[i].size(), np_info)
-            for j in xrange(vout[i].size()):
+            for j in range(vout[i].size()):
                 out[i][j] = vout[i][j]
         return out
 
@@ -2387,18 +2408,18 @@ cdef class Delaunay2:
         cdef np.ndarray[info_t] iind
         cdef np.ndarray[info_t] lr_arr
         iN = alln.size()
-        iind = np.array([alln[j] for j in xrange(<int>iN)], np_info)
+        iind = np.array([alln[j] for j in range(<int>iN)], np_info)
         for i in range(2):
             if   i == 0: lr = lx
             elif i == 1: lr = ly
             iN = <info_t>lr.size()
-            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
+            lr_arr = np.array([lr[j] for j in range(<int>iN)], np_info)
             lind[i] = lr_arr
         for i in range(2):
             if   i == 0: lr = rx
             elif i == 1: lr = ry
             iN = <info_t>lr.size()
-            lr_arr = np.array([lr[j] for j in xrange(<int>iN)], np_info)
+            lr_arr = np.array([lr[j] for j in range(<int>iN)], np_info)
             rind[i] = lr_arr
         # Return
         return lind, rind, iind

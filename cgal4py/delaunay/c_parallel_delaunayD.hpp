@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <stdexcept>
+#include <exception>
 #include <iostream>
 #include <fstream>
 // #include "c_kdtree.hpp"
@@ -29,10 +30,15 @@
 #define MAXLEN_FILENAME  1000
 #define DEBUG 1
 
+void my_error(const char* msg = "") {
+  printf(msg);
+  // throw std::runtime_error(msg);
+}
+
 void *my_malloc(size_t size) {
   void *out = malloc(size);
   if (out == NULL)
-    throw std::runtime_error("Failed to malloc\n");
+    my_error("Failed to malloc\n");
   return out;
 }
 
@@ -43,7 +49,7 @@ void *my_realloc(void *in, size_t size, const char* msg = "") {
     std::strcpy(msg_tot, "Failed to realloc: ");
     std::strcat(msg_tot, msg);
     std::strcat(msg_tot, "\n");
-    throw std::runtime_error(msg_tot);
+    my_error( msg_tot );
   }
   return out;
 }
@@ -111,7 +117,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[CGeneralDelaunay] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
   ~CGeneralDelaunay() {
@@ -130,7 +136,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[~CGeneralDelaunay] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -151,7 +157,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[num_finite_verts] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
     return out;
   }
@@ -172,7 +178,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[num_cells] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
     return out;
   }
@@ -193,7 +199,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[insert] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -227,7 +233,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[serialize_info2idx] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
     return out;
   }
@@ -262,7 +268,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[deserialize] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -285,7 +291,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[outgoing_points] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
     return out;
   }
@@ -306,7 +312,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[write_to_buffer] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -326,7 +332,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[read_from_buffer] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -346,7 +352,7 @@ public:
     } else {
       char msg[100];
       sprintf(msg, "[dual_volumes] Incorrect number of dimensions. %d", ndim);
-      throw std::runtime_error(msg);
+      my_error(msg);
     }
   }
 
@@ -1363,7 +1369,7 @@ public:
     MPI_Bcast(&leafsize_limit, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if (leafsize_limit)
       printf("Leafsize is too small (%d in %dD).", leafsize_limit, ndim);
-      // throw std::runtime_error("Leafsize is too small (%d in %dD).",
+      // my_error("Leafsize is too small (%d in %dD).",
       // 			       leafsize_limit, );
     // Send leaves
     if (rank == 0) {
@@ -1450,7 +1456,7 @@ public:
 		  MPI_COMM_WORLD);
     if (leafsize_limit)
       printf("Leafsize is too small (%d in %dD).", leafsize_limit, ndim);
-      // throw std::runtime_error("Leafsize is too small (%d in %dD).",
+      // my_error("Leafsize is too small (%d in %dD).",
       // 			       leafsize_limit, );
     // Create leaves from tree nodes
     for (i = 0; i < nleaves; i++) {

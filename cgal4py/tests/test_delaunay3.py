@@ -9,7 +9,7 @@ r"""Tests for 3D Delaunay Triangulation.
 import numpy as np
 import os
 from cgal4py.delaunay import Delaunay3
-from test_cgal4py import MyTestCase, make_points
+from cgal4py.tests.test_cgal4py import MyTestCase, make_points
 
 
 pts, left_edge, right_edge = make_points(0, 3)

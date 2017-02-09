@@ -55,7 +55,7 @@ def plot2D(T, plotfile=None, vertex_kw={}, edge_kw={},
 
     # Plot edges
     e = T.edges
-    seg = [v[e[i, :], :] for i in xrange(e.shape[0])]
+    seg = [v[e[i, :], :] for i in range(e.shape[0])]
     lc = LineCollection(seg, **edge_kw)
     axs.add_collection(lc)
 
@@ -126,7 +126,7 @@ def plot3D(T, plotfile=None, vertex_kw={}, edge_kw={},
 
     # Plot edges
     e = T.edges
-    seg = [v[e[i, :], :] for i in xrange(e.shape[0])]
+    seg = [v[e[i, :], :] for i in range(e.shape[0])]
     lc = Line3DCollection(seg, **edge_kw)
     axs.add_collection(lc)
 

@@ -3,10 +3,12 @@ import nose.tools as nt
 import numpy as np
 import os
 import time
+from cgal4py import PY_MAJOR_VERSION
 from cgal4py import parallel, delaunay
 from cgal4py.domain_decomp import GenericTree
-from test_cgal4py import make_points, make_test, MyTestCase
-import multiprocessing as mp
+from cgal4py.tests.test_cgal4py import make_points, make_test, MyTestCase
+if PY_MAJOR_VERSION == 2:
+    import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
 np.random.seed(10)
@@ -214,75 +216,76 @@ class TestDelaunayProcessMPI(MyTestCase):
         dummy2.gather_leaf_arrays(arr)
 
 
-class TestDelaunayProcessMulti(MyTestCase):
+if PY_MAJOR_VERSION == 2:
+    class TestDelaunayProcessMulti(MyTestCase):
 
-    def setup_param(self):
-        self._func = parallel.DelaunayProcessMulti
-        self.param_runs = [
-            (('triangulate',), {}),
-            (('triangulate',), {'limit_mem':True}),
-            (('volumes',), {}),
-            (('triangulate',), {'limit_mem':True}),
-            ]
+        def setup_param(self):
+            self._func = parallel.DelaunayProcessMulti
+            self.param_runs = [
+                (('triangulate',), {}),
+                (('triangulate',), {'limit_mem':True}),
+                (('volumes',), {}),
+                (('triangulate',), {'limit_mem':True}),
+                ]
 
-    def check_runs(self, args, kwargs):
-        (taskname,) = args
-        ndim = 2
-        periodic = False
-        pts, tree = make_test(0, ndim, periodic=periodic)
-        idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-        ptsArray = mp.RawArray('d', pts.size)
-        memoryview(idxArray)[:] = tree.idx
-        memoryview(ptsArray)[:] = pts
-        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-        leaves = tree.leaves
-        nproc = 2  # len(leaves)
-        count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
-        lock = mp.Condition()
-        queues = [mp.Queue() for _ in xrange(nproc+1)]
-        in_pipes = [None for _ in xrange(nproc)]
-        out_pipes = [None for _ in xrange(nproc)]
-        for i in range(nproc):
-            out_pipes[i],in_pipes[i] = mp.Pipe(True)
-        # Split leaves
-        task2leaves = [[] for _ in xrange(nproc)]
-        for leaf in leaves:
-            task = leaf.id % nproc
-            task2leaves[task].append(leaf)
-        # Dummy process
-        processes = []
-        for i in xrange(nproc):
-            processes.append(self._func(
-                taskname, i, task2leaves[i],
-                ptsArray, idxArray, left_edges, right_edges,
-                queues, lock, count, in_pipes[i], **kwargs))
-        # Perform setup on higher processes
-        for i in xrange(1, nproc):
-            P = processes[i]
-            P.tessellate_leaves()
-            P.outgoing_points()
-        for i in xrange(1, nproc):
-            count[0].value += 1
-        # Perform entire run on lowest process
-        P = processes[0]
-        P.run(test_in_serial=True)
-        # Do tear down on higher processes
-        for i in xrange(1, nproc):
-            P = processes[i]
-            P.incoming_points()
-            P.enqueue_result()
-            for l in range(len(task2leaves[i])):
-                x = P.receive_result(out_pipes[i])
-        # Clean up files
-        for i in xrange(nproc):
-            P = processes[i]
-            for leaf in P._leaves:
-                if kwargs.get('limit_mem', False):
-                    leaf.remove_tess()
-                ffinal = leaf.tess_output_filename
-                if os.path.isfile(ffinal):
-                    os.remove(ffinal)
+        def check_runs(self, args, kwargs):
+            (taskname,) = args
+            ndim = 2
+            periodic = False
+            pts, tree = make_test(0, ndim, periodic=periodic)
+            idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+            ptsArray = mp.RawArray('d', pts.size)
+            memoryview(idxArray)[:] = tree.idx
+            memoryview(ptsArray)[:] = pts
+            left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+            right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+            leaves = tree.leaves
+            nproc = 2  # len(leaves)
+            count = [mp.Value('i',0),mp.Value('i',0),mp.Value('i',0)]
+            lock = mp.Condition()
+            queues = [mp.Queue() for _ in xrange(nproc+1)]
+            in_pipes = [None for _ in xrange(nproc)]
+            out_pipes = [None for _ in xrange(nproc)]
+            for i in range(nproc):
+                out_pipes[i],in_pipes[i] = mp.Pipe(True)
+            # Split leaves
+            task2leaves = [[] for _ in xrange(nproc)]
+            for leaf in leaves:
+                task = leaf.id % nproc
+                task2leaves[task].append(leaf)
+            # Dummy process
+            processes = []
+            for i in xrange(nproc):
+                processes.append(self._func(
+                    taskname, i, task2leaves[i],
+                    ptsArray, idxArray, left_edges, right_edges,
+                    queues, lock, count, in_pipes[i], **kwargs))
+            # Perform setup on higher processes
+            for i in xrange(1, nproc):
+                P = processes[i]
+                P.tessellate_leaves()
+                P.outgoing_points()
+            for i in xrange(1, nproc):
+                count[0].value += 1
+            # Perform entire run on lowest process
+            P = processes[0]
+            P.run(test_in_serial=True)
+            # Do tear down on higher processes
+            for i in xrange(1, nproc):
+                P = processes[i]
+                P.incoming_points()
+                P.enqueue_result()
+                for l in range(len(task2leaves[i])):
+                    x = P.receive_result(out_pipes[i])
+            # Clean up files
+            for i in xrange(nproc):
+                P = processes[i]
+                for leaf in P._leaves:
+                    if kwargs.get('limit_mem', False):
+                        leaf.remove_tess()
+                    ffinal = leaf.tess_output_filename
+                    if os.path.isfile(ffinal):
+                        os.remove(ffinal)
 
 
 class TestParallelDelaunay(MyTestCase):
@@ -309,10 +312,11 @@ class TestParallelDelaunay(MyTestCase):
             ans = delaunay.Delaunay(pts)
             read_lines = lines_load_test(args[0], args[1])
             for limit_mem in [False, True]:
-                self.param_returns += [
-                    (ans, (pts, tree, args[2]),
-                         {'use_mpi': False, 'limit_mem': limit_mem})
-                    ]
+                if PY_MAJOR_VERSION == 2:
+                    self.param_returns += [
+                        (ans, (pts, tree, args[2]),
+                             {'use_mpi': False, 'limit_mem': limit_mem})
+                        ]
                 for profile in [False, self._fprof]:
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
@@ -380,10 +384,11 @@ class TestParallelVoronoiVolumes(MyTestCase):
             ans = delaunay.VoronoiVolumes(pts)
             read_lines = lines_load_test(args[0], args[1])
             for limit_mem in [False, True]:
-                self.param_returns += [
-                    (ans, (pts, tree, args[2]),
-                         {'use_mpi': False, 'limit_mem': limit_mem})
-                    ]
+                if PY_MAJOR_VERSION == 2:
+                    self.param_returns += [
+                        (ans, (pts, tree, args[2]),
+                             {'use_mpi': False, 'limit_mem': limit_mem})
+                        ]
                 for profile in [False, self._fprof]:
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
@@ -400,8 +405,8 @@ class TestParallelVoronoiVolumes(MyTestCase):
                         ]
 
     def check_returns(self, result, args, kwargs):
-        print result
-        print self.func(*args, **kwargs)
+        print(result)
+        print(self.func(*args, **kwargs))
         assert(np.allclose(result, self.func(*args, **kwargs)))
         if os.path.isfile(self._fprof):
             os.remove(self._fprof)

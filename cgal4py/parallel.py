@@ -4,19 +4,26 @@ r"""Routines for running triangulations in paralle.
    * parallelism through treading
 
 """
+from cgal4py import PY_MAJOR_VERSION
 from cgal4py.delaunay import Delaunay, tools, _get_Delaunay
 from cgal4py import domain_decomp
 from cgal4py.domain_decomp import GenericTree
 import numpy as np
 import os
+import sys
 import time
 import copy
 import struct
 import pstats
-import cPickle
+if PY_MAJOR_VERSION == 2:
+    import cPickle as pickle
+    import multiprocessing as mp
+    import mp.Process as mp_Process
+else:
+    import pickle
+    mp_Process = object
 import warnings
 from datetime import datetime
-import multiprocessing as mp
 try:
     from mpi4py import MPI
     mpi_loaded = True
@@ -243,12 +250,20 @@ def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
         unique_str = datetime.today().strftime("%Y%j%H%M%S")
         fpick = _generate_filename("dict", unique_str=unique_str)
         out = dict(pts=pts, tree=GenericTree.from_tree(tree))
-        with open(fpick, 'wb') as fd:
-            cPickle.dump(out, fd, cPickle.HIGHEST_PROTOCOL)
-        assert(os.path.isfile(fpick))
-        read_lines = ["import cPickle",
-                      "with open('{}', 'rb') as fd:".format(fpick),
-                      "    load_dict = cPickle.load(fd)"]
+        if PY_MAJOR_VERSION == 2:
+            with open(fpick, 'wb') as fd:
+                pickle.dump(out, fd, pickle.HIGHEST_PROTOCOL)
+            assert(os.path.isfile(fpick))
+            read_lines = ["import cPickle",
+                          "with open('{}', 'rb') as fd:".format(fpick),
+                          "    load_dict = cPickle.load(fd)"]
+        else:
+            with open(fpick, 'wb') as fd:
+                pickle.dump(out, fd)
+            assert(os.path.isfile(fpick))
+            read_lines = ["import pickle",
+                          "with open('{}', 'rb') as fd:".format(fpick),
+                          "    load_dict = pickle.load(fd)"]
         ndim = tree.ndim
         out = ParallelDelaunayMPI(read_lines, ndim, nproc, **kwargs)
         os.remove(fpick)
@@ -280,12 +295,20 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
         unique_str = datetime.today().strftime("%Y%j%H%M%S")
         fpick = _generate_filename("dict", unique_str=unique_str)
         out = dict(pts=pts, tree=GenericTree.from_tree(tree))
-        with open(fpick, 'wb') as fd:
-            cPickle.dump(out, fd, cPickle.HIGHEST_PROTOCOL)
-        assert(os.path.isfile(fpick))
-        read_lines = ["import cPickle",
-                      "with open('{}', 'rb') as fd:".format(fpick),
-                      "    load_dict = cPickle.load(fd)"]
+        if PY_MAJOR_VERSION == 2:
+            with open(fpick, 'wb') as fd:
+                pickle.dump(out, fd, pickle.HIGHEST_PROTOCOL)
+            assert(os.path.isfile(fpick))
+            read_lines = ["import cPickle",
+                          "with open('{}', 'rb') as fd:".format(fpick),
+                          "    load_dict = cPickle.load(fd)"]
+        else:
+            with open(fpick, 'wb') as fd:
+                pickle.dump(out, fd)
+            assert(os.path.isfile(fpick))
+            read_lines = ["import pickle",
+                          "with open('{}', 'rb') as fd:".format(fpick),
+                          "    load_dict = pickle.load(fd)"]
         ndim = tree.ndim
         out = ParallelVoronoiVolumesMPI(read_lines, ndim, nproc, **kwargs)
         os.remove(fpick)
@@ -475,12 +498,16 @@ def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
             less than zero indicate infinite volumes.
 
     """
+    if PY_MAJOR_VERSION != 2:
+        raise NotImplementedError("Parallelism using multiprocessing not " +
+                                  "supported for versions of Python greater " +
+                                  "than 2x.")
     idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
     ptsArray = mp.RawArray('d', pts.size)
     memoryview(idxArray)[:] = tree.idx
     memoryview(ptsArray)[:] = pts
     # Split leaves
-    task2leaves = [[] for _ in xrange(nproc)]
+    task2leaves = [[] for _ in range(nproc)]
     for leaf in tree.leaves:
         proc = leaf.id % nproc
         task2leaves[proc].append(leaf)
@@ -489,16 +516,16 @@ def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
     # Create & execute processes
     count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i', 0)]
     lock = mp.Condition()
-    queues = [mp.Queue() for _ in xrange(nproc+1)]
-    in_pipes = [None for _ in xrange(nproc)]
-    out_pipes = [None for _ in xrange(nproc)]
+    queues = [mp.Queue() for _ in range(nproc+1)]
+    in_pipes = [None for _ in range(nproc)]
+    out_pipes = [None for _ in range(nproc)]
     for i in range(nproc):
         out_pipes[i], in_pipes[i] = mp.Pipe(True)
     unique_str = datetime.today().strftime("%Y%j%H%M%S")
     processes = [DelaunayProcessMulti(
         task, _, task2leaves[_], ptsArray, idxArray,
         left_edges, right_edges, queues, lock, count, in_pipes[_],
-        unique_str=unique_str, limit_mem=limit_mem) for _ in xrange(nproc)]
+        unique_str=unique_str, limit_mem=limit_mem) for _ in range(nproc)]
     for p in processes:
         p.start()
     # Synchronize to ensure rapid receipt of output info from leaves
@@ -507,7 +534,7 @@ def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
     lock.release()
     # Setup methods for recieving leaf info
     if task == 'triangulate':
-        serial = [None for _ in xrange(tree.num_leaves)]
+        serial = [None for _ in range(tree.num_leaves)]
 
         def recv_leaf(p):
             iid, s = processes[p].receive_result(out_pipes[p])
@@ -626,7 +653,7 @@ def consolidate_tess(tree, leaf_output, pts, use_double=False,
     cells = cons.verts
     neigh = cons.neigh
     # if np.sum(neigh == idx_inf) != 0:
-    #     for i in xrange(ncells):
+    #     for i in range(ncells):
     #         print(i, cells[i, :], neigh[i, :])
     # assert(np.sum(neigh == idx_inf) == 0)
     # Do tessellation
@@ -836,7 +863,7 @@ class DelaunayProcessMPI_Python(object):
                                           periodic=periodic, nleaves=size)
             if not isinstance(tree, GenericTree):
                 tree = GenericTree.from_tree(tree)
-            task2leaves = [[] for _ in xrange(size)]
+            task2leaves = [[] for _ in range(size)]
             for leaf in tree.leaves:
                 leaf.pts = pts[tree.idx[leaf.start_idx:leaf.stop_idx]]
                 task = leaf.id % size
@@ -912,7 +939,7 @@ class DelaunayProcessMPI_Python(object):
         """
         total_arr = {}
         if self._use_buffer:  # pragma: no cover
-            leaf_ids = local_arr.keys()
+            leaf_ids = list(local_arr.keys())
             np_dtype = local_arr[leaf_ids[0]].dtype
             mpi_dtype = _get_mpi_type(np_dtype)
             # Prepare things to send
@@ -968,7 +995,7 @@ class DelaunayProcessMPI_Python(object):
             data = self._comm.gather(local_arr, root=root)
             if self._proc_idx == root:
                 for x in data:
-                    total_arr.update(**x)
+                    total_arr.update(x)
         return total_arr
 
     def alltoall_leaf_arrays(self, local_arr, dtype=None, return_counts=False,
@@ -988,7 +1015,7 @@ class DelaunayProcessMPI_Python(object):
         """
         total_arr = {}
         if self._use_buffer:  # pragma: no cover
-            local_leaf_ids = local_arr.keys()
+            local_leaf_ids = list(local_arr.keys())
             leaf_ids = [[] for i in range(self._num_proc)]
             local_array_count = 0
             for k in local_leaf_ids:
@@ -1059,7 +1086,7 @@ class DelaunayProcessMPI_Python(object):
             assert(curr == rarr.size)
         else:
             return_counts = False
-            local_leaf_ids = local_arr.keys()
+            local_leaf_ids = list(local_arr.keys())
             send_data = [{} for i in range(self._num_proc)]
             for k in local_leaf_ids:
                 task = k[1] % self._num_proc
@@ -1079,7 +1106,7 @@ class DelaunayProcessMPI_Python(object):
             for leaf in self._leaves:
                 src = leaf.id
                 hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
-                for dst in xrange(self._total_leaves):
+                for dst in range(self._total_leaves):
                     task = dst % self._num_proc
                     if hvall[dst] is not None:
                         k = (src, dst)
@@ -1114,7 +1141,7 @@ class DelaunayProcessMPI_Python(object):
                         i in range(self._num_proc)]
             for leaf in self._leaves:
                 hvall, n, le, re, ptall = leaf.outgoing_points(return_pts=True)
-                for i in xrange(self._total_leaves):
+                for i in range(self._total_leaves):
                     task = i % self._num_proc
                     if hvall[i] is None:
                         tot_send[task][i][leaf.id] = None
@@ -1288,7 +1315,7 @@ class DelaunayProcessMPI_Python(object):
                 leaf.remove_tess()
 
 
-class DelaunayProcessMulti(mp.Process):
+class DelaunayProcessMulti(mp_Process):
     r"""`multiprocessing.Process` subclass for coordinating operations on a
     single process during a parallel Delaunay triangulation.
 
@@ -1337,6 +1364,10 @@ class DelaunayProcessMulti(mp.Process):
     def __init__(self, task, proc_idx, leaves, pts, idx,
                  left_edges, right_edges, queues, lock, count, pipe,
                  unique_str=None, limit_mem=False, **kwargs):
+        if PY_MAJOR_VERSION != 2:
+            raise NotImplementedError("Parallelism using multiprocessing not " +
+                                      "supported for versions of Python greater " +
+                                      "than 2x.")
         task_list = ['triangulate', 'volumes', 'output']
         if task not in task_list:
             raise ValueError('{} is not a valid task.'.format(task))
@@ -1384,7 +1415,7 @@ class DelaunayProcessMulti(mp.Process):
         r"""Enqueues points at edges of each leaf's boundaries."""
         for leaf in self._leaves:
             hvall, n, le, re = leaf.outgoing_points()
-            for i in xrange(self._total_leaves):
+            for i in range(self._total_leaves):
                 task = i % self._num_proc
                 if hvall[i] is None:
                     self._queues[task].put(None)
@@ -1649,7 +1680,7 @@ class ParallelLeaf(object):
         self.all_neighbors = set([])
         self.neighbors = copy.deepcopy(leaf.neighbors)
         keep = False
-        for i in xrange(self.ndim):
+        for i in range(self.ndim):
             if leaf.id in leaf.left_neighbors[i]:
                 keep = True
                 break
@@ -1662,7 +1693,7 @@ class ParallelLeaf(object):
         self.right_neighbors = copy.deepcopy(leaf.right_neighbors)
         le = copy.deepcopy(left_edges)
         re = copy.deepcopy(right_edges)
-        for i in xrange(self.ndim):
+        for i in range(self.ndim):
             if self.periodic_left[i]:
                 for k in leaf.left_neighbors[i]:
                     le[k, i] -= self.domain_width[i]
@@ -1782,11 +1813,11 @@ class ParallelLeaf(object):
         re = self.right_edges
         idx_enq = self.T.outgoing_points(le, re)
         # Remove points that are not local
-        for i in xrange(len(n)):
+        for i in range(len(n)):
             ridx = (idx_enq[i] < self.norig)
             idx_enq[i] = idx_enq[i][ridx]
         # Translate and add entries for non-neighbors
-        hvall = [None for k in xrange(self.num_leaves)]
+        hvall = [None for k in range(self.num_leaves)]
         for i, k in enumerate(n):
             hvall[k] = self.idx[idx_enq[i]]
         # Reset neighbors for incoming
@@ -1796,7 +1827,7 @@ class ParallelLeaf(object):
         self.right_edges = np.zeros((0, self.ndim), 'float64')
         # Return correct structure
         if return_pts:
-            ptall = [None for k in xrange(self.num_leaves)]
+            ptall = [None for k in range(self.num_leaves)]
             for i, k in enumerate(n):
                 ptall[k] = self.pts[idx_enq[i]]
             out = (hvall, n, le, re, ptall)
@@ -1819,7 +1850,7 @@ class ParallelLeaf(object):
     #                                               self.right_edge,
     #                                               True)
     #     # Remove points that are not local
-    #     for i in xrange(self.ndim):
+    #     for i in range(self.ndim):
     #         ridx = (rind[i] < self.norig)
     #         lidx = (lind[i] < self.norig)
     #         rind[i] = rind[i][ridx]
@@ -1827,7 +1858,7 @@ class ParallelLeaf(object):
     #     # Count for preallocation
     #     all_leaves = range(0, self.id) + range(self.id + 1, self.num_leaves)
     #     Nind = np.zeros(self.num_leaves, 'uint32')
-    #     for i in xrange(self.ndim):
+    #     for i in range(self.ndim):
     #         l_neighbors = self.left_neighbors[i]
     #         r_neighbors = self.right_neighbors[i]
     #         if len(l_neighbors) == 0:
@@ -1837,12 +1868,12 @@ class ParallelLeaf(object):
     #         Nind[np.array(l_neighbors, 'uint32')] += len(lind[i])
     #         Nind[np.array(r_neighbors, 'uint32')] += len(rind[i])
     #     # Add points
-    #     ln_out = [[[] for _ in xrange(self.ndim)] for
-    #               k in xrange(self.num_leaves)]
-    #     rn_out = [[[] for _ in xrange(self.ndim)] for
-    #               k in xrange(self.num_leaves)]
+    #     ln_out = [[[] for _ in range(self.ndim)] for
+    #               k in range(self.num_leaves)]
+    #     rn_out = [[[] for _ in range(self.ndim)] for
+    #               k in range(self.num_leaves)]
     #     hvall = [np.zeros(Nind[k], rind[0].dtype) for
-    #              k in xrange(self.num_leaves)]
+    #              k in range(self.num_leaves)]
     #     Cind = np.zeros(self.num_leaves, 'uint32')
     #     for i in range(self.ndim):
     #         l_neighbors = self.left_neighbors[i]
@@ -1868,7 +1899,7 @@ class ParallelLeaf(object):
     #             for j in range(self.ndim):
     #                 ln_out[k][i] += self._leaf.left_neighbors[j]
     #     # Ensure unique values (overlap can happen if a point is at a corner)
-    #     for k in xrange(self.num_leaves):
+    #     for k in range(self.num_leaves):
     #         hvall[k] = self.idx[np.unique(hvall[k])]
     #         for i in range(self.ndim):
     #             ln_out[k][i] = list(set(ln_out[k][i]))

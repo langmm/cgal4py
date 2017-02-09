@@ -1,6 +1,6 @@
 import numpy as np
 import cykdtree as kdtree
-
+from cgal4py import PY_MAJOR_VERSION
 
 def tree(method, pts, left_edge, right_edge, periodic, *args, **kwargs):
     r"""Get tree for a given domain decomposition schema.
@@ -176,9 +176,11 @@ def process_leaves(leaves, left_edge, right_edge, periodic):
 
     """
     ndim = len(left_edge)
-    req_attr = {'npts': [int, long, np.int32, np.uint32, np.int64, np.uint64],
+    req_attr = {'npts': [int, np.int32, np.uint32, np.int64, np.uint64],
                 'left_edge': ([float, np.float32, np.float64], (ndim,)),
                 'right_edge': ([float, np.float32, np.float64], (ndim,))}
+    if PY_MAJOR_VERSION < 3:
+        req_attr['npts'].append(long)
     # Check for necessary attributes
     for k, v in req_attr.items():
         if isinstance(v, tuple):

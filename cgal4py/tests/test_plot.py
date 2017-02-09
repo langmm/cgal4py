@@ -1,7 +1,7 @@
 import os
 from cgal4py.delaunay import Delaunay2, Delaunay3
-from test_delaunay2 import pts as pts2
-from test_delaunay3 import pts as pts3
+from cgal4py.tests.test_delaunay2 import pts as pts2
+from cgal4py.tests.test_delaunay3 import pts as pts3
 
 
 def test_plot2D():

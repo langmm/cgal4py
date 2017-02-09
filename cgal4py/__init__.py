@@ -1,18 +1,21 @@
 r"""Package for performing Delaunay triangulations in Python using Cython
 wrapped CGAL C++ libraries."""
-import plot
-import domain_decomp
-import delaunay
-from delaunay import Delaunay
+import sys
+PY_MAJOR_VERSION = sys.version_info[0]
+from cgal4py import plot
+from cgal4py import domain_decomp
+from cgal4py import delaunay
+from cgal4py.delaunay import Delaunay
 import numpy as np
 import warnings
 FLAG_MULTIPROC = False
 try:
-    import parallel
+    from cgal4py import parallel
     FLAG_MULTIPROC = True
 except:
     warnings.warn("Package for parallel triangulation could not be " +
                   "imported. Parallel features will be disabled.")
+    raise
 
 
 def triangulate(pts, left_edge=None, right_edge=None, periodic=False,

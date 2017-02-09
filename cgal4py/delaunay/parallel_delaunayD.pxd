@@ -28,9 +28,9 @@ cdef extern from "c_parallel_delaunayD.hpp":
         Info *info_total
         double *pts_total
 
-        void insert(uint64_t npts, double *pts)
+        void insert(uint64_t npts, double *pts) except +
 
         uint64_t num_cells()
-        void consolidate_vols(double *vols)
+        void consolidate_vols(double *vols) except +
         uint64_t consolidate_tess(uint64_t tot_ncells_total, Info *tot_idx_inf,
-                                  Info *allverts, Info *allneigh)
+                                  Info *allverts, Info *allneigh) except +

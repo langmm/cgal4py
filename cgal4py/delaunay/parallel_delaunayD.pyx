@@ -3,7 +3,6 @@ import cython
 import numpy as np
 cimport numpy as np
 from mpi4py import MPI
-
 from libc.stdlib cimport malloc, free
 from libcpp cimport bool as cbool
 from cpython cimport bool as pybool

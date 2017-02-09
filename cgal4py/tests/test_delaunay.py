@@ -3,13 +3,13 @@ import numpy as np
 from nose.tools import assert_equal
 from nose.tools import assert_raises
 from cgal4py.delaunay import Delaunay, VoronoiVolumes, tools
-from test_delaunay2 import pts as pts2
-from test_delaunay2 import left_edge as le2
-from test_delaunay2 import right_edge as re2
-from test_delaunay3 import pts as pts3
-from test_delaunay3 import left_edge as le3
-from test_delaunay3 import right_edge as re3
-from test_cgal4py import make_points
+from cgal4py.tests.test_delaunay2 import pts as pts2
+from cgal4py.tests.test_delaunay2 import left_edge as le2
+from cgal4py.tests.test_delaunay2 import right_edge as re2
+from cgal4py.tests.test_delaunay3 import pts as pts3
+from cgal4py.tests.test_delaunay3 import left_edge as le3
+from cgal4py.tests.test_delaunay3 import right_edge as re3
+from cgal4py.tests.test_cgal4py import make_points
 import copy
 
 
@@ -104,9 +104,9 @@ def test_intersect_sph_box():
         # Sphere inside box
         le = -1*np.ones(ndim, 'float64')
         re = 1*np.ones(ndim, 'float64')
-        print c.shape
-        print le.shape
-        print c.shape == le.shape
+        print(c.shape)
+        print(le.shape)
+        print(c.shape == le.shape)
         assert(tools.py_intersect_sph_box(c, r, le, re) == True)
         # Box inside sphere
         le = -np.sqrt(2.0)*np.ones(ndim, 'float64')
