@@ -1422,10 +1422,11 @@ cdef class Delaunay2:
 
         """
         cdef char* cfname
-        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        cdef bytes pyfname
         if PY_MAJOR_VERSION < 3:
             cfname = fname
         else:
+            pyfname = bytes(fname, encoding="ascii")
             cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.write_to_file(cfname)
@@ -1440,10 +1441,11 @@ cdef class Delaunay2:
 
         """
         cdef char* cfname
-        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        cdef bytes pyfname
         if PY_MAJOR_VERSION < 3:
             cfname = fname
         else:
+            pyfname = bytes(fname, encoding="ascii")
             cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.read_from_file(cfname)

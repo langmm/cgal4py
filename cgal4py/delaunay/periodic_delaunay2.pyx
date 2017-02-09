@@ -1462,7 +1462,11 @@ cdef class PeriodicDelaunay2:
         ffmt = 'd'
         if pos is not None:
             ffmt = pos.dtype.char
-        buf.write(struct.pack('cc', ffmt, ifmt))
+        if PY_MAJOR_VERSION == 2:
+            buf.write(struct.pack('cc', ffmt, ifmt))
+        else:
+            buf.write(struct.pack('cc', ffmt.encode('ascii'),
+                                  ifmt.encode('ascii')))
         buf.write(struct.pack(ifmt, idx_inf))
         if pos is not None:
             buf.write(struct.pack(2*ifmt, pos.shape[0], pos.shape[1]))
@@ -1489,7 +1493,13 @@ cdef class PeriodicDelaunay2:
         cdef str ifmt, ffmt
         cdef int isiz, fsiz
         cdef int nx, ny
-        (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        cdef bytes ibfmt, fbfmt
+        if PY_MAJOR_VERSION == 2:
+            (ffmt, ifmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+        else:
+            (fbfmt, ibfmt) = struct.unpack('cc', buf.read(struct.calcsize('cc')))
+            ffmt = fbfmt.decode()
+            ifmt = ibfmt.decode()
         fsiz = struct.calcsize(ffmt)
         isiz = struct.calcsize(ifmt)
         (idx_inf,) = struct.unpack(ifmt, buf.read(isiz))
@@ -1568,10 +1578,11 @@ cdef class PeriodicDelaunay2:
 
         """
         cdef char* cfname
-        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        cdef bytes pyfname
         if PY_MAJOR_VERSION < 3:
             cfname = fname
         else:
+            pyfname = bytes(fname, encoding="ascii")
             cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.write_to_file(cfname)
@@ -1586,10 +1597,11 @@ cdef class PeriodicDelaunay2:
 
         """
         cdef char* cfname
-        cdef bytes pyfname = bytes(fname, encoding="ascii")
+        cdef bytes pyfname
         if PY_MAJOR_VERSION < 3:
             cfname = fname
         else:
+            pyfname = bytes(fname, encoding="ascii")
             cfname = pyfname
         with nogil, cython.boundscheck(False), cython.wraparound(False):
             self.T.read_from_file(cfname)

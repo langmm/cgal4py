@@ -18,9 +18,10 @@ import pstats
 if PY_MAJOR_VERSION == 2:
     import cPickle as pickle
     import multiprocessing as mp
-    import mp.Process as mp_Process
+    from multiprocessing import Process as mp_Process
 else:
     import pickle
+    mp = object
     mp_Process = object
 import warnings
 from datetime import datetime
