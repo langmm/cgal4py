@@ -177,7 +177,7 @@ def voronoi_volumes(pts, left_edge=None, right_edge=None, periodic=False,
     return vols
 
 # Must go here to support tests of triangulate & voronoi_volumes
-import tests  # noqa: E402
+from cgal4py import tests  # noqa: E402
 
 __all__ = ["triangulate", "voronoi_volumes", "delaunay", "plot",
            "domain_decomp", "tests"]
