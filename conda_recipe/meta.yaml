@@ -1,0 +1,89 @@
+package:
+  name: cgal4py
+  version: "0.1.4"
+
+source:
+  fn: cgal4py-0.1.4.tar.gz
+  url: https://pypi.python.org/packages/f5/05/491fc6b2f2cbcb3ae2cbb17c3fc5f6fbacd02caa80f9a64bcb7288985de5/cgal4py-0.1.4.tar.gz
+  md5: a1aa3ea0b85289fbaa9bd1bc2029d680
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+# build:
+  script:
+    - flake8 . -v --config=.flake8rc
+    - nosetests --verbose
+    - python setup.py install
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - cgal4py = cgal4py:main
+    #
+    # Would create an entry point called cgal4py that calls cgal4py.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  # number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - nose
+    - flake8
+    - cython
+    - numpy
+    - cykdtree
+    - boost
+    - eigen3
+    - cgal >=4.9
+
+  run:
+    - python
+    - cython
+    - numpy
+    - scipy
+    - matplotlib
+    - nose
+    - mpi4py
+    - cykdtree
+    - boost
+    - eigen3
+    - cgal >=4.9
+    # Python 2 only
+    - multiprocessing
+
+test:
+  # Python imports
+  imports:
+    - cgal4py
+    - cgal4py.delaunay
+    - cgal4py.domain_decomp
+    - cgal4py.tests
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    - nose
+
+about:
+  home: https://langmm@bitbucket.org/langmm/cgal4py
+  license: BSD License
+  summary: 'Python interface for CGAL Triangulations'
+  license_family: BSD
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml
