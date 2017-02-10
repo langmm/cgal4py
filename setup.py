@@ -181,6 +181,7 @@ ext_modules += [
     ]
 src_include += [
     "cgal4py/delaunay/tools.pyx",
+    "cgal4py/delaunay/tools.pxd",
     "cgal4py/delaunay/c_tools.hpp"]
 
 
@@ -196,7 +197,7 @@ setup(name = 'cgal4py',
       # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},
-      version = '0.1.4',
+      version = '0.1.5',
       description = 'Python interface for CGAL Triangulations',
       long_description = long_description,
       author = 'Meagan Lang',
