@@ -192,6 +192,7 @@ src_include = [ ]
 for ver in [2, 3]:
     add_delaunay(ext_modules, src_include, ver)
     add_delaunay(ext_modules, src_include, ver, periodic=True)
+add_delaunay(ext_modules, src_include, 'D', dont_compile=True)
 add_delaunay(ext_modules, src_include, 'D', parallel=True,
              dont_compile=(not compile_parallel))
 
@@ -219,7 +220,7 @@ setup(name = 'cgal4py',
       # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},
-      version = '0.2.0',
+      version = '0.2.1',
       description = 'Python interface for CGAL Triangulations',
       long_description = long_description,
       author = 'Meagan Lang',
