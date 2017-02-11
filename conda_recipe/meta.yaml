@@ -1,12 +1,12 @@
 package:
   name: cgal4py
-  version: "0.1.8"
+  version: "0.2.0"
 
 source:
-  path: ../
-  # fn: cgal4py-0.1.8.tar.gz
-  # url: https://pypi.python.org/packages/06/c0/5bde9d2afb9448c8598e723945d3721377045f33c9752dd4a0a2ab889a71/cgal4py-0.1.8.tar.gz
-  # md5: a8c2cf61b4cc951dbe19181a529654c7
+  # path: ../
+  fn: cgal4py-0.2.0.tar.gz
+  url: https://pypi.python.org/packages/2b/e8/3d8dd74d29e373b2bb915f5615edd1de91250d53b0e4c2919449d39b8bcf/cgal4py-0.2.0.tar.gz
+  md5: e54b67d4e041069ff6df5ab65584aa18
 #  patches:
    # List any patch files here
    # - fix.patch

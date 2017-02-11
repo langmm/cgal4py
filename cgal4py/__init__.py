@@ -10,6 +10,7 @@ from cgal4py import delaunay
 from cgal4py.delaunay import Delaunay
 import numpy as np
 import warnings
+_use_multiprocessing = False
 FLAG_MULTIPROC = False
 try:
     from cgal4py import parallel

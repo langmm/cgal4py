@@ -3,11 +3,11 @@ import nose.tools as nt
 import numpy as np
 import os
 import time
-from cgal4py import PY_MAJOR_VERSION
+from cgal4py import _use_multiprocessing
 from cgal4py import parallel, delaunay
 from cgal4py.domain_decomp import GenericTree
 from cgal4py.tests.test_cgal4py import make_points, make_test, MyTestCase
-if PY_MAJOR_VERSION == 2:
+if _use_multiprocessing:
     import multiprocessing as mp
 from mpi4py import MPI
 import ctypes
@@ -216,7 +216,7 @@ class TestDelaunayProcessMPI(MyTestCase):
         dummy2.gather_leaf_arrays(arr)
 
 
-if PY_MAJOR_VERSION == 2:
+if _use_multiprocessing:
     class TestDelaunayProcessMulti(MyTestCase):
 
         def setup_param(self):
@@ -312,7 +312,7 @@ class TestParallelDelaunay(MyTestCase):
             ans = delaunay.Delaunay(pts)
             read_lines = lines_load_test(args[0], args[1])
             for limit_mem in [False, True]:
-                if PY_MAJOR_VERSION == 2:
+                if _use_multiprocessing:
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': False, 'limit_mem': limit_mem})
@@ -384,7 +384,7 @@ class TestParallelVoronoiVolumes(MyTestCase):
             ans = delaunay.VoronoiVolumes(pts)
             read_lines = lines_load_test(args[0], args[1])
             for limit_mem in [False, True]:
-                if PY_MAJOR_VERSION == 2:
+                if _use_multiprocessing:
                     self.param_returns += [
                         (ans, (pts, tree, args[2]),
                              {'use_mpi': False, 'limit_mem': limit_mem})

@@ -4,7 +4,7 @@ r"""Routines for running triangulations in paralle.
    * parallelism through treading
 
 """
-from cgal4py import PY_MAJOR_VERSION
+from cgal4py import PY_MAJOR_VERSION, _use_multiprocessing
 from cgal4py.delaunay import Delaunay, tools, _get_Delaunay
 from cgal4py import domain_decomp
 from cgal4py.domain_decomp import GenericTree
@@ -17,10 +17,12 @@ import struct
 import pstats
 if PY_MAJOR_VERSION == 2:
     import cPickle as pickle
+else:
+    import pickle
+if _use_multiprocessing:
     import multiprocessing as mp
     from multiprocessing import Process as mp_Process
 else:
-    import pickle
     mp = object
     mp_Process = object
 import warnings
@@ -227,7 +229,7 @@ def write_mpi_script(fname, read_func, taskname, unique_str=None,
         f.write("\n".join(lines))
 
 
-def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
+def ParallelDelaunay(pts, tree, nproc, use_mpi=True, **kwargs):
     r"""Return a triangulation that is constructed in parallel.
 
     Args:
@@ -237,7 +239,7 @@ def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
             processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
         nproc (int): Number of processors that should be used.
         use_mpi (bool, optional): If True, `mpi4py` is used for communications.
-            Otherwise `multiprocessing` is used.
+            Otherwise `multiprocessing` is used. Defaults to True.
         \*\*kwargs: Additional keywords arguments are passed to the correct
             parallel implementation of the triangulation.
 
@@ -269,11 +271,17 @@ def ParallelDelaunay(pts, tree, nproc, use_mpi=False, **kwargs):
         out = ParallelDelaunayMPI(read_lines, ndim, nproc, **kwargs)
         os.remove(fpick)
     else:
-        out = ParallelDelaunayMulti(pts, tree, nproc, **kwargs)
+        if _use_multiprocessing:
+            out = ParallelDelaunayMulti(pts, tree, nproc, **kwargs)
+        else:
+            raise RuntimeError("The multiprocessing version of parallelism " +
+                               "is currently disabled. To enable it, set " +
+                               "_use_multiprocessing to True in " +
+                               "cgal4py/__init__.py.")
     return out
 
 
-def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
+def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=True, **kwargs):
     r"""Return a triangulation that is constructed in parallel.
 
     Args:
@@ -283,7 +291,7 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
             processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
         nproc (int): Number of processors that should be used.
         use_mpi (bool, optional): If True, `mpi4py` is used for communications.
-            Otherwise `multiprocessing` is used.
+            Otherwise `multiprocessing` is used. Defaults to True.
         \*\*kwargs: Additional keywords arguments are passed to the correct
             parallel implementation of the triangulation.
 
@@ -314,7 +322,13 @@ def ParallelVoronoiVolumes(pts, tree, nproc, use_mpi=False, **kwargs):
         out = ParallelVoronoiVolumesMPI(read_lines, ndim, nproc, **kwargs)
         os.remove(fpick)
     else:
-        out = ParallelVoronoiVolumesMulti(pts, tree, nproc, **kwargs)
+        if _use_multiprocessing:
+            out = ParallelVoronoiVolumesMulti(pts, tree, nproc, **kwargs)
+        else:
+            raise RuntimeError("The multiprocessing version of parallelism " +
+                               "is currently disabled. To enable it, set " +
+                               "_use_multiprocessing to True in " +
+                               "cgal4py/__init__.py.")
     return out
 
 
@@ -438,142 +452,139 @@ def ParallelMPI(task, read_func, ndim, nproc, use_double=False,
                            "parallel script.")
     
 
-def ParallelDelaunayMulti(*args, **kwargs):
-    r"""Return a triangulation that is constructed in parallel using the
-    `multiprocessing` package. See :func:`cgal4py.parallel.ParallelMulti`
-    for information on arguments.
+if _use_multiprocessing:
+    def ParallelDelaunayMulti(*args, **kwargs):
+        r"""Return a triangulation that is constructed in parallel using the
+        `multiprocessing` package. See :func:`cgal4py.parallel.ParallelMulti`
+        for information on arguments.
 
-    Returns:
-        A Delaunay triangulation class like :class:`cgal4py.delaunay.Delaunay2`
-            (but for the appropriate number of dimensions) will be returned.
+        Returns:
+            A Delaunay triangulation class like :class:`cgal4py.delaunay.Delaunay2`
+                (but for the appropriate number of dimensions) will be returned.
 
-    """
-    return ParallelMulti('triangulate', *args, **kwargs)
-
-
-def ParallelVoronoiVolumesMulti(*args, **kwargs):
-    r"""Return the voronoi cell volumes after constructing triangulation in
-    parallel. See :func:`cgal4py.parallel.ParallelMulti` for information on
-    arguments.
-
-    Returns:
-        np.ndarray of float64: (n,) array of n voronoi volumes for the provided
-            points.
-
-    """
-    return ParallelMulti('volumes', *args, **kwargs)
+        """
+        return ParallelMulti('triangulate', *args, **kwargs)
 
 
-def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
-    r"""Return results from a triangulation that is constructed in parallel
-    using the `multiprocessing` package.
+    def ParallelVoronoiVolumesMulti(*args, **kwargs):
+        r"""Return the voronoi cell volumes after constructing triangulation in
+        parallel. See :func:`cgal4py.parallel.ParallelMulti` for information on
+        arguments.
 
-    Args:
-        task (str): Task for which results should be returned. Values
-            include:
+        Returns:
+            np.ndarray of float64: (n,) array of n voronoi volumes for the provided
+                points.
 
-            * 'triangulate': Return the Delaunay triangulation class.
-            * 'volumes': Return the volumes of the Voronoi cells associated with
-              each point.
+        """
+        return ParallelMulti('volumes', *args, **kwargs)
 
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional
-            coordinates.
-        tree (object): Domain decomposition tree for splitting points among the
-            processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
-        nproc (int): Number of processors that should be used.
-        use_double (bool, optional): If True, the triangulation is forced to
-            use 64bit integers reguardless of if there are too many points for
-            32bit. Otherwise 32bit integers are used so long as the number of
-            points is <=4294967295. Defaults to False.
-        limit_mem (bool, optional): If False, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. If True, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to False.
 
-    Returns:
-        Dependent on task. For 'triangulate', a Delaunay triangulation class
-            like :class:`cgal4py.delaunay.Delaunay2` (but for the appropriate
-            number of dimensions) will be returned. For 'volumes', a numpy
-            array of floating point volumes will be returned where values
-            less than zero indicate infinite volumes.
+    def ParallelMulti(task, pts, tree, nproc, use_double=False, limit_mem=False):
+        r"""Return results from a triangulation that is constructed in parallel
+        using the `multiprocessing` package.
 
-    """
-    if PY_MAJOR_VERSION != 2:
-        raise NotImplementedError("Parallelism using multiprocessing not " +
-                                  "supported for versions of Python greater " +
-                                  "than 2x.")
-    idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
-    ptsArray = mp.RawArray('d', pts.size)
-    memoryview(idxArray)[:] = tree.idx
-    memoryview(ptsArray)[:] = pts
-    # Split leaves
-    task2leaves = [[] for _ in range(nproc)]
-    for leaf in tree.leaves:
-        proc = leaf.id % nproc
-        task2leaves[proc].append(leaf)
-    left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
-    right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
-    # Create & execute processes
-    count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i', 0)]
-    lock = mp.Condition()
-    queues = [mp.Queue() for _ in range(nproc+1)]
-    in_pipes = [None for _ in range(nproc)]
-    out_pipes = [None for _ in range(nproc)]
-    for i in range(nproc):
-        out_pipes[i], in_pipes[i] = mp.Pipe(True)
-    unique_str = datetime.today().strftime("%Y%j%H%M%S")
-    processes = [DelaunayProcessMulti(
-        task, _, task2leaves[_], ptsArray, idxArray,
-        left_edges, right_edges, queues, lock, count, in_pipes[_],
-        unique_str=unique_str, limit_mem=limit_mem) for _ in range(nproc)]
-    for p in processes:
-        p.start()
-    # Synchronize to ensure rapid receipt of output info from leaves
-    lock.acquire()
-    lock.wait()
-    lock.release()
-    # Setup methods for recieving leaf info
-    if task == 'triangulate':
-        serial = [None for _ in range(tree.num_leaves)]
+        Args:
+            task (str): Task for which results should be returned. Values
+                include:
 
-        def recv_leaf(p):
-            iid, s = processes[p].receive_result(out_pipes[p])
-            assert(tree.leaves[iid].id == iid)
-            serial[iid] = s
+                * 'triangulate': Return the Delaunay triangulation class.
+                * 'volumes': Return the volumes of the Voronoi cells associated with
+                  each point.
 
-    elif task == 'volumes':
-        vol = np.empty(pts.shape[0], pts.dtype)
+            pts (np.ndarray of float64): (n,m) array of n m-dimensional
+                coordinates.
+            tree (object): Domain decomposition tree for splitting points among the
+                processes. Produced by :meth:`cgal4py.domain_decomp.tree`.
+            nproc (int): Number of processors that should be used.
+            use_double (bool, optional): If True, the triangulation is forced to
+                use 64bit integers reguardless of if there are too many points for
+                32bit. Otherwise 32bit integers are used so long as the number of
+                points is <=4294967295. Defaults to False.
+            limit_mem (bool, optional): If False, the triangulation results from
+                each process are moved to local memory using `multiprocessing`
+                pipes. If True, each process writes out tessellation info to
+                files which are then incrementally loaded as consolidation occurs.
+                Defaults to False.
 
-        def recv_leaf(p):
-            iid, ivol = processes[p].receive_result(out_pipes[p])
-            assert(tree.leaves[iid].id == iid)
-            vol[tree.idx[tree.leaves[iid].slice]] = ivol
+        Returns:
+            Dependent on task. For 'triangulate', a Delaunay triangulation class
+                like :class:`cgal4py.delaunay.Delaunay2` (but for the appropriate
+                number of dimensions) will be returned. For 'volumes', a numpy
+                array of floating point volumes will be returned where values
+                less than zero indicate infinite volumes.
 
-    # Recieve output from processes
-    proc_list = range(nproc)
-    # Version that takes whatever is available
-    total_count = 0
-    max_total_count = tree.num_leaves
-    while total_count != max_total_count:
-        for i in proc_list:
-            while out_pipes[i].poll():
-                recv_leaf(i)
-                total_count += 1
-    # Version that does processors in order
-    # for i in proc_list:
-    #     for _ in range(len(task2leaves[i])):
-    #         recv_leaf(i)
-    # Consolidate tessellation
-    if task == 'triangulate':
-        out = consolidate_tess(tree, serial, pts, use_double=use_double,
-                               unique_str=unique_str, limit_mem=limit_mem)
-    elif task == 'volumes':
-        out = vol
-    # Close queues and processes
-    for p in processes:
-        p.join()
-    return out
+        """
+        idxArray = mp.RawArray(ctypes.c_ulonglong, tree.idx.size)
+        ptsArray = mp.RawArray('d', pts.size)
+        memoryview(idxArray)[:] = tree.idx
+        memoryview(ptsArray)[:] = pts
+        # Split leaves
+        task2leaves = [[] for _ in range(nproc)]
+        for leaf in tree.leaves:
+            proc = leaf.id % nproc
+            task2leaves[proc].append(leaf)
+        left_edges = np.vstack([leaf.left_edge for leaf in tree.leaves])
+        right_edges = np.vstack([leaf.right_edge for leaf in tree.leaves])
+        # Create & execute processes
+        count = [mp.Value('i', 0), mp.Value('i', 0), mp.Value('i', 0)]
+        lock = mp.Condition()
+        queues = [mp.Queue() for _ in range(nproc+1)]
+        in_pipes = [None for _ in range(nproc)]
+        out_pipes = [None for _ in range(nproc)]
+        for i in range(nproc):
+            out_pipes[i], in_pipes[i] = mp.Pipe(True)
+        unique_str = datetime.today().strftime("%Y%j%H%M%S")
+        processes = [DelaunayProcessMulti(
+            task, _, task2leaves[_], ptsArray, idxArray,
+            left_edges, right_edges, queues, lock, count, in_pipes[_],
+            unique_str=unique_str, limit_mem=limit_mem) for _ in range(nproc)]
+        for p in processes:
+            p.start()
+        # Synchronize to ensure rapid receipt of output info from leaves
+        lock.acquire()
+        lock.wait()
+        lock.release()
+        # Setup methods for recieving leaf info
+        if task == 'triangulate':
+            serial = [None for _ in range(tree.num_leaves)]
+
+            def recv_leaf(p):
+                iid, s = processes[p].receive_result(out_pipes[p])
+                assert(tree.leaves[iid].id == iid)
+                serial[iid] = s
+
+        elif task == 'volumes':
+            vol = np.empty(pts.shape[0], pts.dtype)
+
+            def recv_leaf(p):
+                iid, ivol = processes[p].receive_result(out_pipes[p])
+                assert(tree.leaves[iid].id == iid)
+                vol[tree.idx[tree.leaves[iid].slice]] = ivol
+
+        # Recieve output from processes
+        proc_list = range(nproc)
+        # Version that takes whatever is available
+        total_count = 0
+        max_total_count = tree.num_leaves
+        while total_count != max_total_count:
+            for i in proc_list:
+                while out_pipes[i].poll():
+                    recv_leaf(i)
+                    total_count += 1
+        # Version that does processors in order
+        # for i in proc_list:
+        #     for _ in range(len(task2leaves[i])):
+        #         recv_leaf(i)
+        # Consolidate tessellation
+        if task == 'triangulate':
+            out = consolidate_tess(tree, serial, pts, use_double=use_double,
+                                   unique_str=unique_str, limit_mem=limit_mem)
+        elif task == 'volumes':
+            out = vol
+        # Close queues and processes
+        for p in processes:
+            p.join()
+        return out
 
 
 # @profile
@@ -1316,310 +1327,307 @@ class DelaunayProcessMPI_Python(object):
                 leaf.remove_tess()
 
 
-class DelaunayProcessMulti(mp_Process):
-    r"""`multiprocessing.Process` subclass for coordinating operations on a
-    single process during a parallel Delaunay triangulation.
-
-    Args:
-        task (str): Key for the task that should be parallelized. Options
-            are:
-
-            * 'triangulate': Perform triangulation and put serialized info in
-              the output queue.
-            * 'volumes': Perform triangulation and put volumes in output queue.
-
-        proc_idx (int): Index of this process.
-        leaves (list of leaf objects): Leaves that should be triangulated on
-            this process. The leaves are created by
-            :meth:`cgal4py.domain_decomp.tree`.
-        pts (np.ndarray of float64): (n,m) array of n m-dimensional
-            coordinates. Each leaf has a set of indices identifying coordinates
-            within `pts` that belong to that leaf.
-        left_edges (np.ndarray float64): Array of mins for all leaves in the
-            domain decomposition.
-        right_edges (np.ndarray float64): Array of maxes for all leaves in the
-            domain decomposition.
-        queues (list of `multiprocessing.Queue`): List of queues for every
-            process being used in the triangulation plus one for the main
-            process.
-        lock (multiprocessing.Lock): Lock for processes.
-        count (multiprocessing.Value): Shared integer for tracking exchanged
-            points.
-        pipe (multiprocessing.Pipe): Input end of pipe that is connected to the
-            master process.
-        unique_str (str, optional): Unique string identifying the domain
-            decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
-            file naming. Defaults to None.
-        limit_mem (bool, optional): If False, the triangulation results from
-            each process are moved to local memory using `multiprocessing`
-            pipes. If True, each process writes out tessellation info to
-            files which are then incrementally loaded as consolidation occurs.
-            Defaults to False.
-        **kwargs: Variable keyword arguments are passed to
-            `multiprocessing.Process`.
-
-    Raises:
-        ValueError: if `task` is not one of the accepted values listed above.
-
-    """
-    def __init__(self, task, proc_idx, leaves, pts, idx,
-                 left_edges, right_edges, queues, lock, count, pipe,
-                 unique_str=None, limit_mem=False, **kwargs):
-        if PY_MAJOR_VERSION != 2:
-            raise NotImplementedError("Parallelism using multiprocessing not " +
-                                      "supported for versions of Python greater " +
-                                      "than 2x.")
-        task_list = ['triangulate', 'volumes', 'output']
-        if task not in task_list:
-            raise ValueError('{} is not a valid task.'.format(task))
-        super(DelaunayProcessMulti, self).__init__(**kwargs)
-        self._task = task
-        self._leaves = [ParallelLeaf(leaf, left_edges, right_edges,
-                                     unique_str=unique_str,
-                                     limit_mem=limit_mem) for leaf in leaves]
-        self._leafid2idx = {leaf.id:i for i,leaf in enumerate(leaves)}
-        self._idx = np.frombuffer(idx, dtype='uint64')
-        self._ptsFlt = np.frombuffer(pts, dtype='float64')
-        ndim = left_edges.shape[1]
-        npts = len(self._ptsFlt)/ndim
-        self._ndim = ndim
-        self._pts = self._ptsFlt.reshape(npts, ndim)
-        self._queues = queues
-        self._lock = lock
-        self._count = count
-        self._pipe = pipe
-        self._unique_str = unique_str
-        self._limit_mem = limit_mem
-        self._num_proc = len(queues)-1
-        self._local_leaves = len(leaves)
-        self._total_leaves = 0
-        if self._local_leaves != 0:
-            self._total_leaves = leaves[0].num_leaves
-        self._proc_idx = proc_idx
-        self._done = False
-
-    def get_leaf(self, leafid):
-        r"""Return the leaf object associated wth a given leaf id.
+if _use_multiprocessing:
+    class DelaunayProcessMulti(mp_Process):
+        r"""`multiprocessing.Process` subclass for coordinating operations on a
+        single process during a parallel Delaunay triangulation.
 
         Args:
-            leafid (int): Leaf ID.
+            task (str): Key for the task that should be parallelized. Options
+                are:
+
+                * 'triangulate': Perform triangulation and put serialized info in
+                  the output queue.
+                * 'volumes': Perform triangulation and put volumes in output queue.
+
+            proc_idx (int): Index of this process.
+            leaves (list of leaf objects): Leaves that should be triangulated on
+                this process. The leaves are created by
+                :meth:`cgal4py.domain_decomp.tree`.
+            pts (np.ndarray of float64): (n,m) array of n m-dimensional
+                coordinates. Each leaf has a set of indices identifying coordinates
+                within `pts` that belong to that leaf.
+            left_edges (np.ndarray float64): Array of mins for all leaves in the
+                domain decomposition.
+            right_edges (np.ndarray float64): Array of maxes for all leaves in the
+                domain decomposition.
+            queues (list of `multiprocessing.Queue`): List of queues for every
+                process being used in the triangulation plus one for the main
+                process.
+            lock (multiprocessing.Lock): Lock for processes.
+            count (multiprocessing.Value): Shared integer for tracking exchanged
+                points.
+            pipe (multiprocessing.Pipe): Input end of pipe that is connected to the
+                master process.
+            unique_str (str, optional): Unique string identifying the domain
+                decomposition that is passed to `cgal4py.parallel.ParallelLeaf` for
+                file naming. Defaults to None.
+            limit_mem (bool, optional): If False, the triangulation results from
+                each process are moved to local memory using `multiprocessing`
+                pipes. If True, each process writes out tessellation info to
+                files which are then incrementally loaded as consolidation occurs.
+                Defaults to False.
+            **kwargs: Variable keyword arguments are passed to
+                `multiprocessing.Process`.
+
+        Raises:
+            ValueError: if `task` is not one of the accepted values listed above.
 
         """
-        return self._leaves[self._leafid2idx[leafid]]
+        def __init__(self, task, proc_idx, leaves, pts, idx,
+                     left_edges, right_edges, queues, lock, count, pipe,
+                     unique_str=None, limit_mem=False, **kwargs):
+            task_list = ['triangulate', 'volumes', 'output']
+            if task not in task_list:
+                raise ValueError('{} is not a valid task.'.format(task))
+            super(DelaunayProcessMulti, self).__init__(**kwargs)
+            self._task = task
+            self._leaves = [ParallelLeaf(leaf, left_edges, right_edges,
+                                         unique_str=unique_str,
+                                         limit_mem=limit_mem) for leaf in leaves]
+            self._leafid2idx = {leaf.id:i for i,leaf in enumerate(leaves)}
+            self._idx = np.frombuffer(idx, dtype='uint64')
+            self._ptsFlt = np.frombuffer(pts, dtype='float64')
+            ndim = left_edges.shape[1]
+            npts = len(self._ptsFlt)/ndim
+            self._ndim = ndim
+            self._pts = self._ptsFlt.reshape(npts, ndim)
+            self._queues = queues
+            self._lock = lock
+            self._count = count
+            self._pipe = pipe
+            self._unique_str = unique_str
+            self._limit_mem = limit_mem
+            self._num_proc = len(queues)-1
+            self._local_leaves = len(leaves)
+            self._total_leaves = 0
+            if self._local_leaves != 0:
+                self._total_leaves = leaves[0].num_leaves
+            self._proc_idx = proc_idx
+            self._done = False
 
-    def tessellate_leaves(self):
-        r"""Performs the tessellation for each leaf on this process."""
-        for leaf in self._leaves:
-            leaf.tessellate(self._pts, idx=self._idx)
+        def get_leaf(self, leafid):
+            r"""Return the leaf object associated wth a given leaf id.
 
-    def outgoing_points(self):
-        r"""Enqueues points at edges of each leaf's boundaries."""
-        for leaf in self._leaves:
-            hvall, n, le, re = leaf.outgoing_points()
-            for i in range(self._total_leaves):
-                task = i % self._num_proc
-                if hvall[i] is None:
-                    self._queues[task].put(None)
-                else:
-                    self._queues[task].put((i, leaf.id, hvall[i], n, le, re))
+            Args:
+                leafid (int): Leaf ID.
+
+            """
+            return self._leaves[self._leafid2idx[leafid]]
+
+        def tessellate_leaves(self):
+            r"""Performs the tessellation for each leaf on this process."""
+            for leaf in self._leaves:
+                leaf.tessellate(self._pts, idx=self._idx)
+
+        def outgoing_points(self):
+            r"""Enqueues points at edges of each leaf's boundaries."""
+            for leaf in self._leaves:
+                hvall, n, le, re = leaf.outgoing_points()
+                for i in range(self._total_leaves):
+                    task = i % self._num_proc
+                    if hvall[i] is None:
+                        self._queues[task].put(None)
+                    else:
+                        self._queues[task].put((i, leaf.id, hvall[i], n, le, re))
+                    time.sleep(0.01)
+
+        def incoming_points(self):
+            r"""Takes points from the queue and adds them to the triangulation."""
+            queue = self._queues[self._proc_idx]
+            count = 0
+            nrecv = 0
+            while count < (self._local_leaves*self._total_leaves):
+                count += 1
                 time.sleep(0.01)
+                out = queue.get()
+                if out is None:
+                    continue
+                i, j, arr, n, le, re = out
+                if (arr is not None) and (arr.shape[0] != 0):
+                    # Find leaf this should go to
+                    for leaf in self._leaves:
+                        if leaf.id == i:
+                            break
+                    # Add points to leaves
+                    new_pts = np.copy(self._pts[self._idx[arr], :])
+                    leaf.incoming_points(j, arr, n, le, re, new_pts)
+                    nrecv += arr.shape[0]
+            with self._count[1].get_lock():
+                self._count[1].value += nrecv
 
-    def incoming_points(self):
-        r"""Takes points from the queue and adds them to the triangulation."""
-        queue = self._queues[self._proc_idx]
-        count = 0
-        nrecv = 0
-        while count < (self._local_leaves*self._total_leaves):
-            count += 1
-            time.sleep(0.01)
-            out = queue.get()
-            if out is None:
-                continue
-            i, j, arr, n, le, re = out
-            if (arr is not None) and (arr.shape[0] != 0):
-                # Find leaf this should go to
-                for leaf in self._leaves:
-                    if leaf.id == i:
-                        break
-                # Add points to leaves
-                new_pts = np.copy(self._pts[self._idx[arr], :])
-                leaf.incoming_points(j, arr, n, le, re, new_pts)
-                nrecv += arr.shape[0]
-        with self._count[1].get_lock():
-            self._count[1].value += nrecv
-
-    def enqueue_result(self):
-        r"""Enqueue the appropriate result for the given task."""
-        if self._task == 'triangulate':
-            if self._limit_mem:
-                self.enqueue_number_of_cells()
-            else:
-                self.enqueue_triangulation()
-        elif self._task == 'volumes':
-            self.enqueue_volumes()
-
-    def receive_result(self, pipe):
-        r"""Return serialized info from a pipe that was placed there by
-        `enqueue_result`.
-
-        Args:
-            pipe (`multiprocessing.Connection`): Receiving end of pipe.
-
-        """
-        if self._task == 'triangulate':
-            if self._limit_mem:
-                out = self.receive_number_of_cells(pipe)
-            else:
-                out = self.receive_triangulation(pipe)
-        elif self._task == 'volumes':
-            out = self.receive_volumes(pipe)
-        return out
-
-    def enqueue_triangulation(self):
-        r"""Enqueue resulting tessellation."""
-        for leaf in self._leaves:
-            s = leaf.serialize()
-            if s[0].dtype == np.uint32:
-                dt = 0
-            elif s[0].dtype == np.uint64:
-                dt = 1
-            # elif s[0].dtype == np.int32:
-            #     dt = 2
-            # elif s[0].dtype == np.int64:
-            #     dt = 3
-            else:
-                raise Exception("No type found for {}".format(s[0].dtype))
-            self._pipe.send_bytes(
-                struct.pack('QQQQQ', leaf.id, s[0].shape[0], dt, s[2], s[5]))
-            for _ in range(2) + range(3, 5):
-                self._pipe.send_bytes(s[_])
-
-    def receive_triangulation(self, pipe):
-        r"""Return serialized info from a pipe that was placed there by
-        `enqueue_triangulation`.
-
-        Args:
-            pipe (`multiprocessing.Connection`): Receiving end of pipe.
-
-        """
-        dt2dtype = {0: np.uint32, 1: np.uint64, 2: np.int32, 3: np.int64}
-        dummy_head = np.empty(5, 'uint64')
-        pipe.recv_bytes_into(dummy_head)
-        iid, ncell, dt, idx_inf, ncell_tot = dummy_head
-        dtype = dt2dtype[dt]
-        s = [np.empty((ncell, self._ndim+1), dtype),
-             np.empty((ncell, self._ndim+1), dtype),
-             dtype(idx_inf),
-             np.empty((ncell, self._ndim+1), 'uint32'),
-             np.empty(ncell, 'uint64'),
-             ncell_tot]
-        for _ in range(2) + range(3, 5):
-            pipe.recv_bytes_into(s[_])
-        s = tuple(s)
-        return iid, s
-        
-    def enqueue_volumes(self):
-        r"""Enqueue resulting voronoi volumes."""
-        for leaf in self._leaves:
-            self._pipe.send_bytes(struct.pack('Q', leaf.id))
-            self._pipe.send_bytes(leaf.voronoi_volumes())
-
-    def receive_volumes(self, pipe):
-        r"""Return serialized info from a pipe that was placed there by
-        `enqueue_volumes`.
-
-        Args:
-            pipe (`multiprocessing.Connection`): Receiving end of pipe.
-
-        """
-        dummy_head = np.empty(1, 'uint64')
-        pipe.recv_bytes_into(dummy_head)
-        iid = dummy_head[0]
-        ivol = np.empty(self.get_leaf(iid).npts, 'float64')
-        pipe.recv_bytes_into(ivol)
-        return iid, ivol
-
-    def enqueue_number_of_cells(self):
-        r"""Enqueue resulting number of cells."""
-        for leaf in self._leaves:
-            ncells = leaf.write_tess_to_file()
-            self._pipe.send_bytes(struct.pack('QQ', leaf.id, ncells))
-
-    def receive_number_of_cells(self, pipe):
-        r"""Return serialized info from a pipe that was placed there by
-        `enqueue_number_of_cells`.
-
-        Args:
-            pipe (`multiprocessing.Connection`): Receiving end of pipe.
-
-        """
-        dummy_head = np.empty(2, 'uint64')
-        pipe.recv_bytes_into(dummy_head)
-        return dummy_head[0], dummy_head[1]
-
-    def output_tess(self):
-        r"""Write serialized tessellation info to file for each leaf."""
-        for leaf in self._leaves:
-            ncells = leaf.write_tess_to_file()
-
-    def run(self, test_in_serial=False):
-        r"""Performs tessellation and communication for each leaf on this
-        process."""
-        if self._task in ['triangulate', 'volumes']:
-            self.tessellate_leaves()
-            # Continue exchanges until there are not any particles that need to
-            # be exchanged.
-            while True:
-                with self._count[2].get_lock():
-                    if self._count[2].value == 1:
-                        break
-                # print('Begin', self._proc_idx, self._count[0].value,
-                #       self._count[1].value, self._count[2].value)
-                self.outgoing_points()
-                self.incoming_points()
-                self._lock.acquire()
-                with self._count[0].get_lock():
-                    self._count[0].value += 1
-                # print('Lock acquired: {}/{}'.format(self._count[0].value,
-                #                                     self._num_proc),
-                #       self._count[1].value)
-                if self._count[0].value < self._num_proc:
-                    self._lock.wait()
+        def enqueue_result(self):
+            r"""Enqueue the appropriate result for the given task."""
+            if self._task == 'triangulate':
+                if self._limit_mem:
+                    self.enqueue_number_of_cells()
                 else:
-                    with self._count[1].get_lock():
-                        if self._count[1].value > 0:
-                            with self._count[0].get_lock():
-                                self._count[0].value = 0
-                            self._count[1].value = 0
-                        else:
-                            with self._count[0].get_lock():
-                                self._count[0].value = 0
-                            self._count[1].value = 0
-                            with self._count[2].get_lock():
-                                self._count[2].value = 1
-                    self._lock.notify_all()
-                self._lock.release()
-                # print 'Lock released', self._proc_idx,self._count[2].value
-                if test_in_serial:
+                    self.enqueue_triangulation()
+            elif self._task == 'volumes':
+                self.enqueue_volumes()
+
+        def receive_result(self, pipe):
+            r"""Return serialized info from a pipe that was placed there by
+            `enqueue_result`.
+
+            Args:
+                pipe (`multiprocessing.Connection`): Receiving end of pipe.
+
+            """
+            if self._task == 'triangulate':
+                if self._limit_mem:
+                    out = self.receive_number_of_cells(pipe)
+                else:
+                    out = self.receive_triangulation(pipe)
+            elif self._task == 'volumes':
+                out = self.receive_volumes(pipe)
+            return out
+
+        def enqueue_triangulation(self):
+            r"""Enqueue resulting tessellation."""
+            for leaf in self._leaves:
+                s = leaf.serialize()
+                if s[0].dtype == np.uint32:
+                    dt = 0
+                elif s[0].dtype == np.uint64:
+                    dt = 1
+                # elif s[0].dtype == np.int32:
+                #     dt = 2
+                # elif s[0].dtype == np.int64:
+                #     dt = 3
+                else:
+                    raise Exception("No type found for {}".format(s[0].dtype))
+                self._pipe.send_bytes(
+                    struct.pack('QQQQQ', leaf.id, s[0].shape[0], dt, s[2], s[5]))
+                for _ in range(2) + range(3, 5):
+                    self._pipe.send_bytes(s[_])
+
+        def receive_triangulation(self, pipe):
+            r"""Return serialized info from a pipe that was placed there by
+            `enqueue_triangulation`.
+
+            Args:
+                pipe (`multiprocessing.Connection`): Receiving end of pipe.
+
+            """
+            dt2dtype = {0: np.uint32, 1: np.uint64, 2: np.int32, 3: np.int64}
+            dummy_head = np.empty(5, 'uint64')
+            pipe.recv_bytes_into(dummy_head)
+            iid, ncell, dt, idx_inf, ncell_tot = dummy_head
+            dtype = dt2dtype[dt]
+            s = [np.empty((ncell, self._ndim+1), dtype),
+                 np.empty((ncell, self._ndim+1), dtype),
+                 dtype(idx_inf),
+                 np.empty((ncell, self._ndim+1), 'uint32'),
+                 np.empty(ncell, 'uint64'),
+                 ncell_tot]
+            for _ in range(2) + range(3, 5):
+                pipe.recv_bytes_into(s[_])
+            s = tuple(s)
+            return iid, s
+
+        def enqueue_volumes(self):
+            r"""Enqueue resulting voronoi volumes."""
+            for leaf in self._leaves:
+                self._pipe.send_bytes(struct.pack('Q', leaf.id))
+                self._pipe.send_bytes(leaf.voronoi_volumes())
+
+        def receive_volumes(self, pipe):
+            r"""Return serialized info from a pipe that was placed there by
+            `enqueue_volumes`.
+
+            Args:
+                pipe (`multiprocessing.Connection`): Receiving end of pipe.
+
+            """
+            dummy_head = np.empty(1, 'uint64')
+            pipe.recv_bytes_into(dummy_head)
+            iid = dummy_head[0]
+            ivol = np.empty(self.get_leaf(iid).npts, 'float64')
+            pipe.recv_bytes_into(ivol)
+            return iid, ivol
+
+        def enqueue_number_of_cells(self):
+            r"""Enqueue resulting number of cells."""
+            for leaf in self._leaves:
+                ncells = leaf.write_tess_to_file()
+                self._pipe.send_bytes(struct.pack('QQ', leaf.id, ncells))
+
+        def receive_number_of_cells(self, pipe):
+            r"""Return serialized info from a pipe that was placed there by
+            `enqueue_number_of_cells`.
+
+            Args:
+                pipe (`multiprocessing.Connection`): Receiving end of pipe.
+
+            """
+            dummy_head = np.empty(2, 'uint64')
+            pipe.recv_bytes_into(dummy_head)
+            return dummy_head[0], dummy_head[1]
+
+        def output_tess(self):
+            r"""Write serialized tessellation info to file for each leaf."""
+            for leaf in self._leaves:
+                ncells = leaf.write_tess_to_file()
+
+        def run(self, test_in_serial=False):
+            r"""Performs tessellation and communication for each leaf on this
+            process."""
+            if self._task in ['triangulate', 'volumes']:
+                self.tessellate_leaves()
+                # Continue exchanges until there are not any particles that need to
+                # be exchanged.
+                while True:
                     with self._count[2].get_lock():
-                        self._count[2].value = 1
-            self.enqueue_result()
-        # Clean up leaves
-        for leaf in self._leaves:
-            leaf.remove_tess()
-        # Synchronize to ensure rapid receipt
-        if test_in_serial:
+                        if self._count[2].value == 1:
+                            break
+                    # print('Begin', self._proc_idx, self._count[0].value,
+                    #       self._count[1].value, self._count[2].value)
+                    self.outgoing_points()
+                    self.incoming_points()
+                    self._lock.acquire()
+                    with self._count[0].get_lock():
+                        self._count[0].value += 1
+                    # print('Lock acquired: {}/{}'.format(self._count[0].value,
+                    #                                     self._num_proc),
+                    #       self._count[1].value)
+                    if self._count[0].value < self._num_proc:
+                        self._lock.wait()
+                    else:
+                        with self._count[1].get_lock():
+                            if self._count[1].value > 0:
+                                with self._count[0].get_lock():
+                                    self._count[0].value = 0
+                                self._count[1].value = 0
+                            else:
+                                with self._count[0].get_lock():
+                                    self._count[0].value = 0
+                                self._count[1].value = 0
+                                with self._count[2].get_lock():
+                                    self._count[2].value = 1
+                        self._lock.notify_all()
+                    self._lock.release()
+                    # print 'Lock released', self._proc_idx,self._count[2].value
+                    if test_in_serial:
+                        with self._count[2].get_lock():
+                            self._count[2].value = 1
+                self.enqueue_result()
+            # Clean up leaves
+            for leaf in self._leaves:
+                leaf.remove_tess()
+            # Synchronize to ensure rapid receipt
+            if test_in_serial:
+                with self._count[0].get_lock():
+                    self._count[0].value = self._num_proc - 1
+            self._lock.acquire()
             with self._count[0].get_lock():
-                self._count[0].value = self._num_proc - 1
-        self._lock.acquire()
-        with self._count[0].get_lock():
-            self._count[0].value += 1
-        if self._count[0].value < self._num_proc:
-            self._lock.wait()
-        else:
-            self._lock.notify_all()
-        self._lock.release()
-        self._done = True
+                self._count[0].value += 1
+            if self._count[0].value < self._num_proc:
+                self._lock.wait()
+            else:
+                self._lock.notify_all()
+            self._lock.release()
+            self._done = True
 
 
 class ParallelLeaf(object):
