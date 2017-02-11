@@ -19,6 +19,3 @@ include cgal4py/delaunay/c_parallel_delaunayD.hpp
 include cgal4py/delaunay/tools.pyx
 include cgal4py/delaunay/tools.pxd
 include cgal4py/delaunay/c_tools.hpp
-include cgal4py/utils.pyx
-include cgal4py/utils.pxd
-include cgal4py/c_utils.hpp

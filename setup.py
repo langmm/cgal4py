@@ -1,9 +1,12 @@
 from setuptools import setup
+import distutils
 from distutils.core import setup
 from distutils.extension import Extension
 import distutils.sysconfig
 import numpy
-import os, copy
+import os
+import copy
+import sys
 try:
     from Cython.Build import cythonize
     from Cython.Distutils import build_ext
@@ -24,6 +27,25 @@ for key, value in cfg_vars.items():
     if type(value) == str:
         cfg_vars[key] = value.replace("-Wstrict-prototypes", "")
 
+# Find eigen3 and boost libraries
+include_dir = cfg_vars['CONFINCLUDEDIR']
+include_dirs = [numpy.get_include(), include_dir]
+include_files = os.listdir(include_dir)
+if 'eigen3' in include_files:
+    include_dirs.append(os.path.join(include_dir, 'eigen3'))
+else:
+    if os.path.isdir('/usr/include/eigen3'):
+        include_dirs.append('/usr/include/eigen3')
+    else:
+        raise Exception("Install eigen3")
+if 'boost' in include_files:
+    include_dirs.append(os.path.join(include_dir, 'boost'))
+else:
+    if os.path.isdir('/usr/include/boost'):
+        include_dirs.append('/usr/include/boost')
+    else:
+        raise Exception("Install boost")
+
 # Needed for line_profiler - disable for production code
 if not RTDFLAG and not release and use_cython:
     try:
@@ -37,7 +59,7 @@ if not RTDFLAG and not release and use_cython:
 
 # Set generic extension options
 ext_options = dict(language="c++",
-                   include_dirs=[numpy.get_include()],
+                   include_dirs=include_dirs,#[numpy.get_include()],
                    libraries=[],
                    extra_link_args=[],
                    extra_compile_args=["-std=gnu++11"],
@@ -197,7 +219,7 @@ setup(name = 'cgal4py',
       # package_dir = {'cgal4py':'cgal4py'}, # maybe comment this out
       package_data = {'cgal4py': ['README.md', 'README.rst'],
                       'cgal4py.delaunay': src_include},
-      version = '0.1.5',
+      version = '0.1.7',
       description = 'Python interface for CGAL Triangulations',
       long_description = long_description,
       author = 'Meagan Lang',

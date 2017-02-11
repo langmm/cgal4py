@@ -34,6 +34,21 @@ else:
                   "Update CGAL to at least version 3.5 to enable this " +
                   "feature.")
 
+_include_dir = distutils.sysconfig.get_config_var('CONFINCLUDEDIR')
+_include_dirs = []
+_drive = os.path.abspath(os.sep)
+if 'eigen3' in os.listdir(_include_dir):
+    _include_dirs.append(os.path.join(_include_dir, 'eigen3'))
+elif 'eigen3' in os.listdir(os.path.join(_drive, 'usr', 'include')):
+    _include_dirs.append(os.path.join(_drive, 'usr', 'include', 'eigen3'))
+else:
+    raise Exception("eigen3 is not installed.")
+if 'boost' in os.listdir(_include_dir):
+    _include_dirs.append(os.path.join(_include_dir, 'boost'))
+elif 'boost' in os.listdir(os.path.join(_drive, 'usr', 'include')):
+    _include_dirs.append(os.path.join(_drive, 'usr', 'include', 'boost'))
+else:
+    raise Exception("boost is not installed.")
 
 _delaunay_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -388,7 +403,7 @@ def _make_ext(dim, periodic=False, bit64=False, parallel=False,
     if generated:
         extra_compile_args = []
         extra_link_args = []
-        include_dirs = []
+        include_dirs = _include_dirs#[]
         if bit64:
             includes = [
                 _delaunay_filename('pyx', dim, periodic=periodic,
