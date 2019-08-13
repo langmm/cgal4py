@@ -18,14 +18,13 @@ For running in parallel you will need the above plus:
 * MPI (either [MPICH](https://www.mpich.org/) or [OpenMPI](https://www.open-mpi.org/))
 * [mpi4py](http://pythonhosted.org/mpi4py/)
 * [multiprocessing](https://docs.python.org/2/library/multiprocessing.html)
-* [cykdtree](https://bitbucket.org/langmm/cykdtree)
+* [cykdtree](https://github.com/cykdtree/cykdtree)
 
 ## Installation ##
 
 ### From Source ###
-1. Clone the cgal4py package using [Mercurial](https://www.mercurial-scm.org/).
-```$ hg clone https://[username]@bitbucket.org/[username]/cgal4py``` 
-where ```[username]``` should be replaced with your Bitbucket username. 
+1. Clone the cgal4py package using [git](https://git-scm.com/).
+```$ git clone https://github.com/langmm/cgal4py.git```
 2. From the distribution directory, execute the install script. ```$ python setup.py install```
 If you do not have administrative privileges, add the flag ```--user``` to the above command and the package will be installed in your [user package directory](https://docs.python.org/2/install/#alternate-installation-the-user-scheme).
 
